@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useState, useEffect, useTransition, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Loader2, Play, CheckCircle, Save, AlertTriangle, Eye, X, HelpCircle, Lock, RotateCcw } from 'lucide-react';
 import Navbar from '../../../components/Navbar';
@@ -94,6 +94,10 @@ export default function ReviewWorkspace() {
   // Auth and Loading States
   const [isChecking, setIsChecking] = useState(true);
   const [isPending, startTransition] = useTransition();
+
+  // Polling refs (BUG 2 fix)
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isFetchingRef = useRef(false);
 
   // Submission Data
   const [submission, setSubmission] = useState<SubmissionData | null>(null);
@@ -206,18 +210,49 @@ export default function ReviewWorkspace() {
     verifyUser();
   }, [router, submissionId]);
 
-  // Polling logic when the submission is 'processing'
+  // Polling logic when the submission is 'processing' (BUG 2 fix)
   useEffect(() => {
-    if (!submission || submission.ai_status !== 'processing') return;
+    if (!submission || (submission.ai_status !== 'processing')) {
+      // Stop polling when not processing
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      return;
+    }
 
-    const interval = setInterval(() => {
+    // Only create a new interval if one doesn't already exist
+    if (pollingRef.current) return;
+
+    pollingRef.current = setInterval(() => {
+      // Prevent overlapping fetches
+      if (isFetchingRef.current) return;
       loadWorkspaceDetails();
-    }, 2000);
+    }, 3000);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
   }, [submission]);
 
-  const loadWorkspaceDetails = async () => {
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, []);
+
+  const loadWorkspaceDetails = useCallback(async () => {
+    // Prevent overlapping fetches (BUG 2 fix)
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
     setIsLoadingWorkspace(true);
     setErrorMsg(null);
     try {
@@ -238,12 +273,11 @@ export default function ReviewWorkspace() {
         .eq('id', submissionId)
         .maybeSingle();
 
-      console.log("RAW SUBMISSION", subData);
-
       if (subError) throw subError;
       if (!subData) {
         setErrorMsg('Data pengumpulan tugas tidak ditemukan.');
         setIsLoadingWorkspace(false);
+        isFetchingRef.current = false;
         return;
       }
 
@@ -347,8 +381,9 @@ export default function ReviewWorkspace() {
       setErrorMsg('Gagal memuat detail lembar jawaban mahasiswa.');
     } finally {
       setIsLoadingWorkspace(false);
+      isFetchingRef.current = false;
     }
-  };
+  }, [submissionId]);
 
   // Handle manual score change
   const handleManualScoreChange = (label: string, value: string) => {

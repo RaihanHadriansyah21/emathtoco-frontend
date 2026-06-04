@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Search, Loader2, ArrowLeft, ArrowRight, BookOpen, Clock, Calendar, CheckSquare, Cpu, Download, FileSpreadsheet, Lock } from 'lucide-react';
+import { Search, Loader2, ArrowLeft, ArrowRight, BookOpen, Clock, Calendar, CheckSquare, Cpu, Download, FileSpreadsheet, Lock, Zap, ChevronDown, CheckCircle, X } from 'lucide-react';
 import Navbar from '../../../components/Navbar';
 import BatchAIModal from '../../../components/BatchAIModal';
 import ExportCSVModal from '../../../components/ExportCSVModal';
@@ -66,6 +66,16 @@ export default function LecturerCoursePortal() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [isRunningAI, setIsRunningAI] = useState(false);
   const { toasts, toast, removeToast } = useToast();
+
+  // Model Selection Modal state (BUG 1 fix)
+  const [showModelSelectModal, setShowModelSelectModal] = useState(false);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [selectedBatchModel, setSelectedBatchModel] = useState<string | null>(null);
+
+  // Polling ref to prevent duplicate intervals (BUG 2 fix)
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isFetchingRef = useRef(false);
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState('');
@@ -157,19 +167,51 @@ export default function LecturerCoursePortal() {
     verifyAccess();
   }, [router, courseId]);
  
-  // Polling logic when any submission is 'processing'
+  // Polling logic when any submission is 'processing' (BUG 2 fix)
   useEffect(() => {
     const hasProcessing = submissions.some(s => s.ai_status === 'processing');
-    if (!hasProcessing) return;
 
-    const interval = setInterval(() => {
+    if (!hasProcessing) {
+      // Stop polling when nothing is processing
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      return;
+    }
+
+    // Only create a new interval if one doesn't already exist
+    if (pollingRef.current) return;
+
+    pollingRef.current = setInterval(() => {
+      // Prevent overlapping fetches
+      if (isFetchingRef.current) return;
       fetchSubmissions();
-    }, 2000);
+    }, 3000);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
   }, [submissions]);
 
-  const fetchSubmissions = async () => {
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, []);
+
+  const fetchSubmissions = useCallback(async () => {
+    // Prevent overlapping fetches (BUG 2 fix)
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
     setIsLoadingData(true);
     setErrorMsg(null);
     try {
@@ -202,17 +244,17 @@ export default function LecturerCoursePortal() {
 
       if (error) throw error;
 
-      console.log("RAW SUBMISSION", data);
-
       setSubmissions((data as unknown as Submission[]) || []);
     } catch (err) {
       console.error('Error fetching submissions:', err);
       setErrorMsg('Gagal mengambil data pengumpulan tugas mahasiswa.');
     } finally {
       setIsLoadingData(false);
+      isFetchingRef.current = false;
     }
-  };
+  }, [courseId]);
 
+  // BUG 1 fix: Open model selection modal instead of running directly
   const handleRunAIBatch = async () => {
     const eligible = submissions.filter(s => (!s.ai_status || s.ai_status === 'pending') && s.ai_status !== 'finalized');
     if (eligible.length === 0) {
@@ -220,33 +262,62 @@ export default function LecturerCoursePortal() {
       return;
     }
 
+    // Fetch available models from backend
+    setIsLoadingModels(true);
+    setSelectedBatchModel(null);
+    try {
+      const res = await apiGet('/ai-models');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.models) {
+          setAvailableModels(data.models.map((m: { name: string }) => m.name));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch AI models:', err);
+      toast.error('Gagal', 'Tidak dapat memuat daftar model AI dari backend.');
+      setIsLoadingModels(false);
+      return;
+    }
+    setIsLoadingModels(false);
+    setShowModelSelectModal(true);
+  };
+
+  // Actually run batch after model is selected
+  const executeAIBatch = async () => {
+    if (!selectedBatchModel) return;
+    setShowModelSelectModal(false);
+
+    const eligible = submissions.filter(s => (!s.ai_status || s.ai_status === 'pending') && s.ai_status !== 'finalized');
+    if (eligible.length === 0) return;
+
     setIsRunningAI(true);
     let successCount = 0;
     let failCount = 0;
 
-      for (const sub of eligible) {
-        try {
-          const res = await apiPost(`/predict/${sub.id}`);
-          if (res.ok) {
-            successCount++;
-          } else {
-            failCount++;
-          }
-        } catch (err: any) {
-          console.error("AI Backend Error:", err);
-          const userFriendlyMsg = (err instanceof TypeError || (err.message && err.message.includes("fetch")))
-            ? "Backend tidak dapat dihubungi. Pastikan server FastAPI berjalan dan IP backend benar."
-            : `Gagal memprediksi tugas ${sub.id}.`;
-          toast.error("AI Backend Error", userFriendlyMsg);
+    for (const sub of eligible) {
+      try {
+        const res = await apiPost(`/predict/${sub.id}?model=${selectedBatchModel}`);
+        if (res.ok) {
+          successCount++;
+        } else {
           failCount++;
         }
+      } catch (err: any) {
+        console.error("AI Backend Error:", err);
+        const userFriendlyMsg = (err instanceof TypeError || (err.message && err.message.includes("fetch")))
+          ? "Backend tidak dapat dihubungi. Pastikan server FastAPI berjalan dan IP backend benar."
+          : `Gagal memprediksi tugas ${sub.id}.`;
+        toast.error("AI Backend Error", userFriendlyMsg);
+        failCount++;
       }
+    }
 
     setIsRunningAI(false);
     if (failCount > 0) {
       toast.warning('Selesai dengan error', `${successCount} sukses, ${failCount} gagal.`);
     } else {
-      toast.success('Sukses', `Berhasil menjalankan AI untuk ${successCount} tugas.`);
+      toast.success('Sukses', `Berhasil menjalankan AI (${selectedBatchModel}) untuk ${successCount} tugas.`);
     }
     fetchSubmissions();
   };
@@ -350,6 +421,74 @@ export default function LecturerCoursePortal() {
     <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-16 relative overflow-hidden flex flex-col">
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
+
+      {/* BUG 1 fix: Model Selection Modal */}
+      {showModelSelectModal && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 dark:bg-[#0A0A0F] dark:border-neutral-800 rounded-2xl max-w-md w-full shadow-[0_0_60px_rgba(168,85,247,0.06)] overflow-hidden">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100 dark:border-neutral-900">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center flex-shrink-0">
+                  <Cpu className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">Pilih Model AI</h2>
+                  <p className="text-[11px] text-slate-500 dark:text-neutral-500 font-mono tracking-wider mt-0.5">
+                    {submissions.filter(s => (!s.ai_status || s.ai_status === 'pending') && s.ai_status !== 'finalized').length} tugas akan diproses
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setShowModelSelectModal(false)} className="text-slate-400 dark:text-neutral-500 hover:text-slate-700 dark:hover:text-white transition-colors p-1 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              {isLoadingModels ? (
+                <div className="flex items-center justify-center py-8 gap-2">
+                  <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
+                  <span className="text-sm text-slate-500 dark:text-neutral-400">Memuat model...</span>
+                </div>
+              ) : (
+                <>
+                  <label className="block text-[10px] font-mono font-bold tracking-widest text-slate-400 dark:text-neutral-500 uppercase mb-2">
+                    Model AI yang Tersedia
+                  </label>
+                  <div className="space-y-2">
+                    {availableModels.map(model => (
+                      <button
+                        key={model}
+                        onClick={() => setSelectedBatchModel(model)}
+                        className={`w-full text-left px-4 py-3 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
+                          selectedBatchModel === model
+                            ? 'bg-purple-500/10 border-purple-500/40 text-purple-600 dark:text-purple-300'
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300 dark:bg-neutral-950 dark:border-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-700'
+                        }`}
+                      >
+                        <Zap className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                        <span className="font-semibold text-sm">{model}</span>
+                        {selectedBatchModel === model && (
+                          <CheckCircle className="w-4 h-4 ml-auto text-purple-400" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              <button
+                onClick={executeAIBatch}
+                disabled={!selectedBatchModel || isLoadingModels}
+                className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-mono text-sm font-bold tracking-wider transition-all duration-300 cursor-pointer bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-[0_0_30px_rgba(168,85,247,0.15)] hover:shadow-[0_0_40px_rgba(168,85,247,0.25)] disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Cpu className="w-4 h-4" />
+                <span>Mulai Batch Processing</span>
+              </button>
+              {!selectedBatchModel && !isLoadingModels && (
+                <p className="text-xs text-amber-500 dark:text-amber-400 text-center">Pilih model AI terlebih dahulu untuk memulai batch.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Batch AI Modal */}
       <BatchAIModal
