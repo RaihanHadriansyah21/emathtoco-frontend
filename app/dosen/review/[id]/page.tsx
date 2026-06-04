@@ -99,6 +99,12 @@ export default function ReviewWorkspace() {
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isFetchingRef = useRef(false);
 
+  // New state variables for UX improvement
+  const [isPredicting, setIsPredicting] = useState(false);
+  const [showSuccessBanner, setShowSuccessBanner] = useState(false);
+  const [aiSuccessModel, setAiSuccessModel] = useState('');
+  const [aiErrorMessage, setAiErrorMessage] = useState<string | null>(null);
+
   // Submission Data
   const [submission, setSubmission] = useState<SubmissionData | null>(null);
   const [slots, setSlots] = useState<SlotState[]>([]);
@@ -144,6 +150,8 @@ export default function ReviewWorkspace() {
   const [isRequestingReupload, setIsRequestingReupload] = useState(false);
   const [isAccessDenied, setIsAccessDenied] = useState(false);
   const [courseId, setCourseId] = useState<string | null>(null);
+
+  const isAIProcessing = isPredicting || submission?.ai_status === 'processing' || submission?.ai_status === 'ai_pending' || submission?.ai_status === 'ai_running';
 
   useEffect(() => {
     // 1. Verify lecturer role
@@ -304,7 +312,29 @@ export default function ReviewWorkspace() {
           formattedSub.nilai_akhir = aiResultsData.nilai_akhir;
         }
       }
-      setSubmission(formattedSub);
+      // Check if previously processing to trigger success/error banner (Requirement 5, 6, 7)
+      setSubmission((prevSubmission) => {
+        const prevStatus = prevSubmission?.ai_status;
+        const newStatus = formattedSub.ai_status;
+
+        const isPrevProcessing = prevStatus === 'processing' || prevStatus === 'ai_pending' || prevStatus === 'ai_running' || isPredicting;
+        const isNewSuccess = newStatus === 'completed' || newStatus === 'partial';
+
+        if (isPrevProcessing && isNewSuccess) {
+          setAiSuccessModel(formattedSub.model_ai || selectedModel);
+          setShowSuccessBanner(true);
+          setTimeout(() => {
+            setShowSuccessBanner(false);
+          }, 3000);
+          setIsPredicting(false);
+        } else if (isPrevProcessing && newStatus === 'failed') {
+          setAiErrorMessage("Silakan coba kembali.");
+          setIsPredicting(false);
+        }
+
+        return formattedSub;
+      });
+
       if (formattedSub.model_ai) {
         setSelectedModel(formattedSub.model_ai);
       }
@@ -383,7 +413,7 @@ export default function ReviewWorkspace() {
       setIsLoadingWorkspace(false);
       isFetchingRef.current = false;
     }
-  }, [submissionId]);
+  }, [submissionId, selectedModel, isPredicting]);
 
   // Handle manual score change
   const handleManualScoreChange = (label: string, value: string) => {
@@ -449,15 +479,26 @@ export default function ReviewWorkspace() {
   // AI processing caller
   const runAISimulation = async () => {
     if (!submission) return;
-    setIsSimulatingAI(true);
-    setAiSimStep(1);
+
+    // Cegah double submit (Requirement 8)
+    const currentStatus = submission.ai_status || submission.status_submit;
+    if (
+      currentStatus === 'processing' ||
+      currentStatus === 'ai_pending' ||
+      currentStatus === 'ai_running' ||
+      isPredicting
+    ) {
+      return;
+    }
+
+    setIsPredicting(true);
+    setAiErrorMessage(null);
+    setShowSuccessBanner(false);
+
+    // Optimistically update local state so the UI updates immediately
+    setSubmission(prev => prev ? { ...prev, ai_status: 'processing', model_ai: selectedModel } : null);
 
     try {
-      // Start visual timeline steps
-      const step2 = setTimeout(() => setAiSimStep(2), 500);
-      const step3 = setTimeout(() => setAiSimStep(3), 1000);
-      const step4 = setTimeout(() => setAiSimStep(4), 1500);
-
       // Call actual backend AI endpoint
       const res = await apiPost(`/predict/${submission.id}?model=${selectedModel}`);
 
@@ -465,21 +506,24 @@ export default function ReviewWorkspace() {
         throw new Error('Backend AI predict failed');
       }
 
-      // Ensure steps complete visually
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Trigger success status (Requirement 6)
+      setAiSuccessModel(selectedModel);
+      setShowSuccessBanner(true);
+      setTimeout(() => {
+        setShowSuccessBanner(false);
+      }, 3000);
 
-      setIsSimulatingAI(false);
-      setSuccessMsg('Analisis AI berhasil dijalankan!');
-      toast.success('Sukses', 'Analisis AI selesai dijalankan.');
+      // Reload workspace details to show new predictions
       loadWorkspaceDetails();
     } catch (err: any) {
       console.error('AI Backend Error:', err);
-      const userFriendlyMsg = (err instanceof TypeError || (err.message && err.message.includes("fetch")))
-        ? "Backend tidak dapat dihubungi. Pastikan server FastAPI berjalan dan IP backend benar."
-        : "Gagal menjalankan analisis AI pada backend.";
-      setErrorMsg(userFriendlyMsg);
-      toast.error('Gagal', userFriendlyMsg);
-      setIsSimulatingAI(false);
+      // Trigger failure status (Requirement 7)
+      setAiErrorMessage("Silakan coba kembali.");
+      // Rollback status to null / failed
+      setSubmission(prev => prev ? { ...prev, ai_status: 'failed' } : null);
+      toast.error('Gagal', 'Gagal menjalankan analisis AI pada backend.');
+    } finally {
+      setIsPredicting(false);
     }
   };
 
@@ -1104,8 +1148,8 @@ export default function ReviewWorkspace() {
                   <select
                     value={selectedModel}
                     onChange={(e) => setSelectedModel(e.target.value)}
-                    disabled={isReadOnly}
-                    className="w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 hover:border-slate-350 dark:hover:border-neutral-800 text-slate-700 dark:text-neutral-300 rounded-xl p-3 text-sm focus:outline-none cursor-pointer"
+                    disabled={isReadOnly || isAIProcessing}
+                    className={`w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 hover:border-slate-350 dark:hover:border-neutral-800 text-slate-700 dark:text-neutral-300 rounded-xl p-3 text-sm focus:outline-none cursor-pointer ${(isReadOnly || isAIProcessing) ? 'opacity-60 cursor-not-allowed' : ''}`}
                   >
                     <option value="MobileNetV2">MobileNetV2 (Ringan & Cepat)</option>
                     <option value="DenseNet201">DenseNet201 (Akurasi Tinggi)</option>
@@ -1113,13 +1157,64 @@ export default function ReviewWorkspace() {
                   </select>
                 </div>
 
+                {/* Status Panels (placed right above the button) */}
+                {(isAIProcessing || showSuccessBanner || aiErrorMessage) && (
+                  <div className="space-y-3">
+                    {/* 1. Loading Panel */}
+                    {isAIProcessing && (
+                      <div className="bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900/50 rounded-xl p-4 flex items-center gap-3 animate-pulse">
+                        <Loader2 className="w-5 h-5 text-purple-600 dark:text-purple-400 animate-spin flex-shrink-0" />
+                        <div className="text-xs font-semibold text-purple-700 dark:text-purple-300">
+                          🤖 {submission?.model_ai || selectedModel} sedang menganalisis jawaban mahasiswa
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 2. Success Panel */}
+                    {showSuccessBanner && (
+                      <div className="bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-250 dark:border-emerald-900/50 rounded-xl p-4 flex items-start gap-3">
+                        <span className="text-lg flex-shrink-0">✅</span>
+                        <div className="space-y-0.5">
+                          <div className="text-xs font-bold text-emerald-800 dark:text-emerald-400">Prediksi selesai</div>
+                          <div className="text-[11px] text-emerald-600 dark:text-emerald-500">
+                            {aiSuccessModel} berhasil menyelesaikan penilaian
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 3. Error Panel */}
+                    {aiErrorMessage && (
+                      <div className="bg-red-50/60 dark:bg-red-950/20 border border-red-250 dark:border-red-900/50 rounded-xl p-4 flex items-start gap-3">
+                        <span className="text-lg flex-shrink-0">❌</span>
+                        <div className="space-y-0.5 flex-grow">
+                          <div className="text-xs font-bold text-red-800 dark:text-red-400">Prediksi gagal</div>
+                          <div className="text-[11px] text-red-650 dark:text-red-500">
+                            {aiErrorMessage}
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => setAiErrorMessage(null)} 
+                          className="text-slate-400 dark:text-neutral-500 hover:text-slate-700 dark:hover:text-white transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <button
                   onClick={runAISimulation}
-                  disabled={isSimulatingAI || isReadOnly}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-600 hover:via-blue-600 hover:to-indigo-700 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all duration-300 shadow-lg shadow-cyan-500/10 disabled:opacity-50 text-sm tracking-widest cursor-pointer active:scale-[0.99] disabled:cursor-not-allowed"
+                  disabled={isAIProcessing || isReadOnly}
+                  className={`w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-600 hover:via-blue-600 hover:to-indigo-700 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all duration-300 shadow-lg shadow-cyan-500/10 text-sm tracking-widest cursor-pointer active:scale-[0.99] ${(isAIProcessing || isReadOnly) ? 'opacity-60 cursor-not-allowed' : ''}`}
                 >
-                  <Play className="w-4 h-4 fill-white" />
-                  <span>PROSES DENGAN AI</span>
+                  {isAIProcessing ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  ) : (
+                    <Play className="w-4 h-4 fill-white" />
+                  )}
+                  <span>{isAIProcessing ? 'Memulai Prediksi...' : 'PROSES DENGAN AI'}</span>
                 </button>
               </div>
             )}
@@ -1247,37 +1342,6 @@ export default function ReviewWorkspace() {
         </div>
       )}
 
-      {/* AI SIMULATION LOADING SCREEN */}
-      {isSimulatingAI && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6 text-center">
-          <div className="w-24 h-24 bg-cyan-500/10 border border-cyan-500/30 rounded-full flex items-center justify-center mb-8 relative shadow-[0_0_50px_rgba(6,182,212,0.15)]">
-            <Loader2 className="w-12 h-12 text-cyan-400 animate-spin" />
-            <div className="absolute inset-0 border-2 border-cyan-500/20 rounded-full animate-ping pointer-events-none"></div>
-          </div>
-
-          <h2 className="text-2xl font-extrabold text-white tracking-wide animate-pulse">🤖 Menganalisis Lembar Jawaban</h2>
-          <p className="text-neutral-500 text-sm mt-2 max-w-sm">Jaringan Saraf Tiruan sedang melakukan penafsiran tulisan tangan menggunakan model <span className="text-cyan-400 font-semibold">{selectedModel}</span>...</p>
-
-          {/* SIMULATED PIPELINE LOGS */}
-          <div className="mt-8 max-w-md w-full bg-[#050508] border border-neutral-900 rounded-xl p-4 font-mono text-left text-xs text-neutral-500 space-y-1.5 shadow-inner">
-            <div className="text-[10px] text-neutral-600 mb-2 border-b border-neutral-900 pb-1.5 uppercase tracking-wider font-bold">
-              [Simulated Pipeline Progress]
-            </div>
-            <div className={aiSimStep >= 1 ? "text-cyan-400" : ""}>
-              {aiSimStep >= 1 ? "✓" : "○"} [1/4] Menginisialisasi Model AI {selectedModel}...
-            </div>
-            <div className={aiSimStep >= 2 ? "text-cyan-400" : ""}>
-              {aiSimStep >= 2 ? "✓" : "○"} [2/4] Melakukan segmentasi lembar jawaban (24 slot)...
-            </div>
-            <div className={aiSimStep >= 3 ? "text-cyan-400" : ""}>
-              {aiSimStep >= 3 ? "✓" : "○"} [3/4] Mengekstraksi pola langkah matematika...
-            </div>
-            <div className={aiSimStep >= 4 ? "text-cyan-400" : ""}>
-              {aiSimStep >= 4 ? "✓" : "○"} [4/4] Menghasilkan nilai dan feedback prediksi...
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
