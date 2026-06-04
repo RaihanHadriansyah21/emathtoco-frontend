@@ -1,4 +1,4 @@
-import { API_URL } from '@/lib/config';
+import { apiGet } from '@/lib/api-client';
 
 export interface AvailableModelsResponse {
   success: boolean;
@@ -13,11 +13,7 @@ export interface AvailableModelsResponse {
  */
 export async function fetchAvailableModels(): Promise<AvailableModelsResponse> {
   try {
-    const res = await fetch(`${API_URL}/ai-models`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
+    const res = await apiGet('/ai-models', {
       cache: 'no-store',
     });
 

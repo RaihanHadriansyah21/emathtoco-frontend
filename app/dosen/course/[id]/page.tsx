@@ -10,7 +10,7 @@ import ToastContainer from '../../../components/Toast';
 import { useToast } from '@/app/hooks/useToast';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
-import { API_URL } from '@/lib/config';
+import { apiGet, apiPost } from '@/lib/api-client';
 
 interface StudentProfile {
   nama_lengkap: string;
@@ -130,7 +130,7 @@ export default function LecturerCoursePortal() {
 
         // Fetch student count from backend
         try {
-          const statsRes = await fetch(`${API_URL}/lecturer/course/${courseId}/stats`);
+          const statsRes = await apiGet(`/lecturer/course/${courseId}/stats`);
           if (statsRes.ok) {
             const statsData = await statsRes.json();
             setTotalStudents(statsData.total_students);
@@ -226,9 +226,7 @@ export default function LecturerCoursePortal() {
 
       for (const sub of eligible) {
         try {
-          const res = await fetch(`${API_URL}/predict/${sub.id}`, {
-            method: 'POST'
-          });
+          const res = await apiPost(`/predict/${sub.id}`);
           if (res.ok) {
             successCount++;
           } else {

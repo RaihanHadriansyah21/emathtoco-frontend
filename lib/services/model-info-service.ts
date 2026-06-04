@@ -1,4 +1,4 @@
-import { API_URL } from '@/lib/config';
+import { apiGet } from '@/lib/api-client';
 
 // ============================================================
 // EMATHTOCO — Model Info Service
@@ -26,11 +26,7 @@ export interface ModelsInfoResponse {
  */
 export async function fetchModelsInfo(): Promise<ModelsInfoResponse> {
   try {
-    const res = await fetch(`${API_URL}/ai-models`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
+    const res = await apiGet('/ai-models', {
       cache: 'no-store',
     });
 

@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import { useToast } from '@/app/hooks/useToast';
 import ToastContainer from '@/app/components/Toast';
-import { API_URL } from '@/lib/config';
+import { apiGet, apiPost } from '@/lib/api-client';
 
 // Helper to generate the 24 section slots (1a - 4f)
 const generateSlots = () => {
@@ -250,7 +250,7 @@ export default function ReviewWorkspace() {
       // Fetch AI results from backend API
       let aiResultsData: any = null;
       try {
-        const aiRes = await fetch(`${API_URL}/submission/${submissionId}/results`);
+        const aiRes = await apiGet(`/submission/${submissionId}/results`);
         if (aiRes.ok) {
           aiResultsData = await aiRes.json();
           setTotalAIScore(aiResultsData.nilai_akhir);
@@ -424,9 +424,7 @@ export default function ReviewWorkspace() {
       const step4 = setTimeout(() => setAiSimStep(4), 1500);
 
       // Call actual backend AI endpoint
-      const res = await fetch(`${API_URL}/predict/${submission.id}?model=${selectedModel}`, {
-        method: 'POST'
-      });
+      const res = await apiPost(`/predict/${submission.id}?model=${selectedModel}`);
 
       if (!res.ok) {
         throw new Error('Backend AI predict failed');
@@ -490,9 +488,7 @@ export default function ReviewWorkspace() {
 
       // Call Backend API to set status to reviewed
       try {
-        const backendRes = await fetch(`${API_URL}/submission/${submission.id}/reviewed`, {
-          method: 'POST'
-        });
+        const backendRes = await apiPost(`/submission/${submission.id}/reviewed`);
         if (!backendRes.ok) {
           console.warn('Backend API reviewed status update failed:', backendRes.statusText);
         }
@@ -567,9 +563,7 @@ export default function ReviewWorkspace() {
 
       // Call Backend API to set status to finalized
       try {
-        const backendRes = await fetch(`${API_URL}/submission/${submission.id}/finalize`, {
-          method: 'POST'
-        });
+        const backendRes = await apiPost(`/submission/${submission.id}/finalize`);
         if (!backendRes.ok) {
           console.warn('Backend API finalize status update failed:', backendRes.statusText);
         }
