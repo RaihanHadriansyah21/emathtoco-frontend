@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Apply smooth transitions across color variables, backgrounds, and borders for high-fidelity theme switching */
+body, header, main, table, tr, th, td, div, button, input, textarea, select, span, p, h1, h2, h3, h4, h5, h6, option {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, box-shadow;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+
+@keyframes float-blue {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translate(60px, -40px) scale(1.15);
+    opacity: 1;
+  }
+}
+
+@keyframes float-purple {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate(-50px, 50px) scale(1.1);
+    opacity: 0.9;
+  }
+}
+
+.animate-float-blue {
+  animation: float-blue 16s ease-in-out infinite;
+}
+
+.animate-float-purple {
+  animation: float-purple 20s ease-in-out infinite;
+}
+
+@keyframes pop-success {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-pop-success {
+  animation: pop-success 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Global Custom Scrollbar Styles */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.dark * {
+  scrollbar-color: #0e7490 #020205;
+}
+
+/* Webkit Scrollbars (Chrome, Safari, Edge, Opera) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #020205;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+  border: 2px solid #f1f5f9;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #0e7490;
+  border-radius: 9999px;
+  border: 2px solid #020205;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #06b6d4;
+}

@@ -1,0 +1,1254 @@
+'use client';
+
+import React, { useState, useEffect, useTransition } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { ArrowLeft, Loader2, Play, CheckCircle, Save, AlertTriangle, Eye, X, HelpCircle, Lock, RotateCcw } from 'lucide-react';
+import Navbar from '../../../components/Navbar';
+import { supabase } from '@/lib/supabase';
+import { normalizeRole } from '@/lib/utils';
+import { useToast } from '@/app/hooks/useToast';
+import ToastContainer from '@/app/components/Toast';
+import { API_URL } from '@/lib/config';
+
+// Helper to generate the 24 section slots (1a - 4f)
+const generateSlots = () => {
+  const list = [];
+  const bagian = ['a', 'b', 'c', 'd', 'e', 'f'];
+  for (let nomor = 1; nomor <= 4; nomor++) {
+    for (let b of bagian) {
+      list.push({ label: `${nomor}${b}`, nomor_soal: nomor, bagian_soal: b });
+    }
+  }
+  return list;
+};
+
+const getMaxScore = (label: string): number => {
+  return label.toLowerCase().endsWith('f') ? 5 : 4;
+};
+
+interface StudentProfile {
+  nama_lengkap: string;
+  kelas: string;
+  nim_nip: string;
+}
+
+interface Course {
+  nama_matkul: string;
+  kode_matkul: string;
+}
+
+interface SubmissionData {
+  id: string;
+  mahasiswa_id: string;
+  status_submit: 'submitted' | 'processing_ai' | 'reviewed' | 'finalized';
+  ai_status?: string | null;
+  waktu_submit: string;
+  nilai_akhir: number | null;
+  model_ai?: string | null;
+  mahasiswa: StudentProfile | StudentProfile[] | null;
+  mata_kuliah: Course | Course[] | null;
+}
+
+interface SlotState {
+  label: string; // e.g. "1a"
+  nomor_soal: number;
+  bagian_soal: string;
+  hasSheet: boolean;
+  sheetId?: string;
+  fileUrl: string | null;
+  imagePath?: string;
+  aiScore: number | null;
+  confidence: number | null; // Added
+  manualScore: number | null; // nilai_dosen in DB
+  manualCorrection: number; // Final - AI
+  finalScore: number | null; // nilai_final in DB
+  feedback: string; // feedback in DB
+  dbStatus?: string;
+  rejectionReason?: string | null;
+  wasReuploaded?: boolean;
+  lastReuploadAt?: string | null;
+  reuploadCount?: number;
+}
+
+const getSignedPreviewUrl = async (path: string): Promise<string | null> => {
+  try {
+    console.log("SIGNED URL PATH", path);
+    const { data, error } = await supabase.storage
+      .from('lembar-jawaban')
+      .createSignedUrl(path, 3600);
+    console.log("SIGNED URL RESULT", data);
+    console.log("SIGNED URL ERROR", error);
+    if (error) throw error;
+    return data.signedUrl;
+  } catch (err) {
+    console.error('Error generating signed URL:', err);
+    return null;
+  }
+};
+
+export default function ReviewWorkspace() {
+  const router = useRouter();
+  const params = useParams();
+  const submissionId = params.id as string;
+
+  // Auth and Loading States
+  const [isChecking, setIsChecking] = useState(true);
+  const [isPending, startTransition] = useTransition();
+
+  // Submission Data
+  const [submission, setSubmission] = useState<SubmissionData | null>(null);
+  const [slots, setSlots] = useState<SlotState[]>([]);
+  const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(true);
+  const [totalAIScore, setTotalAIScore] = useState<number | null>(null);
+
+  // AI Simulation States
+  const [selectedModel, setSelectedModel] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('emathtoco_selected_model');
+      if (saved === 'MobileNetV2' || saved === 'DenseNet201' || saved === 'InceptionV3') {
+        return saved;
+      }
+    }
+    return 'MobileNetV2';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('emathtoco_selected_model', selectedModel);
+    }
+  }, [selectedModel]);
+
+  const [isSimulatingAI, setIsSimulatingAI] = useState(false);
+  const [aiSimStep, setAiSimStep] = useState(0);
+
+  // UI Modal Preview
+  const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
+  const [modalTitle, setModalTitle] = useState('');
+
+  // Editing Action States
+  const [isSaving, setIsSaving] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const { toasts, toast, removeToast } = useToast();
+
+  // Reupload Request States
+  const [showReuploadModal, setShowReuploadModal] = useState(false);
+  const [reuploadTargetSlot, setReuploadTargetSlot] = useState<string | null>(null);
+  const [reuploadReason, setReuploadReason] = useState('');
+  const [isRequestingReupload, setIsRequestingReupload] = useState(false);
+  const [isAccessDenied, setIsAccessDenied] = useState(false);
+  const [courseId, setCourseId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // 1. Verify lecturer role
+    const verifyUser = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          await supabase.auth.signOut();
+          document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
+          router.push('/login');
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from('profil_pengguna')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        const userRole = normalizeRole(profile?.role);
+        if (userRole !== 'dosen') {
+          if (userRole === 'admin') {
+            router.push('/admin');
+          } else {
+            router.push('/');
+          }
+          return;
+        }
+
+        setIsChecking(false);
+
+        // Authorization check: verify lecturer is assigned to this submission's course
+        const { data: subMeta } = await supabase
+          .from('pengumpulan_tugas')
+          .select('mata_kuliah_id')
+          .eq('id', submissionId)
+          .maybeSingle();
+
+        if (subMeta?.mata_kuliah_id) {
+          setCourseId(subMeta.mata_kuliah_id);
+          const { data: assignmentCheck } = await supabase
+            .from('dosen_mata_kuliah')
+            .select('id')
+            .eq('dosen_id', user.id)
+            .eq('mata_kuliah_id', subMeta.mata_kuliah_id)
+            .maybeSingle();
+
+          if (!assignmentCheck) {
+            console.warn(`[Access Denied] Lecturer ${user.id} is not assigned to course ${subMeta.mata_kuliah_id}`);
+            setIsAccessDenied(true);
+            return;
+          }
+        }
+
+        // Load submission and lembar_jawaban details
+        loadWorkspaceDetails();
+      } catch (err) {
+        console.error('Dosen verification error:', err);
+        await supabase.auth.signOut();
+        document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
+        router.push('/login');
+      }
+    };
+    verifyUser();
+  }, [router, submissionId]);
+
+  // Polling logic when the submission is 'processing'
+  useEffect(() => {
+    if (!submission || submission.ai_status !== 'processing') return;
+
+    const interval = setInterval(() => {
+      loadWorkspaceDetails();
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [submission]);
+
+  const loadWorkspaceDetails = async () => {
+    setIsLoadingWorkspace(true);
+    setErrorMsg(null);
+    try {
+      // Fetch parent submission
+      const { data: subData, error: subError } = await supabase
+        .from('pengumpulan_tugas')
+        .select(`
+          id,
+          mahasiswa_id,
+          status_submit,
+          ai_status,
+          waktu_submit,
+          nilai_akhir,
+          model_ai,
+          mahasiswa:profil_pengguna!pengumpulan_tugas_mahasiswa_id_fkey(nama_lengkap, kelas, nim_nip),
+          mata_kuliah (nama_matkul, kode_matkul)
+        `)
+        .eq('id', submissionId)
+        .maybeSingle();
+
+      console.log("RAW SUBMISSION", subData);
+
+      if (subError) throw subError;
+      if (!subData) {
+        setErrorMsg('Data pengumpulan tugas tidak ditemukan.');
+        setIsLoadingWorkspace(false);
+        return;
+      }
+
+      // Fetch AI results from backend API
+      let aiResultsData: any = null;
+      try {
+        const aiRes = await fetch(`${API_URL}/submission/${submissionId}/results`);
+        if (aiRes.ok) {
+          aiResultsData = await aiRes.json();
+          setTotalAIScore(aiResultsData.nilai_akhir);
+        }
+      } catch (aiErr: any) {
+        console.error('AI Backend Error:', aiErr);
+        const userFriendlyMsg = (aiErr instanceof TypeError || (aiErr.message && aiErr.message.includes("fetch")))
+          ? "Backend tidak dapat dihubungi. Pastikan server FastAPI berjalan dan IP backend benar."
+          : "Gagal memuat hasil AI dari backend.";
+        setErrorMsg(userFriendlyMsg);
+      }
+
+      const formattedSub = subData as unknown as SubmissionData;
+      if (aiResultsData) {
+        formattedSub.ai_status = aiResultsData.ai_status;
+        if (aiResultsData.nilai_akhir !== null) {
+          formattedSub.nilai_akhir = aiResultsData.nilai_akhir;
+        }
+      }
+      setSubmission(formattedSub);
+      if (formattedSub.model_ai) {
+        setSelectedModel(formattedSub.model_ai);
+      }
+
+      // Fetch answer sheets
+      const { data: sheets, error: sheetsError } = await supabase
+        .from('lembar_jawaban')
+        .select('*')
+        .eq('pengumpulan_tugas_id', submissionId);
+
+      console.log("RAW SHEETS", sheets);
+
+      if (sheetsError) throw sheetsError;
+
+      // Initialize 24 slots
+      const initialSlots = generateSlots().map(s => {
+        const sectionCode = `S-${s.label.toUpperCase()}`;
+        const matchedSheet = sheets?.find(sh => sh.section_code === sectionCode);
+        console.log("MATCHED SHEET", matchedSheet);
+        console.log("IMAGE_URL", matchedSheet?.image_url);
+
+        // Get AI score and confidence from backend
+        const matchedSectionAI = aiResultsData?.sections?.find((sec: any) => sec.section_code === sectionCode);
+        const aiScore = matchedSectionAI !== undefined && matchedSectionAI !== null ? matchedSectionAI.predicted_score : null;
+        const confidence = matchedSectionAI !== undefined && matchedSectionAI !== null ? matchedSectionAI.confidence : null;
+
+        const manualScore = matchedSheet?.nilai_dosen !== undefined && matchedSheet.nilai_dosen !== null
+          ? matchedSheet.nilai_dosen
+          : null;
+
+        const finalScore = manualScore !== null
+          ? manualScore
+          : (matchedSheet?.nilai_final !== undefined && matchedSheet.nilai_final !== null ? matchedSheet.nilai_final : aiScore);
+        const manualCorrection = (finalScore !== null && aiScore !== null) ? (finalScore - aiScore) : 0;
+
+        return {
+          label: s.label,
+          nomor_soal: s.nomor_soal,
+          bagian_soal: s.bagian_soal,
+          hasSheet: !!matchedSheet,
+          sheetId: matchedSheet?.id,
+          fileUrl: null,
+          imagePath: matchedSheet?.image_url,
+          aiScore,
+          confidence,
+          manualScore,
+          manualCorrection,
+          finalScore,
+          feedback: matchedSheet?.feedback || '',
+          dbStatus: matchedSheet?.status,
+          rejectionReason: matchedSheet?.rejection_reason || null,
+          wasReuploaded: matchedSheet?.was_reuploaded || false,
+          lastReuploadAt: matchedSheet?.last_reupload_at || null,
+          reuploadCount: matchedSheet?.reupload_count || 0,
+        };
+      });
+
+      setSlots(initialSlots as SlotState[]);
+
+      // Generate signed URLs for uploaded sheets
+      const urlPromises = initialSlots.map(async (slot) => {
+        if (slot.hasSheet && slot.imagePath) {
+          const signedUrl = await getSignedPreviewUrl(slot.imagePath);
+          return { ...slot, fileUrl: signedUrl };
+        }
+        return slot;
+      });
+
+      const resolvedSlots = await Promise.all(urlPromises);
+      setSlots(resolvedSlots);
+
+    } catch (err) {
+      console.error('Error loading review workspace:', err);
+      setErrorMsg('Gagal memuat detail lembar jawaban mahasiswa.');
+    } finally {
+      setIsLoadingWorkspace(false);
+    }
+  };
+
+  // Handle manual score change
+  const handleManualScoreChange = (label: string, value: string) => {
+    const maxScore = getMaxScore(label);
+    const manualVal = value === '' ? null : Math.max(0, Math.min(maxScore, parseInt(value) || 0));
+
+    setSlots(prev => prev.map(slot => {
+      if (slot.label === label) {
+        const finalScore = manualVal !== null ? manualVal : slot.aiScore;
+        const correction = (finalScore !== null && slot.aiScore !== null) ? (finalScore - slot.aiScore) : 0;
+        return {
+          ...slot,
+          manualScore: manualVal,
+          finalScore: finalScore,
+          manualCorrection: correction
+        };
+      }
+      return slot;
+    }));
+  };
+
+  // Handle final score change directly
+  const handleFinalScoreChange = (label: string, value: string) => {
+    const maxScore = getMaxScore(label);
+    const finalVal = value === '' ? null : Math.max(0, Math.min(maxScore, parseInt(value) || 0));
+
+    setSlots(prev => prev.map(slot => {
+      if (slot.label === label) {
+        const finalScore = finalVal !== null ? finalVal : slot.aiScore;
+        const manualVal = finalVal;
+        const correction = (finalScore !== null && slot.aiScore !== null) ? (finalScore - slot.aiScore) : 0;
+        return {
+          ...slot,
+          manualScore: manualVal,
+          finalScore: finalScore,
+          manualCorrection: correction
+        };
+      }
+      return slot;
+    }));
+  };
+
+  // Handle feedback text change
+  const handleFeedbackChange = (label: string, text: string) => {
+    setSlots(prev => prev.map(slot => {
+      if (slot.label === label) {
+        return { ...slot, feedback: text };
+      }
+      return slot;
+    }));
+  };
+
+  // Calculate overall accumulated score
+  const getOverallScore = () => {
+    return slots.reduce((acc, s) => acc + (s.finalScore || 0), 0);
+  };
+
+  // Derived real-time dashboard summary stats
+  const totalSectionScore = slots.reduce((acc, s) => acc + (s.finalScore || 0), 0);
+  const manualOverrideCount = slots.filter(s => s.hasSheet && s.manualScore !== null).length;
+  const aiContributionCount = slots.filter(s => s.hasSheet && s.manualScore === null && s.aiScore !== null).length;
+
+  // AI processing caller
+  const runAISimulation = async () => {
+    if (!submission) return;
+    setIsSimulatingAI(true);
+    setAiSimStep(1);
+
+    try {
+      // Start visual timeline steps
+      const step2 = setTimeout(() => setAiSimStep(2), 500);
+      const step3 = setTimeout(() => setAiSimStep(3), 1000);
+      const step4 = setTimeout(() => setAiSimStep(4), 1500);
+
+      // Call actual backend AI endpoint
+      const res = await fetch(`${API_URL}/predict/${submission.id}?model=${selectedModel}`, {
+        method: 'POST'
+      });
+
+      if (!res.ok) {
+        throw new Error('Backend AI predict failed');
+      }
+
+      // Ensure steps complete visually
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      setIsSimulatingAI(false);
+      setSuccessMsg('Analisis AI berhasil dijalankan!');
+      toast.success('Sukses', 'Analisis AI selesai dijalankan.');
+      loadWorkspaceDetails();
+    } catch (err: any) {
+      console.error('AI Backend Error:', err);
+      const userFriendlyMsg = (err instanceof TypeError || (err.message && err.message.includes("fetch")))
+        ? "Backend tidak dapat dihubungi. Pastikan server FastAPI berjalan dan IP backend benar."
+        : "Gagal menjalankan analisis AI pada backend.";
+      setErrorMsg(userFriendlyMsg);
+      toast.error('Gagal', userFriendlyMsg);
+      setIsSimulatingAI(false);
+    }
+  };
+
+  // Save Draft logic
+  const saveDraftReview = async () => {
+    if (!submission) return;
+    setIsSaving(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    try {
+      const overall = getOverallScore();
+
+      const promises = slots
+        .filter(slot => slot.hasSheet && slot.sheetId)
+        .map(slot => {
+          return supabase
+            .from('lembar_jawaban')
+            .update({
+              nilai_dosen: slot.manualScore,
+              nilai_final: slot.finalScore,
+              feedback: slot.feedback,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', slot.sheetId!);
+        });
+
+      await Promise.all(promises);
+
+      // Save overall score to database
+      const { error: subUpdateError } = await supabase
+        .from('pengumpulan_tugas')
+        .update({
+          nilai_akhir: overall,
+          model_ai: selectedModel,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', submission.id);
+
+      if (subUpdateError) throw subUpdateError;
+
+      // Call Backend API to set status to reviewed
+      try {
+        const backendRes = await fetch(`${API_URL}/submission/${submission.id}/reviewed`, {
+          method: 'POST'
+        });
+        if (!backendRes.ok) {
+          console.warn('Backend API reviewed status update failed:', backendRes.statusText);
+        }
+      } catch (backendErr: any) {
+        console.error('AI Backend Error:', backendErr);
+        const userFriendlyMsg = (backendErr instanceof TypeError || (backendErr.message && backendErr.message.includes("fetch")))
+          ? "Backend tidak dapat dihubungi. Pastikan server FastAPI berjalan dan IP backend benar."
+          : "Gagal memperbarui status ke reviewed pada backend.";
+        toast.error('Gagal', userFriendlyMsg);
+      }
+
+      setSuccessMsg('Draf review berhasil disimpan.');
+
+      // Reload details to ensure data integrity
+      loadWorkspaceDetails();
+    } catch (err) {
+      console.error('Error saving review draft:', err);
+      setErrorMsg('Terjadi kesalahan saat menyimpan draf review.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Finalize Submission logic
+  const finalizeAssessment = async () => {
+    if (!submission) return;
+    // Show the inline confirm modal instead of window.confirm
+    setShowConfirmModal(true);
+  };
+
+  const doFinalize = async () => {
+    setShowConfirmModal(false);
+    if (!submission) return;
+
+    setIsFinalizing(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    try {
+      const overall = getOverallScore();
+
+      // 1. Save all sheet scores and feedbacks, and set status to 'finalized'
+      const sheetPromises = slots
+        .filter(slot => slot.hasSheet && slot.sheetId)
+        .map(slot => {
+          return supabase
+            .from('lembar_jawaban')
+            .update({
+              nilai_dosen: slot.manualScore,
+              nilai_final: slot.finalScore,
+              feedback: slot.feedback,
+              status: 'finalized',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', slot.sheetId!);
+        });
+
+      await Promise.all(sheetPromises);
+
+      // 2. Update pengumpulan_tugas to finalized and store nilai_akhir
+      const { error: subUpdateError } = await supabase
+        .from('pengumpulan_tugas')
+        .update({
+          status_submit: 'finalized',
+          nilai_akhir: overall,
+          model_ai: selectedModel,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', submission.id);
+
+      if (subUpdateError) throw subUpdateError;
+
+      // Call Backend API to set status to finalized
+      try {
+        const backendRes = await fetch(`${API_URL}/submission/${submission.id}/finalize`, {
+          method: 'POST'
+        });
+        if (!backendRes.ok) {
+          console.warn('Backend API finalize status update failed:', backendRes.statusText);
+        }
+      } catch (backendErr: any) {
+        console.error('AI Backend Error:', backendErr);
+        const userFriendlyMsg = (backendErr instanceof TypeError || (backendErr.message && backendErr.message.includes("fetch")))
+          ? "Backend tidak dapat dihubungi. Pastikan server FastAPI berjalan dan IP backend benar."
+          : "Gagal memperbarui status ke finalized pada backend.";
+        toast.error('Gagal', userFriendlyMsg);
+      }
+
+      setSuccessMsg('Penilaian tugas berhasil difinalisasi!');
+      toast.success('Finalisasi Berhasil', 'Nilai pengumpulan tugas telah dikunci secara permanen.');
+      loadWorkspaceDetails();
+    } catch (err) {
+      console.error('Error finalizing assessment:', err);
+      setErrorMsg('Gagal menyelesaikan proses finalisasi nilai.');
+      toast.error('Finalisasi Gagal', 'Terjadi kesalahan saat mengunci nilai.');
+    } finally {
+      setIsFinalizing(false);
+    }
+  };
+
+  // Handle reupload request for a specific section
+  const openReuploadModal = (slotLabel: string) => {
+    setReuploadTargetSlot(slotLabel);
+    setReuploadReason('');
+    setShowReuploadModal(true);
+  };
+
+  const handleRequestReupload = async () => {
+    if (!reuploadTargetSlot || !reuploadReason.trim()) return;
+
+    const targetSlot = slots.find(s => s.label === reuploadTargetSlot);
+    if (!targetSlot?.sheetId) return;
+
+    setIsRequestingReupload(true);
+    try {
+      const { error } = await supabase
+        .from('lembar_jawaban')
+        .update({
+          status: 'reupload_required',
+          rejection_reason: reuploadReason.trim(),
+          prediksi_ai: null,
+          nilai_final: null,
+          nilai_dosen: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', targetSlot.sheetId);
+
+      if (error) throw error;
+
+      toast.success('Reupload Diminta', `Section ${reuploadTargetSlot.toUpperCase()} ditandai untuk upload ulang.`);
+      setShowReuploadModal(false);
+      loadWorkspaceDetails();
+    } catch (err) {
+      console.error('Error requesting reupload:', err);
+      toast.error('Gagal', 'Tidak dapat menandai section untuk upload ulang.');
+    } finally {
+      setIsRequestingReupload(false);
+    }
+  };
+
+  // Status Chip Config
+  const getStatusBadge = (aiStatus: string | null | undefined) => {
+    const status = aiStatus || 'pending';
+    switch (status) {
+      case 'pending':
+        return { icon: '⏳', text: 'Menunggu AI', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' };
+      case 'processing':
+        return { icon: '🤖', text: 'Diproses AI', color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' };
+      case 'completed':
+        return { icon: '👨‍🏫', text: 'Siap Direview', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' };
+      case 'reviewed':
+        return { icon: '👨‍🏫', text: 'Direview Dosen', color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20' };
+      case 'finalized':
+        return { icon: '🏁', text: 'Finalized', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' };
+      default:
+        return { icon: '⏳', text: 'Menunggu AI', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' };
+    }
+  };
+
+  const isReadOnly = submission?.ai_status === 'finalized';
+
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] flex items-center justify-center font-sans">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-10 h-10 text-cyan-500 dark:text-cyan-400 animate-spin" />
+          <p className="text-slate-500 dark:text-neutral-400 text-sm animate-pulse">Memverifikasi otoritas dosen...</p>
+        </div>
+      </div>
+    );
+  }
+  if (isAccessDenied) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans relative overflow-hidden flex flex-col">
+        <Navbar showBack backUrl={courseId ? `/dosen/course/${courseId}` : "/dosen"} title="Akses Ditolak" />
+        <main className="flex-grow flex items-center justify-center">
+          <div className="text-center max-w-md mx-auto px-6 space-y-4">
+            <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto">
+              <Lock className="w-8 h-8 text-red-400" />
+            </div>
+            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">Akses Ditolak</h1>
+            <p className="text-slate-500 dark:text-neutral-400 text-sm">Anda tidak ditugaskan ke mata kuliah dari pengumpulan tugas ini. Silakan hubungi administrator.</p>
+            <button
+              onClick={() => router.push(courseId ? `/dosen/course/${courseId}` : "/dosen")}
+              className="mt-4 px-6 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-cyan-500 to-blue-600 text-white cursor-pointer transition-all hover:from-cyan-400 hover:to-blue-500"
+            >
+              Kembali ke Dashboard
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-24 relative overflow-hidden flex flex-col">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+
+      {/* Inline Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 dark:bg-[#0A0A0F] dark:border-amber-500/30 rounded-2xl max-w-md w-full shadow-[0_0_40px_rgba(245,158,11,0.08)] p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-amber-500 dark:text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Finalisasi Penilaian</h3>
+                <p className="text-xs text-slate-550 dark:text-neutral-500 mt-0.5">Tindakan ini tidak dapat dibatalkan</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-700 dark:text-neutral-300 leading-relaxed mb-6">
+              Apakah Anda yakin ingin memfinalisasi nilai pengumpulan tugas ini?{' '}
+              <span className="text-amber-600 dark:text-amber-400 font-semibold">Seluruh perubahan nilai akan dikunci secara permanen.</span>
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="px-5 py-2.5 rounded-xl border border-slate-200 bg-slate-100/50 text-slate-700 hover:bg-slate-200 dark:border-neutral-800 dark:bg-neutral-900/50 dark:text-neutral-300 dark:hover:bg-neutral-800 transition-all cursor-pointer"
+              >
+                Batalkan
+              </button>
+              <button
+                onClick={doFinalize}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-bold transition-all shadow-lg shadow-amber-500/15 cursor-pointer"
+              >
+                Ya, Finalisasi Sekarang
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reupload Request Modal */}
+      {showReuploadModal && reuploadTargetSlot && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 dark:bg-[#0A0A0F] dark:border-amber-500/30 rounded-2xl max-w-md w-full shadow-[0_0_40px_rgba(245,158,11,0.08)] p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+                <RotateCcw className="w-5 h-5 text-amber-500 dark:text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Request Reupload</h3>
+                <p className="text-xs text-slate-500 dark:text-neutral-500 mt-0.5">
+                  Section <span className="text-amber-600 dark:text-amber-400 font-mono font-bold">{reuploadTargetSlot.toUpperCase()}</span> — Mahasiswa harus upload ulang
+                </p>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-wider mb-2">
+                Alasan Upload Ulang
+              </label>
+              <textarea
+                value={reuploadReason}
+                onChange={(e) => setReuploadReason(e.target.value)}
+                placeholder="Contoh: Gambar blur, jawaban tidak sesuai, halaman salah, file rusak..."
+                rows={3}
+                className="w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-800 hover:border-slate-350 dark:hover:border-neutral-700 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 rounded-xl p-3 text-slate-800 dark:text-neutral-200 text-sm focus:outline-none resize-none placeholder:text-slate-400 dark:placeholder:text-neutral-600"
+              />
+            </div>
+
+            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-xl p-3 mb-5">
+              <p className="text-xs text-amber-700 dark:text-amber-300/80 leading-relaxed">
+                ⚠ Section ini akan ditandai untuk upload ulang. Nilai AI dan nilai manual akan direset.
+                Mahasiswa dapat mengunggah file baru pada section ini.
+              </p>
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowReuploadModal(false)}
+                className="px-5 py-2.5 rounded-xl border border-slate-200 bg-slate-100/50 text-slate-700 hover:bg-slate-200 dark:border-neutral-800 dark:bg-neutral-900/50 dark:text-neutral-300 dark:hover:bg-neutral-800 transition-all cursor-pointer"
+              >
+                Batalkan
+              </button>
+              <button
+                onClick={handleRequestReupload}
+                disabled={!reuploadReason.trim() || isRequestingReupload}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-bold transition-all shadow-lg shadow-amber-500/15 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isRequestingReupload ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-4 h-4" />
+                )}
+                Request Reupload
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Background Glows */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[10%] left-[15%] w-[450px] h-[450px] bg-cyan-500/5 dark:bg-cyan-500/8 rounded-full blur-[120px] animate-float-blue"></div>
+        <div className="absolute bottom-[15%] right-[15%] w-[500px] h-[500px] bg-indigo-500/5 dark:bg-indigo-500/8 rounded-full blur-[130px] animate-float-purple"></div>
+      </div>
+
+      <Navbar
+        showBack
+        backUrl={courseId ? `/dosen/course/${courseId}` : "/dosen"}
+        title="Workspace Review Dosen"
+        subtitle={
+          Array.isArray(submission?.mahasiswa)
+            ? submission?.mahasiswa[0]?.nama_lengkap
+            : submission?.mahasiswa?.nama_lengkap || ''
+        }
+      />
+
+      {isLoadingWorkspace ? (
+        <div className="flex-grow flex flex-col items-center justify-center py-20 gap-3">
+          <Loader2 className="w-10 h-10 text-cyan-500 dark:text-cyan-400 animate-spin" />
+          <p className="text-slate-500 dark:text-neutral-400 text-sm animate-pulse">Memuat workspace lembar jawaban...</p>
+        </div>
+      ) : errorMsg && !submission ? (
+        <div className="max-w-xl mx-auto px-4 py-20 text-center">
+          <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-400 p-5 rounded-2xl">
+            <p className="font-semibold">{errorMsg}</p>
+            <button onClick={() => router.push(courseId ? `/dosen/course/${courseId}` : "/dosen")} className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 dark:bg-neutral-900 dark:text-white dark:hover:bg-neutral-850 dark:border-transparent rounded-xl text-sm font-bold transition-all cursor-pointer">Kembali ke Dashboard</button>
+          </div>
+        </div>
+      ) : (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10 w-full flex-grow grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+          {/* LEFT COLUMN: 24-GRID REVIEW LIST */}
+          <div className="lg:col-span-2 space-y-8 order-2 lg:order-1">
+            {/* Notifications */}
+            {errorMsg && (
+              <div className="flex items-start gap-3 bg-red-950/20 border border-red-900/50 text-red-400 p-4 rounded-xl text-sm">
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <p className="font-medium leading-relaxed">{errorMsg}</p>
+              </div>
+            )}
+            {successMsg && (
+              <div className="flex items-start gap-3 bg-emerald-950/20 border border-emerald-900/50 text-emerald-400 p-4 rounded-xl text-sm">
+                <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <p className="font-medium leading-relaxed">{successMsg}</p>
+              </div>
+            )}
+
+            <div className="space-y-6">
+              {[1, 2, 3, 4].map(numSoal => {
+                const questionSlots = slots.filter(s => s.nomor_soal === numSoal);
+                return (
+                  <div key={numSoal} className="bg-white dark:bg-[#0A0A0F]/70 border border-slate-200 dark:border-neutral-900 rounded-2xl p-6 backdrop-blur-md space-y-4">
+                    <h3 className="text-sm font-bold text-slate-500 dark:text-neutral-400 tracking-widest border-b border-slate-100 dark:border-neutral-900/60 pb-2 uppercase">
+                      Kumpulan Soal {numSoal}
+                    </h3>
+
+                    <div className="space-y-6">
+                      {questionSlots.map(slot => (
+                        <div
+                          key={slot.label}
+                          className={`border rounded-xl pt-12 pb-4 px-4 transition-all duration-300 relative flex flex-col md:flex-row gap-4 ${slot.dbStatus === 'reupload_required'
+                              ? 'bg-amber-500/5 dark:bg-amber-950/10 border-amber-500/30 border-dashed'
+                              : slot.hasSheet
+                              ? 'bg-slate-50 dark:bg-[#0D0D14]/80 border-slate-200 dark:border-neutral-900/80 hover:border-cyan-500/20'
+                              : 'bg-slate-100/50 border-slate-200 dark:bg-neutral-950/20 dark:border-neutral-950 opacity-40 select-none'
+                            }`}
+                        >
+                          {/* Label Section Code */}
+                          <div className="absolute top-4 left-4 flex items-center gap-2 flex-wrap">
+                            <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded uppercase ${
+                              slot.dbStatus === 'reupload_required'
+                                ? 'bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400'
+                                : 'bg-slate-100 dark:bg-neutral-950 border border-slate-200 dark:border-neutral-900 text-slate-500 dark:text-neutral-400'
+                            }`}>
+                              {slot.dbStatus === 'reupload_required' ? '⚠ ' : ''}Bagian {slot.label.toUpperCase()}
+                            </span>
+                            {slot.wasReuploaded && slot.dbStatus !== 'reupload_required' && (
+                              <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center gap-1">
+                                ✅ REUPLOADED
+                              </span>
+                            )}
+                          </div>
+                          
+                          {/* Image preview box */}
+                          <div className="w-full md:w-32 h-32 bg-slate-50 dark:bg-black border border-slate-200 dark:border-neutral-900 rounded-xl overflow-hidden relative flex-shrink-0 flex items-center justify-center mt-0">
+                            {slot.hasSheet && slot.fileUrl ? (
+                              <div className="group/card w-full h-full relative cursor-pointer" onClick={() => {
+                                setModalImageUrl(slot.fileUrl);
+                                setModalTitle(`Section ${slot.label.toUpperCase()}`);
+                              }}>
+                                <img src={slot.fileUrl} alt={`Slot ${slot.label}`} className="w-full h-full object-cover opacity-80 group-hover/card:opacity-100 transition-opacity duration-300" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/card:opacity-100 flex items-center justify-center transition-all">
+                                  <Eye className="w-5 h-5 text-white" />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center gap-1 opacity-50">
+                                <Lock className="w-5 h-5 text-slate-400 dark:text-neutral-600" />
+                                <span className="text-[9px] font-mono text-slate-405 dark:text-neutral-600">Locked</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Inputs and Feedback */}
+                          {slot.hasSheet ? (
+                            <div className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-6">
+                              {/* Left parameters */}
+                              <div className="space-y-3">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-wider mb-1">Hasil AI</label>
+                                  <div className="w-full bg-slate-100 border border-slate-200 dark:bg-neutral-950/50 dark:border-neutral-900 rounded-xl py-2 px-3 text-slate-500 dark:text-neutral-400 text-xs font-mono font-bold leading-normal">
+                                    <div>Nilai AI : {slot.aiScore !== null ? slot.aiScore : '-'}</div>
+                                    <div>Confidence : {slot.confidence !== null ? `${Math.round(slot.confidence * 100)}%` : '-'}</div>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-400 dark:text-neutral-400 uppercase tracking-wider mb-1">Nilai Manual</label>
+                                  <input
+                                    type="number"
+                                    placeholder="Belum diatur"
+                                    value={slot.manualScore !== null ? slot.manualScore : ''}
+                                    onChange={(e) => handleManualScoreChange(slot.label, e.target.value)}
+                                    disabled={isReadOnly}
+                                    className="w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 hover:border-slate-350 dark:hover:border-neutral-800 focus:border-cyan-500 dark:focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/10 rounded-xl py-2 px-3 text-slate-800 dark:text-white text-sm font-mono focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+                                  />
+                                  <span className="text-[10px] text-slate-400 dark:text-neutral-500/70 mt-1 block">
+                                    Maksimal nilai: {slot.label.toLowerCase().endsWith('f') ? '5' : '4'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Center final score */}
+                              <div className="flex flex-col justify-between">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider mb-1">Nilai Akhir Bagian</label>
+                                  <input
+                                    type="number"
+                                    placeholder="0"
+                                    value={slot.finalScore !== null ? slot.finalScore : ''}
+                                    onChange={(e) => handleFinalScoreChange(slot.label, e.target.value)}
+                                    disabled={isReadOnly}
+                                    className="w-full bg-slate-50 border border-cyan-550/30 hover:border-cyan-500 dark:bg-black dark:border-cyan-500/20 dark:hover:border-cyan-500/40 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 rounded-xl py-2 px-3 text-cyan-600 dark:text-cyan-400 text-base font-mono font-extrabold focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+                                  />
+                                  <span className="text-[10px] text-slate-400 dark:text-neutral-500/70 mt-1 block">
+                                    Maksimal nilai: {slot.label.toLowerCase().endsWith('f') ? '5' : '4'}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-slate-400 dark:text-neutral-600 leading-normal hidden md:inline-block">
+                                  *Nilai ini akan disimpan sebagai skor final bagian.
+                                </span>
+                              </div>
+
+                              {/* Right Feedback + Reupload */}
+                              <div className="flex flex-col">
+                                <label className="block text-[10px] font-bold text-slate-400 dark:text-neutral-400 uppercase tracking-wider mb-1">Feedback Dosen</label>
+                                <textarea
+                                  placeholder="Tulis koreksi atau arahan..."
+                                  value={slot.feedback}
+                                  onChange={(e) => handleFeedbackChange(slot.label, e.target.value)}
+                                  disabled={isReadOnly || slot.dbStatus === 'reupload_required'}
+                                  rows={3}
+                                  className="w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 hover:border-slate-350 dark:hover:border-neutral-800 text-slate-800 dark:text-neutral-200 text-xs focus:outline-none resize-none flex-grow disabled:opacity-40 disabled:cursor-not-allowed"
+                                />
+
+                                {/* Reupload Request Button */}
+                                {!isReadOnly && slot.dbStatus !== 'reupload_required' && (
+                                  <button
+                                    onClick={() => openReuploadModal(slot.label)}
+                                    className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-amber-400/70 hover:text-amber-400 transition-colors cursor-pointer"
+                                  >
+                                    <RotateCcw className="w-3 h-3" />
+                                    Request Reupload
+                                  </button>
+                                )}
+
+                                {/* Rejection indicator for already-rejected sections */}
+                                {slot.dbStatus === 'reupload_required' && (
+                                  <div className="mt-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">
+                                    <p className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">⚠ Upload Ulang Diminta</p>
+                                    {slot.rejectionReason && (
+                                      <p className="text-xs text-amber-300/70 leading-relaxed">"{slot.rejectionReason}"</p>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Catat reupload sebelumnya */}
+                                {slot.wasReuploaded && slot.rejectionReason && slot.dbStatus !== 'reupload_required' && (
+                                  <div className="mt-2 bg-slate-100 border border-slate-250 dark:bg-neutral-900 dark:border-neutral-800 rounded-lg p-2.5">
+                                    <p className="text-[10px] font-bold text-slate-500 dark:text-neutral-500 uppercase tracking-wider mb-1">Catatan Reupload Sebelumnya</p>
+                                    <p className="text-xs text-slate-600 dark:text-neutral-400 leading-relaxed">"{slot.rejectionReason}"</p>
+                                    {slot.lastReuploadAt && (
+                                      <p className="text-[9px] text-slate-400 dark:text-neutral-500 font-mono mt-1.5">
+                                        Reuploaded: {new Date(slot.lastReuploadAt).toLocaleString('id-ID', {
+                                          day: 'numeric',
+                                          month: 'short',
+                                          year: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex-grow flex items-center">
+                              <span className="text-xs text-slate-400 dark:text-neutral-600 italic">Mahasiswa belum mengunggah lembar jawaban pada bagian ini.</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: ASSESSMENT INFO & CONTROLS */}
+          <div className="order-1 lg:order-2 space-y-6">
+
+            {/* Student Info Card */}
+            <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none"></div>
+
+              <h3 className="text-xs font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-4">Informasi Mahasiswa</h3>
+
+              <div className="space-y-4">
+                <div>
+                  <span className="text-[10px] text-slate-400 dark:text-neutral-500 font-bold uppercase tracking-wider block">Nama Lengkap</span>
+                  <span className="text-lg font-bold text-slate-800 dark:text-white">{Array.isArray(submission?.mahasiswa) ? submission?.mahasiswa[0]?.nama_lengkap : submission?.mahasiswa?.nama_lengkap || 'Unknown'}</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-[10px] text-slate-400 dark:text-neutral-500 font-bold uppercase tracking-wider block">NIM / NIP</span>
+                    <span className="text-sm font-mono text-slate-650 dark:text-neutral-300">{Array.isArray(submission?.mahasiswa) ? submission?.mahasiswa[0]?.nim_nip : submission?.mahasiswa?.nim_nip || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 dark:text-neutral-500 font-bold uppercase tracking-wider block">Kelas</span>
+                    <span className="text-sm font-semibold text-slate-650 dark:text-neutral-300">{Array.isArray(submission?.mahasiswa) ? submission?.mahasiswa[0]?.kelas : submission?.mahasiswa?.kelas || '-'}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] text-slate-400 dark:text-neutral-500 font-bold uppercase tracking-wider block">Mata Kuliah</span>
+                  <span className="text-sm font-semibold text-slate-650 dark:text-neutral-300">{Array.isArray(submission?.mata_kuliah) ? submission?.mata_kuliah[0]?.nama_matkul : submission?.mata_kuliah?.nama_matkul || '-'}</span>
+                  <span className="text-[10px] text-slate-400 dark:text-neutral-500 font-mono block mt-0.5 uppercase">{Array.isArray(submission?.mata_kuliah) ? submission?.mata_kuliah[0]?.kode_matkul : submission?.mata_kuliah?.kode_matkul || ''}</span>
+                </div>
+
+                <div className="border-t border-slate-100 dark:border-neutral-900 pt-3 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-slate-400 dark:text-neutral-500 font-bold uppercase tracking-wider block">Status Submit</span>
+                    {submission && (() => {
+                      const badge = getStatusBadge(submission.ai_status || submission.status_submit);
+                      return (
+                        <span className={`inline-flex items-center gap-1 mt-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${badge.bg} ${badge.border} ${badge.color}`}>
+                          {badge.icon} {badge.text}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 dark:text-neutral-500 font-bold uppercase tracking-wider block text-right">Waktu Submit</span>
+                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 font-medium block mt-1 text-right">
+                      {submission?.waktu_submit ? new Date(submission.waktu_submit).toLocaleString('id-ID', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }) : '-'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* AI pipeline integration controls */}
+            {submission && (
+              <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl p-6 backdrop-blur-md space-y-5">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest block mb-1">Model AI Penilaian</h3>
+                  <p className="text-[10px] text-slate-400 dark:text-neutral-500 mb-3">Pilih arsitektur jaringan saraf dalam untuk melakukan penilaian.</p>
+
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    disabled={isReadOnly}
+                    className="w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 hover:border-slate-350 dark:hover:border-neutral-800 text-slate-700 dark:text-neutral-300 rounded-xl p-3 text-sm focus:outline-none cursor-pointer"
+                  >
+                    <option value="MobileNetV2">MobileNetV2 (Ringan & Cepat)</option>
+                    <option value="DenseNet201">DenseNet201 (Akurasi Tinggi)</option>
+                    <option value="InceptionV3">InceptionV3 (Deteksi Pola Komparatif)</option>
+                  </select>
+                </div>
+
+                <button
+                  onClick={runAISimulation}
+                  disabled={isSimulatingAI || isReadOnly}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-600 hover:via-blue-600 hover:to-indigo-700 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all duration-300 shadow-lg shadow-cyan-500/10 disabled:opacity-50 text-sm tracking-widest cursor-pointer active:scale-[0.99] disabled:cursor-not-allowed"
+                >
+                  <Play className="w-4 h-4 fill-white" />
+                  <span>PROSES DENGAN AI</span>
+                </button>
+              </div>
+            )}
+
+            {/* Final Score Summary Panel */}
+            <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl p-6 backdrop-blur-md relative overflow-hidden shadow-2xl space-y-4">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none"></div>
+
+              <h3 className="text-xs font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-widest flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-cyan-500 dark:text-cyan-400" /> Ringkasan Nilai Akhir
+              </h3>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-slate-50 border border-slate-200 dark:bg-black/45 dark:border-neutral-900 rounded-xl p-3">
+                    <span className="text-[10px] text-slate-400 dark:text-neutral-500 font-bold uppercase tracking-wider block mb-0.5">Skor Bagian</span>
+                    <span className="text-2xl font-extrabold text-slate-800 dark:text-white font-mono">{totalSectionScore}</span>
+                    <span className="text-[9px] text-slate-400 dark:text-neutral-600 font-mono block mt-0.5">/ 100</span>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 dark:bg-black/45 dark:border-neutral-900 rounded-xl p-3">
+                    <span className="text-[10px] text-purple-400 dark:text-purple-400 font-bold uppercase tracking-wider block mb-0.5">Total Nilai AI</span>
+                    <span className="text-2xl font-extrabold text-purple-600 dark:text-purple-400 font-mono">{totalAIScore !== null ? totalAIScore : '-'}</span>
+                    <span className="text-[9px] text-purple-400/70 dark:text-purple-500/60 font-mono block mt-0.5">AI Engine</span>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 dark:bg-black/45 dark:border-neutral-900 rounded-xl p-3">
+                    <span className="text-[10px] text-slate-400 dark:text-neutral-500 font-bold uppercase tracking-wider block mb-0.5">Nilai Resmi</span>
+                    <span className="text-2xl font-extrabold text-cyan-600 dark:text-cyan-400 font-mono">{totalSectionScore}</span>
+                    <span className="text-[9px] text-cyan-600/70 dark:text-cyan-500/60 font-mono block mt-0.5">Official</span>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-100 dark:border-neutral-900/60 pt-3 space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400 dark:text-neutral-400 font-medium">Model Aktif:</span>
+                    <span className="font-mono bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded text-[10px] font-bold">
+                      {submission?.model_ai || selectedModel}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400 dark:text-neutral-400 font-medium">Kontribusi AI</span>
+                    <span className="font-mono bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded text-[10px] font-bold">
+                      {aiContributionCount} / 24 Bagian
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400 dark:text-neutral-400 font-medium">Override Manual Dosen</span>
+                    <span className="font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded text-[10px] font-bold">
+                      {manualOverrideCount} / 24 Bagian
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Overall Grading Dashboard Summary Card */}
+            <div className="bg-gradient-to-b from-[#0F1424] to-[#060814] border border-cyan-500/10 rounded-2xl p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none"></div>
+
+              <div>
+                <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest block mb-1">Nilai Akhir Tugas</span>
+                <p className="text-[10px] text-neutral-500 mb-4">Nilai kumulatif dari seluruh halaman lembar jawaban.</p>
+
+                <div className="flex items-baseline gap-2 mb-6">
+                  <span className="text-5xl font-extrabold text-cyan-400 font-mono">{getOverallScore()}</span>
+                  <span className="text-sm font-bold text-neutral-500 uppercase tracking-wider font-mono">/ 100</span>
+                </div>
+              </div>
+
+              {!isReadOnly ? (
+                <div className="space-y-3">
+                  <button
+                    onClick={saveDraftReview}
+                    disabled={isSaving || isFinalizing}
+                    className="w-full flex items-center justify-center gap-2 border border-neutral-800 hover:border-neutral-700 hover:bg-white/5 text-neutral-300 py-3 rounded-xl transition-all text-xs font-extrabold tracking-widest cursor-pointer"
+                  >
+                    {isSaving ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
+                    ) : (
+                      <Save className="w-4 h-4" />
+                    )}
+                    <span>SIMPAN DRAF REVIEW</span>
+                  </button>
+
+                  <button
+                    onClick={finalizeAssessment}
+                    disabled={isFinalizing || isSaving}
+                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-700 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all duration-300 shadow-lg shadow-emerald-500/10 text-xs tracking-widest cursor-pointer active:scale-[0.99]"
+                  >
+                    {isFinalizing ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    ) : (
+                      <span>🏁 FINALISASI NILAI</span>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <div className="border border-emerald-550/20 bg-emerald-50 dark:bg-emerald-500/5 p-4 rounded-xl text-center">
+                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-widest block">🏁 Penilaian Telah Final</span>
+                  <span className="text-[10px] text-slate-500 dark:text-neutral-400 mt-1 block">Nilai akhir telah dikunci secara permanen dan dipublikasikan ke mahasiswa.</span>
+                </div>
+              )}
+            </div>
+
+          </div>
+
+        </div>
+      )}
+
+      {/* FULLSIZE IMAGE PREVIEW MODAL */}
+      {modalImageUrl && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={() => setModalImageUrl(null)}>
+          <div className="relative max-w-4xl max-h-[90vh] bg-white border border-slate-250 dark:bg-[#0A0A0F] dark:border-neutral-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-neutral-900">
+              <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">{modalTitle}</span>
+              <button onClick={() => setModalImageUrl(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-neutral-900 rounded-lg transition-colors cursor-pointer">
+                <X className="w-5 h-5 text-slate-400 dark:text-neutral-400" />
+              </button>
+            </div>
+            <div className="p-4 overflow-auto flex items-center justify-center">
+              <img src={modalImageUrl} alt="Full Size Preview" className="max-w-full max-h-[70vh] rounded-xl object-contain border border-slate-200 dark:border-neutral-900 shadow-md" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI SIMULATION LOADING SCREEN */}
+      {isSimulatingAI && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex flex-col items-center justify-center p-6 text-center">
+          <div className="w-24 h-24 bg-cyan-500/10 border border-cyan-500/30 rounded-full flex items-center justify-center mb-8 relative shadow-[0_0_50px_rgba(6,182,212,0.15)]">
+            <Loader2 className="w-12 h-12 text-cyan-400 animate-spin" />
+            <div className="absolute inset-0 border-2 border-cyan-500/20 rounded-full animate-ping pointer-events-none"></div>
+          </div>
+
+          <h2 className="text-2xl font-extrabold text-white tracking-wide animate-pulse">🤖 Menganalisis Lembar Jawaban</h2>
+          <p className="text-neutral-500 text-sm mt-2 max-w-sm">Jaringan Saraf Tiruan sedang melakukan penafsiran tulisan tangan menggunakan model <span className="text-cyan-400 font-semibold">{selectedModel}</span>...</p>
+
+          {/* SIMULATED PIPELINE LOGS */}
+          <div className="mt-8 max-w-md w-full bg-[#050508] border border-neutral-900 rounded-xl p-4 font-mono text-left text-xs text-neutral-500 space-y-1.5 shadow-inner">
+            <div className="text-[10px] text-neutral-600 mb-2 border-b border-neutral-900 pb-1.5 uppercase tracking-wider font-bold">
+              [Simulated Pipeline Progress]
+            </div>
+            <div className={aiSimStep >= 1 ? "text-cyan-400" : ""}>
+              {aiSimStep >= 1 ? "✓" : "○"} [1/4] Menginisialisasi Model AI {selectedModel}...
+            </div>
+            <div className={aiSimStep >= 2 ? "text-cyan-400" : ""}>
+              {aiSimStep >= 2 ? "✓" : "○"} [2/4] Melakukan segmentasi lembar jawaban (24 slot)...
+            </div>
+            <div className={aiSimStep >= 3 ? "text-cyan-400" : ""}>
+              {aiSimStep >= 3 ? "✓" : "○"} [3/4] Mengekstraksi pola langkah matematika...
+            </div>
+            <div className={aiSimStep >= 4 ? "text-cyan-400" : ""}>
+              {aiSimStep >= 4 ? "✓" : "○"} [4/4] Menghasilkan nilai dan feedback prediksi...
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
