@@ -103,7 +103,7 @@ export default function Navbar({ showBack = false, backUrl = '/', title, subtitl
   };
 
   return (
-    <header className="border-b border-slate-200 dark:border-neutral-900 bg-white/75 dark:bg-[#0A0A0F]/65 backdrop-blur-md sticky top-0 z-50 w-full px-4 sm:px-6 lg:px-10 flex-shrink-0">
+    <header className="border-b border-slate-200 dark:border-neutral-900 bg-white/75 dark:bg-[#0A0A0F]/65 backdrop-blur-md sticky top-0 z-50 w-full px-4 sm:px-6 lg:px-10 flex-shrink-0 pt-[env(safe-area-inset-top)]">
       <div className="h-16 flex items-center justify-between">
         {/* Left section: Back button + Logo + Page context */}
         <div className="flex items-center gap-3 md:gap-4 overflow-hidden mr-4">

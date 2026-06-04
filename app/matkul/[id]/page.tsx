@@ -686,7 +686,7 @@ export default function UploadWorkspace() {
             <Navbar showBack backUrl="/" title={namaMatkul || 'Lembar Kerja Pengumpulan'} subtitle={kodeMatkul || `Mata Kuliah ID: ${matkulId}`} />
 
             {/* LAYOUT 24 GRID INTERAKTIF */}
-            <main className="max-w-4xl mx-auto px-4 py-8 relative z-10 pb-32 flex-grow w-full">
+            <main className="max-w-4xl mx-auto px-4 py-8 relative z-10 pb-[calc(8rem+env(safe-area-inset-bottom))] flex-grow w-full">
                 {/* WORKFLOW STATUS PANEL */}
                 {(() => {
                     const uploadedCount = slots.filter(s => s.status === 'success').length;
@@ -1126,7 +1126,7 @@ export default function UploadWorkspace() {
             </main>
 
             {/* FLOATING ACTION BOTTOM BAR */}
-            <footer className="fixed bottom-0 left-0 right-0 border-t border-slate-200 dark:border-neutral-900 bg-white/85 dark:bg-[#0A0A0F]/85 backdrop-blur-md py-4 px-4 sm:px-6 lg:px-10 z-40">
+            <footer className="fixed bottom-0 left-0 right-0 border-t border-slate-200 dark:border-neutral-900 bg-white/85 dark:bg-[#0A0A0F]/85 backdrop-blur-md pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] px-4 sm:px-6 lg:px-10 z-40">
                 {(() => {
                     const uploadedCount = slots.filter(s => s.status === 'success').length;
                     const totalSlots = slots.length;
@@ -1435,7 +1435,7 @@ export default function UploadWorkspace() {
                 return (
                     <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-250" onClick={!isDeleting ? closeModal : undefined}>
                         <div 
-                            className="bg-white dark:bg-[#0A0A0F] border-t border-slate-200 dark:border-neutral-900 sm:border rounded-t-3xl sm:rounded-2xl max-w-md w-full p-6 shadow-2xl relative animate-in slide-in-from-bottom duration-300"
+                            className="bg-white dark:bg-[#0A0A0F] border-t border-slate-200 dark:border-neutral-900 sm:border rounded-t-3xl sm:rounded-2xl max-w-md w-full pt-6 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:p-6 shadow-2xl relative animate-in slide-in-from-bottom duration-300"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="w-12 h-1 ml-auto mr-auto bg-slate-200 dark:bg-neutral-800 rounded-full mb-5 sm:hidden" />

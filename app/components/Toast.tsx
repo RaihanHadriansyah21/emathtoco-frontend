@@ -55,7 +55,7 @@ export default function ToastContainer({ toasts, onRemove }: ToastContainerProps
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-24 right-4 z-[9999] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
+    <div className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 left-4 sm:left-auto z-[9999] flex flex-col gap-3 max-w-sm w-[calc(100%-2rem)] sm:w-80 pointer-events-none">
       {toasts.map((t) => {
         const c = config[t.type];
         return (

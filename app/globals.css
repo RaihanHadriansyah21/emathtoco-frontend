@@ -58,45 +58,66 @@ body, header, main, table, tr, th, td, div, button, input, textarea, select, spa
 }
 
 /* Global Custom Scrollbar Styles */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 #f1f5f9;
-}
 
-.dark * {
-  scrollbar-color: #0e7490 #020205;
+/* Standard Properties (Firefox only) */
+@supports not selector(::-webkit-scrollbar) {
+  html, body, * {
+    scrollbar-width: thin;
+    scrollbar-color: #0891b2 #f1f5f9;
+  }
+
+  html.dark, .dark, .dark * {
+    scrollbar-color: #0e7490 #020205;
+  }
 }
 
 /* Webkit Scrollbars (Chrome, Safari, Edge, Opera) */
-::-webkit-scrollbar {
+::-webkit-scrollbar,
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-::-webkit-scrollbar-track {
+::-webkit-scrollbar-track,
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
   background: #f1f5f9;
 }
 
-.dark ::-webkit-scrollbar-track {
+.dark ::-webkit-scrollbar-track,
+html.dark ::-webkit-scrollbar-track,
+html.dark::-webkit-scrollbar-track,
+.dark::-webkit-scrollbar-track {
   background: #020205;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+::-webkit-scrollbar-thumb,
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  background: #0891b2;
   border-radius: 9999px;
   border: 2px solid #f1f5f9;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background: #0e7490;
+.dark ::-webkit-scrollbar-thumb,
+html.dark ::-webkit-scrollbar-thumb,
+html.dark::-webkit-scrollbar-thumb,
+.dark::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #0e7490, #2563eb);
   border-radius: 9999px;
   border: 2px solid #020205;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+::-webkit-scrollbar-thumb:hover,
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover {
+  background: #06b6d4;
 }
 
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #06b6d4;
+.dark ::-webkit-scrollbar-thumb:hover,
+html.dark ::-webkit-scrollbar-thumb:hover,
+html.dark::-webkit-scrollbar-thumb:hover,
+.dark::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #06b6d4, #3b82f6);
 }
