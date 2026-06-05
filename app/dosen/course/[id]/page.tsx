@@ -552,7 +552,7 @@ export default function LecturerCoursePortal() {
         </div>
 
         {/* SUMMARY CARDS */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-4 mb-8">
+        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 mb-8">
           {[
             { label: 'Total Pengumpulan', val: counts.total, icon: '📊', color: 'bg-white dark:bg-[#0A0A0F] dark:bg-gradient-to-b dark:from-cyan-500/10 dark:to-blue-500/5', border: 'border-slate-200 dark:border-cyan-500/10 dark:hover:border-cyan-500/20' },
             { label: 'Mahasiswa Terdaftar', val: totalStudents !== null ? totalStudents : '-', icon: '👥', color: 'bg-white dark:bg-[#0A0A0F] dark:bg-gradient-to-b dark:from-teal-500/10 dark:to-emerald-500/5', border: 'border-slate-200 dark:border-teal-500/10 dark:hover:border-teal-500/20' },
@@ -564,7 +564,7 @@ export default function LecturerCoursePortal() {
           ].map((card, idx) => (
             <div
               key={idx}
-              className={`${card.color} border ${card.border} backdrop-blur-md rounded-2xl p-4 shadow-lg flex flex-col justify-between transition-all duration-300`}
+              className={`${card.color} border ${card.border} backdrop-blur-md rounded-2xl p-4 shadow-lg flex flex-col justify-between transition-all duration-300 ${idx === 6 ? 'col-span-1 min-[360px]:col-span-2 lg:col-span-1' : ''}`}
             >
               <div className="flex flex-col gap-1.5 items-start">
                 <span className="text-xl">{card.icon}</span>
@@ -576,10 +576,10 @@ export default function LecturerCoursePortal() {
         </div>
 
         {/* SEARCH AND FILTERS */}
-        <div className="bg-white dark:bg-[#0A0A0F]/70 border border-slate-200 dark:border-neutral-900 rounded-2xl p-5 mb-8 backdrop-blur-md flex flex-col gap-4">
-          <div className="flex flex-col md:flex-row gap-4 justify-between items-center w-full">
+        <div className="bg-white dark:bg-[#0A0A0F]/70 border border-slate-200 dark:border-neutral-900 rounded-2xl p-4 sm:p-5 mb-8 backdrop-blur-md flex flex-col gap-4">
+          <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center w-full">
             {/* Tab Filters */}
-            <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto border-b md:border-b-0 border-slate-105 dark:border-neutral-900 pb-2 md:pb-0">
+            <div className="flex flex-wrap items-center gap-1.5 w-full lg:w-auto border-b lg:border-b-0 border-slate-100 dark:border-neutral-900 pb-2 lg:pb-0">
               {[
                 { id: 'all', label: 'Semua', count: counts.total },
                 { id: 'pending', label: 'Menunggu AI', count: counts.pending },
@@ -591,7 +591,7 @@ export default function LecturerCoursePortal() {
                 <button
                   key={tab.id}
                   onClick={() => setSelectedStatus(tab.id)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                     selectedStatus === tab.id
                       ? 'bg-cyan-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400'
                       : 'bg-slate-100 dark:bg-neutral-950/40 border border-slate-200 dark:border-transparent hover:border-slate-300 dark:hover:border-neutral-850 hover:bg-slate-200 dark:hover:bg-neutral-900/30 text-slate-600 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-neutral-200'
@@ -603,8 +603,8 @@ export default function LecturerCoursePortal() {
             </div>
 
             {/* Search + Batch AI Button Row */}
-            <div className="flex items-center gap-3 w-full md:w-auto">
-              <div className="relative flex-grow md:w-80">
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 w-full lg:w-auto">
+              <div className="relative w-full lg:w-80">
                 <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-neutral-600" />
                 <input
                   type="text"
@@ -614,33 +614,37 @@ export default function LecturerCoursePortal() {
                   className="w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 rounded-xl py-3 pl-11 pr-4 text-sm text-slate-800 dark:text-white focus:outline-none focus:border-blue-500/60 dark:focus:border-cyan-500/60 focus:ring-1 focus:ring-blue-500/10 dark:focus:ring-cyan-500/10 transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600"
                 />
               </div>
-              <button
-                onClick={handleRunAIBatch}
-                disabled={isRunningAI || counts.pending === 0}
-                title={counts.pending === 0 ? "Tidak ada submission yang perlu diproses" : undefined}
-                className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-4 py-3 rounded-xl text-xs font-bold tracking-wider transition-all duration-300 shadow-[0_0_20px_rgba(168,85,247,0.1)] hover:shadow-[0_0_30px_rgba(168,85,247,0.2)] cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isRunningAI ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Cpu className="w-4 h-4" />
-                )}
-                <span>{isRunningAI ? 'Processing AI...' : 'Run AI Batch'}</span>
-              </button>
-              <button
-                onClick={() => setShowExportModal(true)}
-                className="flex items-center gap-2 bg-emerald-50/50 dark:bg-[#0D1E16] border border-emerald-500/30 hover:border-emerald-500/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100/50 dark:hover:bg-emerald-500/10 hover:text-slate-800 dark:hover:text-white px-4 py-3 rounded-xl text-xs font-bold tracking-wider transition-all duration-300 cursor-pointer whitespace-nowrap"
-              >
-                <Download className="w-4 h-4" />
-                <span>Export CSV</span>
-              </button>
-              <button
-                onClick={() => setShowExportModal(true)}
-                className="flex items-center gap-2 bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white px-4 py-3 rounded-xl text-xs font-bold tracking-wider transition-all duration-300 shadow-[0_0_20px_rgba(6,182,212,0.1)] hover:shadow-[0_0_30px_rgba(6,182,212,0.2)] cursor-pointer whitespace-nowrap"
-              >
-                <FileSpreadsheet className="w-4 h-4" />
-                <span>Export Excel</span>
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+                <button
+                  onClick={handleRunAIBatch}
+                  disabled={isRunningAI || counts.pending === 0}
+                  title={counts.pending === 0 ? "Tidak ada submission yang perlu diproses" : undefined}
+                  className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-4 py-3 rounded-xl text-xs font-bold tracking-wider transition-all duration-300 shadow-[0_0_20px_rgba(168,85,247,0.1)] hover:shadow-[0_0_30px_rgba(168,85,247,0.2)] cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto py-2.5 px-3 text-[11px] sm:text-xs lg:w-auto"
+                >
+                  {isRunningAI ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Cpu className="w-4 h-4" />
+                  )}
+                  <span>{isRunningAI ? 'Processing AI...' : 'Run AI Batch'}</span>
+                </button>
+                <div className="grid grid-cols-2 gap-3 w-full sm:w-auto sm:flex">
+                  <button
+                    onClick={() => setShowExportModal(true)}
+                    className="flex items-center justify-center gap-2 bg-emerald-50/50 dark:bg-[#0D1E16] border border-emerald-500/30 hover:border-emerald-500/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100/50 dark:hover:bg-emerald-500/10 hover:text-slate-800 dark:hover:text-white px-4 py-3 rounded-xl text-xs font-bold tracking-wider transition-all duration-300 cursor-pointer whitespace-nowrap py-2.5 px-3 text-[11px] sm:text-xs w-full sm:w-auto"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Export CSV</span>
+                  </button>
+                  <button
+                    onClick={() => setShowExportModal(true)}
+                    className="flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white px-4 py-3 rounded-xl text-xs font-bold tracking-wider transition-all duration-300 shadow-[0_0_20px_rgba(6,182,212,0.1)] hover:shadow-[0_0_30px_rgba(6,182,212,0.2)] cursor-pointer whitespace-nowrap py-2.5 px-3 text-[11px] sm:text-xs w-full sm:w-auto"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    <span>Export Excel</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -747,12 +751,12 @@ export default function LecturerCoursePortal() {
                     key={sub.id}
                     className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl p-5 space-y-4 shadow-lg backdrop-blur-md hover:border-cyan-500/30 transition-all duration-300"
                   >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-bold text-slate-900 dark:text-white text-base">{mhs?.nama_lengkap || 'Unknown'}</h3>
-                        <span className="text-xs text-slate-500 dark:text-neutral-400 font-mono">{mhs?.nim_nip || '-'}</span>
+                    <div className="flex flex-wrap sm:flex-nowrap gap-3 justify-between items-start">
+                      <div className="min-w-0 flex-grow">
+                        <h3 className="font-bold text-slate-900 dark:text-white text-base leading-tight break-words">{mhs?.nama_lengkap || 'Unknown'}</h3>
+                        <span className="text-xs text-slate-500 dark:text-neutral-400 font-mono mt-0.5 block">{mhs?.nim_nip || '-'}</span>
                       </div>
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wider ${statusBadge.bg} ${statusBadge.border} ${statusBadge.color}`}>
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wider ${statusBadge.bg} ${statusBadge.border} ${statusBadge.color} flex-shrink-0 w-fit`}>
                         {statusBadge.icon} {statusBadge.text}
                       </span>
                     </div>
@@ -760,7 +764,7 @@ export default function LecturerCoursePortal() {
                     <div className="grid grid-cols-2 gap-3 text-xs border-y border-slate-100 dark:border-neutral-900 py-3">
                       <div className="space-y-1">
                         <span className="text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-widest text-[9px]">Mata Kuliah</span>
-                        <div className="font-semibold text-slate-700 dark:text-neutral-300 truncate max-w-[150px]">{mk?.nama_matkul || 'Unknown'}</div>
+                        <div className="font-semibold text-slate-700 dark:text-neutral-300 break-words">{mk?.nama_matkul || 'Unknown'}</div>
                       </div>
                       <div className="space-y-1">
                         <span className="text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-widest text-[9px]">Kelas</span>

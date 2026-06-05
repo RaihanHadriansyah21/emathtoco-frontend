@@ -26,7 +26,7 @@ export default function FullscreenLoader() {
             {/* Content Container */}
             <div className="relative z-10 flex flex-col items-center gap-6 text-center animate-in fade-in zoom-in-95 duration-500">
                 {/* Logo Frame with Shimmer and Pulse */}
-                <div className="relative p-5 bg-white border border-slate-200/80 dark:bg-[#0A0A0F]/90 dark:border-neutral-800 rounded-2xl shadow-xl dark:shadow-[0_0_40px_rgba(6,182,212,0.12)] flex items-center justify-center animate-[pulse-glow-box_3s_ease-in-out_infinite]">
+                <div className="relative p-5 bg-white border border-slate-200/80 rounded-2xl shadow-xl dark:shadow-[0_0_40px_rgba(6,182,212,0.12)] flex items-center justify-center animate-[pulse-glow-box_3s_ease-in-out_infinite]">
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-500/10 dark:via-cyan-500/20 to-transparent -translate-x-full animate-[shimmer_2.5s_infinite] pointer-events-none rounded-2xl" />
                     <Image
                         src={Logo}

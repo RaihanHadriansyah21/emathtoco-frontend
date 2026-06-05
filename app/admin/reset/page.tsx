@@ -37,84 +37,141 @@ export default function DemoResetPage() {
     setResultMessage(null);
   };
 
-  const deleteSubmissionFiles = async (): Promise<void> => {
-    console.log('[RESET] Fetching all image_urls from lembar_jawaban...');
-    const { data: sheets, error: fetchError } = await supabase
-      .from('lembar_jawaban')
-      .select('image_url');
 
-    if (fetchError) {
-      console.error('[RESET] Failed to fetch image_urls from lembar_jawaban:', fetchError);
-      throw new Error(`Gagal membaca path storage: ${fetchError.message}`);
-    }
-
-    const paths = (sheets || [])
-      .map((s) => s.image_url)
-      .filter((url): url is string => typeof url === 'string' && url.length > 0);
-
-    console.log('[RESET] Compiled paths list for deletion:', paths);
-
-    if (paths.length > 0) {
-      console.log(`[RESET] Deleting ${paths.length} files from bucket "lembar-jawaban"...`);
-      const { data: deleteData, error: deleteStorageError } = await supabase.storage
-        .from('lembar-jawaban')
-        .remove(paths);
-
-      if (deleteStorageError) {
-        console.error('[RESET] Error during storage files deletion:', deleteStorageError);
-        throw deleteStorageError;
-      }
-      
-      console.log('[RESET] Successfully deleted storage files. Response:', deleteData);
-    } else {
-      console.log('[RESET] Storage is already clean (0 files found to delete).');
-    }
-  };
 
   const handleReset = async () => {
     if (confirmText !== 'RESET') return;
     setIsResetting(true);
+
+    // Audit counters
+    let storageFilesDeleted = 0;
+    let predictionsDeleted = 0;
+    let answerSheetsDeleted = 0;
+    let submissionsDeleted = 0;
+    let enrollmentsDeleted = 0;
+
     try {
       if (resetType === 'submissions' || resetType === 'all') {
-        // STEP 1-4: Delete storage files before deleting DB rows
-        await deleteSubmissionFiles();
+        // ==========================================
+        // STEP 1: Fetch all lembar_jawaban records
+        // ==========================================
+        console.log('[RESET] Step 1: Fetching all lembar_jawaban records...');
+        const { data: sheets, error: fetchError } = await supabase
+          .from('lembar_jawaban')
+          .select('id, image_url');
 
-        // STEP 5: Only after storage cleanup succeeds:
-        // Delete child tables first, then parent tables
-        console.log('[RESET] Deleting hasil_prediksi rows...');
-        const { error: deleteHasilError } = await supabase
-          .from('hasil_prediksi')
-          .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000');
-        if (deleteHasilError) {
-          console.warn('[RESET] Warning deleting hasil_prediksi:', deleteHasilError);
+        if (fetchError) {
+          throw new Error(`Gagal membaca data lembar_jawaban: ${fetchError.message}`);
         }
 
-        console.log('[RESET] Deleting lembar_jawaban rows...');
-        const { error: deleteLembarError } = await supabase
+        const allSheets = sheets || [];
+        console.log(`[RESET] Found ${allSheets.length} lembar_jawaban records`);
+
+        // ==========================================
+        // STEP 2: Compile storage paths
+        // ==========================================
+        const paths = allSheets
+          .map((s) => s.image_url)
+          .filter((url): url is string => typeof url === 'string' && url.length > 0);
+
+        console.log(`[RESET] Found ${paths.length} storage file paths to delete`);
+
+        // ==========================================
+        // STEP 3: Delete storage files FIRST
+        // ==========================================
+        if (paths.length > 0) {
+          console.log(`[RESET] Step 3: Deleting ${paths.length} files from bucket "lembar-jawaban"...`);
+          const { data: deleteData, error: deleteStorageError } = await supabase.storage
+            .from('lembar-jawaban')
+            .remove(paths);
+
+          if (deleteStorageError) {
+            console.error('[RESET] Storage deletion failed:', deleteStorageError);
+            throw new Error(`Gagal menghapus file Storage: ${deleteStorageError.message}`);
+          }
+
+          storageFilesDeleted = deleteData?.length ?? paths.length;
+          console.log(`[RESET] ✓ Storage files deleted: ${storageFilesDeleted}`);
+        } else {
+          console.log('[RESET] Storage already clean (0 files)');
+        }
+
+        // ==========================================
+        // STEP 4: Delete hasil_prediksi
+        // ==========================================
+        console.log('[RESET] Step 4: Deleting hasil_prediksi...');
+        const { data: deletedHasil, error: deleteHasilError } = await supabase
+          .from('hasil_prediksi')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000')
+          .select('id');
+        if (deleteHasilError) {
+          throw new Error(`Gagal menghapus hasil_prediksi: ${deleteHasilError.message}`);
+        }
+        predictionsDeleted = deletedHasil?.length ?? 0;
+        console.log(`[RESET] ✓ Predictions deleted: ${predictionsDeleted}`);
+
+        // ==========================================
+        // STEP 5: Delete lembar_jawaban
+        // ==========================================
+        console.log('[RESET] Step 5: Deleting lembar_jawaban...');
+        const { data: deletedLembar, error: deleteLembarError } = await supabase
           .from('lembar_jawaban')
           .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000');
-        if (deleteLembarError) throw deleteLembarError;
+          .neq('id', '00000000-0000-0000-0000-000000000000')
+          .select('id');
+        if (deleteLembarError) {
+          throw new Error(`Gagal menghapus lembar_jawaban: ${deleteLembarError.message}`);
+        }
+        answerSheetsDeleted = deletedLembar?.length ?? 0;
+        console.log(`[RESET] ✓ Answer sheets deleted: ${answerSheetsDeleted}`);
 
-        console.log('[RESET] Deleting pengumpulan_tugas rows...');
-        const { error: deleteSubmissionsError } = await supabase
+        // ==========================================
+        // STEP 6: Delete pengumpulan_tugas
+        // ==========================================
+        console.log('[RESET] Step 6: Deleting pengumpulan_tugas...');
+        const { data: deletedSubs, error: deleteSubsError } = await supabase
           .from('pengumpulan_tugas')
           .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000');
-        if (deleteSubmissionsError) throw deleteSubmissionsError;
+          .neq('id', '00000000-0000-0000-0000-000000000000')
+          .select('id');
+        if (deleteSubsError) {
+          throw new Error(`Gagal menghapus pengumpulan_tugas: ${deleteSubsError.message}`);
+        }
+        submissionsDeleted = deletedSubs?.length ?? 0;
+        console.log(`[RESET] ✓ Submissions deleted: ${submissionsDeleted}`);
       }
 
       if (resetType === 'enrollments' || resetType === 'all') {
-        console.log('[RESET] Deleting mahasiswa_mata_kuliah rows...');
-        const { error: deleteEnrollmentsError } = await supabase
+        console.log('[RESET] Deleting mahasiswa_mata_kuliah...');
+        const { data: deletedEnrollments, error: deleteEnrollmentsError } = await supabase
           .from('mahasiswa_mata_kuliah')
           .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000');
-        if (deleteEnrollmentsError) throw deleteEnrollmentsError;
+          .neq('id', '00000000-0000-0000-0000-000000000000')
+          .select('id');
+        if (deleteEnrollmentsError) {
+          throw new Error(`Gagal menghapus enrollment: ${deleteEnrollmentsError.message}`);
+        }
+        enrollmentsDeleted = deletedEnrollments?.length ?? 0;
+        console.log(`[RESET] ✓ Enrollments deleted: ${enrollmentsDeleted}`);
       }
 
-      setResultMessage({ type: 'success', text: `Reset berhasil! Data ${resetType === 'submissions' ? 'pengumpulan tugas' : resetType === 'enrollments' ? 'enrollment mahasiswa' : 'submissions + enrollment'} telah dihapus.` });
+      // Build audit summary
+      const auditLines: string[] = ['Reset selesai!', ''];
+      if (resetType === 'submissions' || resetType === 'all') {
+        auditLines.push(`Storage files deleted: ${storageFilesDeleted}`);
+        auditLines.push(`Predictions deleted: ${predictionsDeleted}`);
+        auditLines.push(`Answer sheets deleted: ${answerSheetsDeleted}`);
+        auditLines.push(`Submissions deleted: ${submissionsDeleted}`);
+      }
+      if (resetType === 'enrollments' || resetType === 'all') {
+        auditLines.push(`Enrollments deleted: ${enrollmentsDeleted}`);
+      }
+
+      console.log('[RESET] === AUDIT SUMMARY ===');
+      auditLines.forEach(line => console.log(`[RESET] ${line}`));
+
+      setResultMessage({ type: 'success', text: auditLines.join('\n') });
       setShowConfirmModal(false);
     } catch (err: any) {
       console.error('[RESET] Reset process failed:', err);
@@ -182,7 +239,7 @@ export default function DemoResetPage() {
 
       {/* Result Message */}
       {resultMessage && (
-        <div className={`rounded-2xl p-4 text-sm font-medium ${
+        <div className={`rounded-2xl p-4 text-sm font-medium whitespace-pre-wrap ${
           resultMessage.type === 'success'
             ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
             : 'bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400'

@@ -127,9 +127,12 @@ export default function UploadWorkspace() {
     };
 
     const isSlotLocked = (slot: SlotState) => {
-        if (isReadOnly && slot.dbStatus !== 'reupload_required') return true;
-        const lockedStatuses = ['processing_ai', 'reviewed', 'finalized'];
-        if (slot.dbStatus && lockedStatuses.includes(slot.dbStatus)) return true;
+        const currentSubStatus = submissionStatus || 'draft';
+        const lockedStatuses = ['processing_ai', 'ready_review', 'reviewed', 'finalized'];
+        if (lockedStatuses.includes(currentSubStatus)) {
+            if (slot.dbStatus === 'reupload_required') return false;
+            return true;
+        }
         return false;
     };
 
@@ -325,7 +328,7 @@ export default function UploadWorkspace() {
 
     // LOGIKA UTAMA: Upload Gambar Mandiri ke Supabase Storage (Bucket: lembar-jawaban)
     const handleFileChange = async (label: string, file: File | undefined) => {
-        if (!file || !userId || isReadOnly) return;
+        if (!file || !userId) return;
 
         const currentSlot = slots.find(s => s.label === label);
         if (currentSlot && isSlotLocked(currentSlot)) {
@@ -868,9 +871,15 @@ export default function UploadWorkspace() {
                                                     }
                                                 }}
                                                 onClick={() => {
-                                                    if (locked || slot.status === 'uploading') return;
-                                                    handleSlotTrigger(slot);
-                                                }}
+                                                     if (slot.status === 'uploading') return;
+                                                     if (locked) {
+                                                         if (slot.status === 'success') {
+                                                             setActiveDetailSlot(slot);
+                                                         }
+                                                         return;
+                                                     }
+                                                     handleSlotTrigger(slot);
+                                                 }}
                                                 className={`h-28 sm:h-32 rounded-2xl border relative flex flex-col items-center justify-center p-2 transition-all duration-350 overflow-hidden group ${
                                                     isJustUploaded ? 'animate-pop-success ' : ''
                                                 } ${slot.status === 'success'
@@ -923,58 +932,72 @@ export default function UploadWorkspace() {
                                                         )}
 
                                                         {/* Hover Overlay Actions (Desktop Only) */}
-                                                        {!locked ? (
-                                                            <div className="absolute inset-0 bg-black/60 opacity-0 md:group-hover/card:opacity-100 transition-all duration-200 hidden md:flex items-center justify-center gap-1.5 z-10">
-                                                                {/* 👁️ View Detail */}
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        setActiveDetailSlot(slot);
-                                                                    }}
-                                                                    className="p-1.5 rounded-lg bg-white/10 hover:bg-white/25 border border-white/15 transition-all cursor-pointer"
-                                                                    title="Lihat Detail"
-                                                                >
-                                                                    <Eye className="w-3.5 h-3.5 text-white" />
-                                                                </button>
-                                                                {/* 📷 Replace Photo */}
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        pendingUploadLabelRef.current = slot.label;
-                                                                        setActiveUploadChoiceLabel(slot.label);
-                                                                        setTimeout(() => {
-                                                                            galleryInputRef.current?.click();
-                                                                        }, 50);
-                                                                    }}
-                                                                    className="p-1.5 rounded-lg bg-white/10 hover:bg-white/25 border border-white/15 transition-all cursor-pointer"
-                                                                    title="Ganti Foto"
-                                                                >
-                                                                    <RefreshCw className="w-3.5 h-3.5 text-white" />
-                                                                </button>
-                                                                {/* 🗑️ Delete Photo */}
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        setDesktopDeleteTarget(slot.label);
-                                                                        setShowDesktopDeleteModal(true);
-                                                                    }}
-                                                                    className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/40 border border-red-500/30 transition-all cursor-pointer"
-                                                                    title="Hapus Foto"
-                                                                >
-                                                                    <Trash2 className="w-3.5 h-3.5 text-red-300" />
-                                                                </button>
-                                                            </div>
-                                                        ) : (
-                                                            <div
-                                                                className="absolute inset-0 opacity-0 md:group-hover/card:opacity-100 transition-all duration-200 hidden md:flex items-center justify-center z-10 cursor-pointer bg-black/40"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setActiveDetailSlot(slot);
-                                                                }}
-                                                            >
-                                                                <Eye className="w-4 h-4 text-white/70" />
-                                                            </div>
-                                                        )}
+                                                         {(() => {
+                                                             const status = submissionStatus || 'draft';
+                                                             const showReplace = status === 'draft' || status === 'submitted' || slot.dbStatus === 'reupload_required';
+                                                             const showDelete = status === 'draft';
+
+                                                             if (showReplace || showDelete) {
+                                                                 return (
+                                                                     <div className="absolute inset-0 bg-black/60 opacity-0 md:group-hover/card:opacity-100 transition-all duration-200 hidden md:flex items-center justify-center gap-1.5 z-10">
+                                                                         {/* 👁️ View Detail */}
+                                                                         <button
+                                                                             onClick={(e) => {
+                                                                                 e.stopPropagation();
+                                                                                 setActiveDetailSlot(slot);
+                                                                             }}
+                                                                             className="p-1.5 rounded-lg bg-white/10 hover:bg-white/25 border border-white/15 transition-all cursor-pointer"
+                                                                             title="Lihat Detail"
+                                                                         >
+                                                                             <Eye className="w-3.5 h-3.5 text-white" />
+                                                                         </button>
+                                                                         {/* 📷 Replace Photo */}
+                                                                         {showReplace && (
+                                                                             <button
+                                                                                 onClick={(e) => {
+                                                                                     e.stopPropagation();
+                                                                                     pendingUploadLabelRef.current = slot.label;
+                                                                                     setActiveUploadChoiceLabel(slot.label);
+                                                                                     setTimeout(() => {
+                                                                                         galleryInputRef.current?.click();
+                                                                                     }, 50);
+                                                                                 }}
+                                                                                 className="p-1.5 rounded-lg bg-white/10 hover:bg-white/25 border border-white/15 transition-all cursor-pointer"
+                                                                                 title="Ganti Foto"
+                                                                             >
+                                                                                 <RefreshCw className="w-3.5 h-3.5 text-white" />
+                                                                             </button>
+                                                                         )}
+                                                                         {/* 🗑️ Delete Photo */}
+                                                                         {showDelete && (
+                                                                             <button
+                                                                                 onClick={(e) => {
+                                                                                     e.stopPropagation();
+                                                                                     setDesktopDeleteTarget(slot.label);
+                                                                                     setShowDesktopDeleteModal(true);
+                                                                                 }}
+                                                                                 className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/40 border border-red-500/30 transition-all cursor-pointer"
+                                                                                 title="Hapus Foto"
+                                                                             >
+                                                                                 <Trash2 className="w-3.5 h-3.5 text-red-300" />
+                                                                             </button>
+                                                                         )}
+                                                                     </div>
+                                                                 );
+                                                             } else {
+                                                                 return (
+                                                                     <div
+                                                                         className="absolute inset-0 opacity-0 md:group-hover/card:opacity-100 transition-all duration-200 hidden md:flex items-center justify-center z-10 cursor-pointer bg-black/40"
+                                                                         onClick={(e) => {
+                                                                             e.stopPropagation();
+                                                                             setActiveDetailSlot(slot);
+                                                                         }}
+                                                                     >
+                                                                         <Eye className="w-4 h-4 text-white/70" />
+                                                                     </div>
+                                                                 );
+                                                             }
+                                                         })()}
                                                     </div>
                                                 )}
 
@@ -1427,6 +1450,10 @@ export default function UploadWorkspace() {
                 const isUploaded = targetSlot?.status === 'success';
                 const isDeleting = isDeletingSlot === activeUploadChoiceLabel;
 
+                const status = submissionStatus || 'draft';
+                const showReplace = status === 'draft' || status === 'submitted' || targetSlot?.dbStatus === 'reupload_required';
+                const showDelete = status === 'draft';
+
                 const closeModal = () => {
                     setShowChoiceModal(false);
                     // Don't clear activeUploadChoiceLabel here — the ref handles it
@@ -1467,55 +1494,61 @@ export default function UploadWorkspace() {
                                         </button>
 
                                         {/* 📷 Ganti Foto — Kamera */}
-                                        <button
-                                            disabled={isDeleting}
-                                            onClick={() => {
-                                                console.log('[GANTI KAMERA BTN] pendingLabel:', pendingUploadLabelRef.current);
-                                                closeModal();
-                                                setTimeout(() => {
-                                                    cameraInputRef.current?.click();
-                                                }, 100);
-                                            }}
-                                            className="h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 rounded-xl font-bold flex items-center justify-center gap-2 text-white cursor-pointer shadow-md shadow-cyan-500/10 transition-all active:scale-[0.98] text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            <Camera className="w-5 h-5" />
-                                            <span>Ganti Foto (Kamera)</span>
-                                        </button>
+                                        {showReplace && (
+                                            <button
+                                                disabled={isDeleting}
+                                                onClick={() => {
+                                                    console.log('[GANTI KAMERA BTN] pendingLabel:', pendingUploadLabelRef.current);
+                                                    closeModal();
+                                                    setTimeout(() => {
+                                                        cameraInputRef.current?.click();
+                                                    }, 100);
+                                                }}
+                                                className="h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 rounded-xl font-bold flex items-center justify-center gap-2 text-white cursor-pointer shadow-md shadow-cyan-500/10 transition-all active:scale-[0.98] text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <Camera className="w-5 h-5" />
+                                                <span>Ganti Foto (Kamera)</span>
+                                            </button>
+                                        )}
 
                                         {/* 🖼️ Ganti dari Galeri */}
-                                        <button
-                                            disabled={isDeleting}
-                                            onClick={() => {
-                                                console.log('[GANTI GALERI BTN] pendingLabel:', pendingUploadLabelRef.current);
-                                                closeModal();
-                                                setTimeout(() => {
-                                                    galleryInputRef.current?.click();
-                                                }, 100);
-                                            }}
-                                            className="h-12 border border-slate-200 dark:border-neutral-800 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl font-bold flex items-center justify-center gap-2 text-slate-800 dark:text-white cursor-pointer transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            <ImageIcon className="w-5 h-5 text-cyan-500" />
-                                            <span>Ganti dari Galeri</span>
-                                        </button>
+                                        {showReplace && (
+                                            <button
+                                                disabled={isDeleting}
+                                                onClick={() => {
+                                                    console.log('[GANTI GALERI BTN] pendingLabel:', pendingUploadLabelRef.current);
+                                                    closeModal();
+                                                    setTimeout(() => {
+                                                        galleryInputRef.current?.click();
+                                                    }, 100);
+                                                }}
+                                                className="h-12 border border-slate-200 dark:border-neutral-800 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl font-bold flex items-center justify-center gap-2 text-slate-800 dark:text-white cursor-pointer transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <ImageIcon className="w-5 h-5 text-cyan-500" />
+                                                <span>Ganti dari Galeri</span>
+                                            </button>
+                                        )}
 
                                         {/* 🗑️ Hapus Foto */}
-                                        <button
-                                            disabled={isDeleting}
-                                            onClick={() => handleDeleteSlot(activeUploadChoiceLabel)}
-                                            className="h-12 border border-red-500/30 bg-red-500/5 hover:bg-red-500/10 dark:border-red-500/30 dark:bg-red-500/5 dark:hover:bg-red-500/10 rounded-xl font-bold flex items-center justify-center gap-2 text-red-600 dark:text-red-400 cursor-pointer transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            {isDeleting ? (
-                                                <>
-                                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                                    <span>Menghapus...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Trash2 className="w-5 h-5" />
-                                                    <span>Hapus Foto</span>
-                                                </>
-                                            )}
-                                        </button>
+                                        {showDelete && (
+                                            <button
+                                                disabled={isDeleting}
+                                                onClick={() => handleDeleteSlot(activeUploadChoiceLabel)}
+                                                className="h-12 border border-red-500/30 bg-red-500/5 hover:bg-red-500/10 dark:border-red-500/30 dark:bg-red-500/5 dark:hover:bg-red-500/10 rounded-xl font-bold flex items-center justify-center gap-2 text-red-600 dark:text-red-400 cursor-pointer transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {isDeleting ? (
+                                                    <>
+                                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                                        <span>Menghapus...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Trash2 className="w-5 h-5" />
+                                                        <span>Hapus Foto</span>
+                                                    </>
+                                                )}
+                                            </button>
+                                        )}
 
                                         {/* Batal */}
                                         <button

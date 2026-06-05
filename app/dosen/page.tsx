@@ -160,7 +160,7 @@ export default function LecturerDashboard() {
       <main className="max-w-4xl mx-auto px-4 py-12 relative z-10 w-full flex-grow">
         {/* Welcome message */}
         <div className="mb-10">
-          <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Selamat Datang, Dosen!</h1>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Selamat Datang, Dosen!</h1>
           <p className="text-slate-500 dark:text-neutral-400 mt-2">Halo <span className="text-cyan-600 dark:text-cyan-400 font-semibold">{lecturerName}</span>. Silakan pilih mata kuliah di bawah ini untuk mengelola penilaian AI tugas mahasiswa.</p>
         </div>
 
@@ -201,38 +201,38 @@ export default function LecturerDashboard() {
                     onClick={() => router.push(`/dosen/course/${course.id}`)}
                     className="group border border-slate-200 dark:border-neutral-900 bg-white dark:bg-[#0A0A0F]/80 rounded-2xl p-5 flex flex-col justify-between cursor-pointer transition-all duration-300 hover:border-blue-500/40 dark:hover:border-cyan-500/40 hover:shadow-[0_0_30px_rgba(59,130,246,0.05)] dark:hover:shadow-[0_0_30px_rgba(6,182,212,0.05)]"
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl border border-slate-200 dark:border-neutral-800 bg-slate-50 dark:bg-black flex items-center justify-center text-2xl group-hover:bg-blue-500/10 dark:group-hover:bg-cyan-500/10 group-hover:border-blue-500/40 dark:group-hover:border-cyan-500/60 transition-colors duration-300">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className="w-12 h-12 rounded-xl border border-slate-200 dark:border-neutral-800 bg-slate-50 dark:bg-black flex items-center justify-center text-2xl group-hover:bg-blue-500/10 dark:group-hover:bg-cyan-500/10 group-hover:border-blue-500/40 dark:group-hover:border-cyan-500/60 transition-colors duration-300 flex-shrink-0">
                           {getCourseIcon(course.icon_name)}
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <span className="text-xs font-mono text-blue-600 dark:text-cyan-400 font-bold">{course.kode_matkul}</span>
-                          <h3 className="text-lg font-bold text-slate-800 dark:text-white mt-0.5 group-hover:text-blue-500 dark:group-hover:text-cyan-300 transition-colors duration-200">{course.nama_matkul}</h3>
+                          <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-white mt-0.5 group-hover:text-blue-500 dark:group-hover:text-cyan-300 transition-colors duration-200 break-words">{course.nama_matkul}</h3>
                         </div>
                       </div>
-                      <div className="w-8 h-8 rounded-full border border-slate-200 dark:border-neutral-800 bg-slate-100 dark:bg-neutral-950 text-slate-400 dark:text-neutral-400 flex items-center justify-center group-hover:bg-gradient-to-r group-hover:from-blue-500 group-hover:to-indigo-600 dark:group-hover:from-cyan-500 dark:group-hover:to-indigo-600 group-hover:border-transparent group-hover:text-white transition-all duration-300">
+                      <div className="w-8 h-8 rounded-full border border-slate-200 dark:border-neutral-800 bg-slate-100 dark:bg-neutral-950 text-slate-400 dark:text-neutral-400 flex items-center justify-center group-hover:bg-gradient-to-r group-hover:from-blue-500 group-hover:to-indigo-600 dark:group-hover:from-cyan-500 dark:group-hover:to-indigo-600 group-hover:border-transparent group-hover:text-white transition-all duration-300 flex-shrink-0">
                         <ChevronRight className="w-4 h-4 transform group-hover:translate-x-0.5 transition-transform" />
                       </div>
                     </div>
 
                     {/* Breakdown Stats inside Course Card */}
-                    <div className="mt-6 pt-4 border-t border-slate-100 dark:border-neutral-900 grid grid-cols-4 gap-2 text-center">
-                      <div className="bg-slate-50 dark:bg-black/30 rounded-xl py-2 px-1 border border-slate-100 dark:border-neutral-950">
-                        <div className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-wider">Total</div>
-                        <div className="text-lg font-extrabold text-slate-700 dark:text-neutral-200 mt-0.5 font-mono">{stats.total}</div>
+                    <div className="mt-6 pt-4 border-t border-slate-100 dark:border-neutral-900 grid grid-cols-4 gap-1.5 sm:gap-2 text-center">
+                      <div className="bg-slate-50 dark:bg-black/30 rounded-xl py-2 px-0.5 border border-slate-100 dark:border-neutral-950">
+                        <div className="text-[9px] min-[360px]:text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-wider">Total</div>
+                        <div className="text-base sm:text-lg font-extrabold text-slate-700 dark:text-neutral-200 mt-0.5 font-mono">{stats.total}</div>
                       </div>
-                      <div className="bg-amber-500/5 rounded-xl py-2 px-1 border border-amber-500/10">
-                        <div className="text-[10px] font-bold text-amber-500/80 dark:text-amber-500/60 uppercase tracking-wider">Wait AI</div>
-                        <div className="text-lg font-extrabold text-amber-600 dark:text-amber-400 mt-0.5 font-mono">{stats.submitted}</div>
+                      <div className="bg-amber-500/5 rounded-xl py-2 px-0.5 border border-amber-500/10">
+                        <div className="text-[9px] min-[360px]:text-[10px] font-bold text-amber-500/80 dark:text-amber-500/60 uppercase tracking-wider">Wait AI</div>
+                        <div className="text-base sm:text-lg font-extrabold text-amber-600 dark:text-amber-400 mt-0.5 font-mono">{stats.submitted}</div>
                       </div>
-                      <div className="bg-blue-500/5 rounded-xl py-2 px-1 border border-blue-500/10">
-                        <div className="text-[10px] font-bold text-blue-500/80 dark:text-blue-500/60 uppercase tracking-wider">Review</div>
-                        <div className="text-lg font-extrabold text-blue-600 dark:text-blue-400 mt-0.5 font-mono">{stats.reviewed}</div>
+                      <div className="bg-blue-500/5 rounded-xl py-2 px-0.5 border border-blue-500/10">
+                        <div className="text-[9px] min-[360px]:text-[10px] font-bold text-blue-500/80 dark:text-blue-500/60 uppercase tracking-wider">Review</div>
+                        <div className="text-base sm:text-lg font-extrabold text-blue-600 dark:text-blue-400 mt-0.5 font-mono">{stats.reviewed}</div>
                       </div>
-                      <div className="bg-emerald-500/5 rounded-xl py-2 px-1 border border-emerald-500/10">
-                        <div className="text-[10px] font-bold text-emerald-500/80 dark:text-emerald-500/60 uppercase tracking-wider">Final</div>
-                        <div className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5 font-mono">{stats.finalized}</div>
+                      <div className="bg-emerald-500/5 rounded-xl py-2 px-0.5 border border-emerald-500/10">
+                        <div className="text-[9px] min-[360px]:text-[10px] font-bold text-emerald-500/80 dark:text-emerald-500/60 uppercase tracking-wider">Final</div>
+                        <div className="text-base sm:text-lg font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5 font-mono">{stats.finalized}</div>
                       </div>
                     </div>
                   </div>

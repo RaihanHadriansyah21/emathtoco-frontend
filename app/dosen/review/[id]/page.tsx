@@ -86,6 +86,51 @@ const getSignedPreviewUrl = async (path: string): Promise<string | null> => {
   }
 };
 
+const isSubmissionEqual = (a: SubmissionData | null, b: SubmissionData | null): boolean => {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return (
+    a.id === b.id &&
+    a.mahasiswa_id === b.mahasiswa_id &&
+    a.status_submit === b.status_submit &&
+    a.ai_status === b.ai_status &&
+    a.waktu_submit === b.waktu_submit &&
+    a.nilai_akhir === b.nilai_akhir &&
+    a.model_ai === b.model_ai &&
+    JSON.stringify(a.mahasiswa) === JSON.stringify(b.mahasiswa) &&
+    JSON.stringify(a.mata_kuliah) === JSON.stringify(b.mata_kuliah)
+  );
+};
+
+const areSlotsEqual = (arr1: SlotState[], arr2: SlotState[]): boolean => {
+  if (arr1.length !== arr2.length) return false;
+  for (let i = 0; i < arr1.length; i++) {
+    const s1 = arr1[i];
+    const s2 = arr2[i];
+    if (
+      s1.label !== s2.label ||
+      s1.hasSheet !== s2.hasSheet ||
+      s1.sheetId !== s2.sheetId ||
+      s1.aiScore !== s2.aiScore ||
+      s1.confidence !== s2.confidence ||
+      s1.manualScore !== s2.manualScore ||
+      s1.manualCorrection !== s2.manualCorrection ||
+      s1.finalScore !== s2.finalScore ||
+      s1.feedback !== s2.feedback ||
+      s1.dbStatus !== s2.dbStatus ||
+      s1.rejectionReason !== s2.rejectionReason ||
+      s1.wasReuploaded !== s2.wasReuploaded ||
+      s1.lastReuploadAt !== s2.lastReuploadAt ||
+      s1.reuploadCount !== s2.reuploadCount ||
+      s1.imagePath !== s2.imagePath ||
+      s1.fileUrl !== s2.fileUrl
+    ) {
+      return false;
+    }
+  }
+  return true;
+};
+
 export default function ReviewWorkspace() {
   const router = useRouter();
   const params = useParams();
@@ -104,6 +149,7 @@ export default function ReviewWorkspace() {
   const [showSuccessBanner, setShowSuccessBanner] = useState(false);
   const [aiSuccessModel, setAiSuccessModel] = useState('');
   const [aiErrorMessage, setAiErrorMessage] = useState<string | null>(null);
+  const [isBackendOffline, setIsBackendOffline] = useState(false);
 
   // Submission Data
   const [submission, setSubmission] = useState<SubmissionData | null>(null);
@@ -151,7 +197,42 @@ export default function ReviewWorkspace() {
   const [isAccessDenied, setIsAccessDenied] = useState(false);
   const [courseId, setCourseId] = useState<string | null>(null);
 
-  const isAIProcessing = isPredicting || submission?.ai_status === 'processing' || submission?.ai_status === 'ai_pending' || submission?.ai_status === 'ai_running';
+  // Sync state to refs for stable useCallback and polling intervals
+  const submissionRef = useRef<SubmissionData | null>(null);
+  const slotsRef = useRef<SlotState[]>([]);
+  const totalAIScoreRef = useRef<number | null>(null);
+  const selectedModelRef = useRef(selectedModel);
+  const isPredictingRef = useRef(isPredicting);
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    submissionRef.current = submission;
+  }, [submission]);
+
+  useEffect(() => {
+    slotsRef.current = slots;
+  }, [slots]);
+
+  useEffect(() => {
+    totalAIScoreRef.current = totalAIScore;
+  }, [totalAIScore]);
+
+  useEffect(() => {
+    selectedModelRef.current = selectedModel;
+  }, [selectedModel]);
+
+  useEffect(() => {
+    isPredictingRef.current = isPredicting;
+  }, [isPredicting]);
+
+  const isAIActive = isPredicting || 
+    submission?.ai_status === 'processing' || 
+    submission?.ai_status === 'ai_pending' || 
+    submission?.ai_status === 'ai_running' || 
+    submission?.status_submit === 'processing_ai' || 
+    (submission?.status_submit as string) === 'diproses_ai';
+
+  const isAIProcessing = isAIActive && !isBackendOffline;
 
   useEffect(() => {
     // 1. Verify lecturer role
@@ -218,40 +299,16 @@ export default function ReviewWorkspace() {
     verifyUser();
   }, [router, submissionId]);
 
-  // Polling logic when the submission is 'processing' (BUG 2 fix)
-  useEffect(() => {
-    if (!submission || (submission.ai_status !== 'processing')) {
-      // Stop polling when not processing
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
-      return;
-    }
-
-    // Only create a new interval if one doesn't already exist
-    if (pollingRef.current) return;
-
-    pollingRef.current = setInterval(() => {
-      // Prevent overlapping fetches
-      if (isFetchingRef.current) return;
-      loadWorkspaceDetails();
-    }, 3000);
-
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
-    };
-  }, [submission]);
-
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
         pollingRef.current = null;
+      }
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+        successTimeoutRef.current = null;
       }
     };
   }, []);
@@ -261,7 +318,10 @@ export default function ReviewWorkspace() {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
 
-    setIsLoadingWorkspace(true);
+    const isFirstLoad = !submissionRef.current;
+    if (isFirstLoad) {
+      setIsLoadingWorkspace(true);
+    }
     setErrorMsg(null);
     try {
       // Fetch parent submission
@@ -283,7 +343,9 @@ export default function ReviewWorkspace() {
 
       if (subError) throw subError;
       if (!subData) {
-        setErrorMsg('Data pengumpulan tugas tidak ditemukan.');
+        if (isFirstLoad) {
+          setErrorMsg('Data pengumpulan tugas tidak ditemukan.');
+        }
         setIsLoadingWorkspace(false);
         isFetchingRef.current = false;
         return;
@@ -295,14 +357,19 @@ export default function ReviewWorkspace() {
         const aiRes = await apiGet(`/submission/${submissionId}/results`);
         if (aiRes.ok) {
           aiResultsData = await aiRes.json();
-          setTotalAIScore(aiResultsData.nilai_akhir);
+          setIsBackendOffline(false);
+        } else {
+          setIsBackendOffline(true);
         }
       } catch (aiErr: any) {
         console.error('AI Backend Error:', aiErr);
+        setIsBackendOffline(true);
         const userFriendlyMsg = (aiErr instanceof TypeError || (aiErr.message && aiErr.message.includes("fetch")))
           ? "Backend tidak dapat dihubungi. Pastikan server FastAPI berjalan dan IP backend benar."
           : "Gagal memuat hasil AI dari backend.";
-        setErrorMsg(userFriendlyMsg);
+        if (isFirstLoad) {
+          setErrorMsg(userFriendlyMsg);
+        }
       }
 
       const formattedSub = subData as unknown as SubmissionData;
@@ -312,30 +379,34 @@ export default function ReviewWorkspace() {
           formattedSub.nilai_akhir = aiResultsData.nilai_akhir;
         }
       }
+
       // Check if previously processing to trigger success/error banner (Requirement 5, 6, 7)
-      setSubmission((prevSubmission) => {
-        const prevStatus = prevSubmission?.ai_status;
-        const newStatus = formattedSub.ai_status;
+      const prevStatus = submissionRef.current?.ai_status;
+      const newStatus = formattedSub.ai_status;
 
-        const isPrevProcessing = prevStatus === 'processing' || prevStatus === 'ai_pending' || prevStatus === 'ai_running' || isPredicting;
-        const isNewSuccess = newStatus === 'completed' || newStatus === 'partial';
+      const isPrevProcessing = prevStatus === 'processing' || prevStatus === 'ai_pending' || prevStatus === 'ai_running' || isPredictingRef.current;
+      const isNewSuccess = newStatus === 'completed' || newStatus === 'partial';
 
-        if (isPrevProcessing && isNewSuccess) {
-          setAiSuccessModel(formattedSub.model_ai || selectedModel);
-          setShowSuccessBanner(true);
-          setTimeout(() => {
-            setShowSuccessBanner(false);
-          }, 3000);
-          setIsPredicting(false);
-        } else if (isPrevProcessing && newStatus === 'failed') {
-          setAiErrorMessage("Silakan coba kembali.");
-          setIsPredicting(false);
-        }
+      if (isPrevProcessing && isNewSuccess) {
+        setAiSuccessModel(formattedSub.model_ai || selectedModelRef.current);
+        setShowSuccessBanner(true);
+        if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+        successTimeoutRef.current = setTimeout(() => {
+          setShowSuccessBanner(false);
+        }, 3000);
+        setIsPredicting(false);
+      } else if (isPrevProcessing && newStatus === 'failed') {
+        setAiErrorMessage("Silakan coba kembali.");
+        setIsPredicting(false);
+      }
 
-        return formattedSub;
-      });
+      // Compare and update submission state
+      const isSubChanged = !isSubmissionEqual(submissionRef.current, formattedSub);
+      if (isSubChanged) {
+        setSubmission(formattedSub);
+      }
 
-      if (formattedSub.model_ai) {
+      if (formattedSub.model_ai && formattedSub.model_ai !== selectedModelRef.current) {
         setSelectedModel(formattedSub.model_ai);
       }
 
@@ -345,16 +416,12 @@ export default function ReviewWorkspace() {
         .select('*')
         .eq('pengumpulan_tugas_id', submissionId);
 
-      console.log("RAW SHEETS", sheets);
-
       if (sheetsError) throw sheetsError;
 
-      // Initialize 24 slots
+      // Initialize 24 slots, reusing existing fileUrl from current state if imagePath matches
       const initialSlots = generateSlots().map(s => {
         const sectionCode = `S-${s.label.toUpperCase()}`;
         const matchedSheet = sheets?.find(sh => sh.section_code === sectionCode);
-        console.log("MATCHED SHEET", matchedSheet);
-        console.log("IMAGE_URL", matchedSheet?.image_url);
 
         // Get AI score and confidence from backend
         const matchedSectionAI = aiResultsData?.sections?.find((sec: any) => sec.section_code === sectionCode);
@@ -370,13 +437,18 @@ export default function ReviewWorkspace() {
           : (matchedSheet?.nilai_final !== undefined && matchedSheet.nilai_final !== null ? matchedSheet.nilai_final : aiScore);
         const manualCorrection = (finalScore !== null && aiScore !== null) ? (finalScore - aiScore) : 0;
 
+        const existingSlot = slotsRef.current.find(ex => ex.label === s.label);
+        const fileUrl = (existingSlot && existingSlot.imagePath === matchedSheet?.image_url)
+          ? existingSlot.fileUrl
+          : null;
+
         return {
           label: s.label,
           nomor_soal: s.nomor_soal,
           bagian_soal: s.bagian_soal,
           hasSheet: !!matchedSheet,
           sheetId: matchedSheet?.id,
-          fileUrl: null,
+          fileUrl,
           imagePath: matchedSheet?.image_url,
           aiScore,
           confidence,
@@ -392,11 +464,9 @@ export default function ReviewWorkspace() {
         };
       });
 
-      setSlots(initialSlots as SlotState[]);
-
-      // Generate signed URLs for uploaded sheets
+      // Generate signed URLs ONLY for slots that need them (don't have them yet)
       const urlPromises = initialSlots.map(async (slot) => {
-        if (slot.hasSheet && slot.imagePath) {
+        if (slot.hasSheet && slot.imagePath && !slot.fileUrl) {
           const signedUrl = await getSignedPreviewUrl(slot.imagePath);
           return { ...slot, fileUrl: signedUrl };
         }
@@ -404,16 +474,58 @@ export default function ReviewWorkspace() {
       });
 
       const resolvedSlots = await Promise.all(urlPromises);
-      setSlots(resolvedSlots);
+
+      // Compare and update AI total score
+      const newTotalScore = aiResultsData ? aiResultsData.nilai_akhir : null;
+      const isTotalAIScoreChanged = totalAIScoreRef.current !== newTotalScore;
+      if (isTotalAIScoreChanged) {
+        setTotalAIScore(newTotalScore);
+      }
+
+      // Compare and update slots state
+      const isSlotsChanged = !areSlotsEqual(slotsRef.current, resolvedSlots);
+      if (isSlotsChanged) {
+        setSlots(resolvedSlots);
+      }
 
     } catch (err) {
       console.error('Error loading review workspace:', err);
-      setErrorMsg('Gagal memuat detail lembar jawaban mahasiswa.');
+      if (isFirstLoad) {
+        setErrorMsg('Gagal memuat detail lembar jawaban mahasiswa.');
+      }
     } finally {
       setIsLoadingWorkspace(false);
       isFetchingRef.current = false;
     }
-  }, [submissionId, selectedModel, isPredicting]);
+  }, [submissionId]);
+
+  // Polling logic when the submission is in processing status
+  useEffect(() => {
+    const activeStatuses = ['pending', 'processing', 'running', 'ai_pending', 'ai_running'];
+    const shouldPoll = submission && activeStatuses.includes(submission.ai_status || '');
+
+    if (!shouldPoll) {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      return;
+    }
+
+    if (pollingRef.current) return;
+
+    pollingRef.current = setInterval(() => {
+      if (isFetchingRef.current) return;
+      loadWorkspaceDetails();
+    }, 12000); // 12 seconds interval (10-15s requirement)
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [submission, loadWorkspaceDetails]);
 
   // Handle manual score change
   const handleManualScoreChange = (label: string, value: string) => {
@@ -483,10 +595,12 @@ export default function ReviewWorkspace() {
     // Cegah double submit (Requirement 8)
     const currentStatus = submission.ai_status || submission.status_submit;
     if (
-      currentStatus === 'processing' ||
-      currentStatus === 'ai_pending' ||
-      currentStatus === 'ai_running' ||
-      isPredicting
+      !isBackendOffline && (
+        currentStatus === 'processing' ||
+        currentStatus === 'ai_pending' ||
+        currentStatus === 'ai_running' ||
+        isPredicting
+      )
     ) {
       return;
     }
@@ -503,25 +617,41 @@ export default function ReviewWorkspace() {
       const res = await apiPost(`/predict/${submission.id}?model=${selectedModel}`);
 
       if (!res.ok) {
-        throw new Error('Backend AI predict failed');
+        let errorDetail = 'Gagal memulai proses prediksi.';
+        try {
+          const errJson = await res.json();
+          if (errJson && errJson.detail) {
+            errorDetail = errJson.detail;
+          }
+        } catch (_) {}
+        throw new Error(errorDetail);
       }
 
-      // Trigger success status (Requirement 6)
-      setAiSuccessModel(selectedModel);
-      setShowSuccessBanner(true);
-      setTimeout(() => {
-        setShowSuccessBanner(false);
-      }, 3000);
-
-      // Reload workspace details to show new predictions
-      loadWorkspaceDetails();
+      setIsBackendOffline(false);
+      // Reload workspace details to show new predictions and show the success banner naturally
+      await loadWorkspaceDetails();
     } catch (err: any) {
       console.error('AI Backend Error:', err);
-      // Trigger failure status (Requirement 7)
-      setAiErrorMessage("Silakan coba kembali.");
-      // Rollback status to null / failed
+      
+      const isConnectionError = err instanceof TypeError || (err.message && err.message.includes("fetch"));
+      if (isConnectionError) {
+        setIsBackendOffline(true);
+      }
+
+      let errorToastTitle = 'Gagal';
+      let errorToastMsg = 'Gagal memulai proses prediksi.';
+      
+      if (isConnectionError) {
+        errorToastTitle = 'Koneksi Gagal';
+        errorToastMsg = 'Backend AI tidak dapat dihubungi.';
+      } else if (err.message) {
+        errorToastMsg = err.message;
+      }
+
+      setAiErrorMessage(errorToastMsg);
+      // Restore submission status so button is not stuck in processing if backend failed
       setSubmission(prev => prev ? { ...prev, ai_status: 'failed' } : null);
-      toast.error('Gagal', 'Gagal menjalankan analisis AI pada backend.');
+      toast.error(errorToastTitle, errorToastMsg);
     } finally {
       setIsPredicting(false);
     }
@@ -720,12 +850,37 @@ export default function ReviewWorkspace() {
         return { icon: '👨‍🏫', text: 'Direview Dosen', color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20' };
       case 'finalized':
         return { icon: '🏁', text: 'Finalized', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' };
+      case 'failed':
+        return { icon: '❌', text: 'Gagal', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' };
+      case 'offline':
+        return { icon: '🔌', text: 'Backend Offline', color: 'text-red-450 dark:text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/30' };
       default:
         return { icon: '⏳', text: 'Menunggu AI', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' };
     }
   };
 
-  const isReadOnly = submission?.ai_status === 'finalized';
+  const isReadOnly = submission?.ai_status === 'finalized' || submission?.status_submit === 'finalized';
+
+  const isProcessing = isPredicting || (isAIActive && !isBackendOffline);
+  const submissionStatus = submission?.status_submit;
+  const aiStatus = submission?.ai_status;
+  const disabledReason = isReadOnly 
+    ? "submission_finalized" 
+    : isPredicting 
+      ? "request_in_flight" 
+      : (isAIActive && !isBackendOffline) 
+        ? "ai_processing" 
+        : "none";
+
+  console.log(
+    "AI Button State:",
+    {
+      isProcessing,
+      submissionStatus,
+      aiStatus,
+      disabledReason
+    }
+  );
 
   if (isChecking) {
     return (
@@ -1115,7 +1270,7 @@ export default function ReviewWorkspace() {
                   <div>
                     <span className="text-[10px] text-slate-400 dark:text-neutral-500 font-bold uppercase tracking-wider block">Status Submit</span>
                     {submission && (() => {
-                      const badge = getStatusBadge(submission.ai_status || submission.status_submit);
+                      const badge = getStatusBadge(isBackendOffline ? 'offline' : (submission.ai_status || submission.status_submit));
                       return (
                         <span className={`inline-flex items-center gap-1 mt-1 px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${badge.bg} ${badge.border} ${badge.color}`}>
                           {badge.icon} {badge.text}
@@ -1165,7 +1320,7 @@ export default function ReviewWorkspace() {
                       <div className="bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900/50 rounded-xl p-4 flex items-center gap-3 animate-pulse">
                         <Loader2 className="w-5 h-5 text-purple-600 dark:text-purple-400 animate-spin flex-shrink-0" />
                         <div className="text-xs font-semibold text-purple-700 dark:text-purple-300">
-                          🤖 {submission?.model_ai || selectedModel} sedang menganalisis jawaban mahasiswa
+                          🤖 {submission?.model_ai || selectedModel} sedang menganalisis jawaban mahasiswa. Model sedang memproses jawaban...
                         </div>
                       </div>
                     )}
@@ -1209,12 +1364,18 @@ export default function ReviewWorkspace() {
                   disabled={isAIProcessing || isReadOnly}
                   className={`w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-600 hover:via-blue-600 hover:to-indigo-700 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all duration-300 shadow-lg shadow-cyan-500/10 text-sm tracking-widest cursor-pointer active:scale-[0.99] ${(isAIProcessing || isReadOnly) ? 'opacity-60 cursor-not-allowed' : ''}`}
                 >
-                  {isAIProcessing ? (
+                  {isPredicting || isAIProcessing ? (
                     <Loader2 className="w-4 h-4 animate-spin text-white" />
                   ) : (
                     <Play className="w-4 h-4 fill-white" />
                   )}
-                  <span>{isAIProcessing ? 'Memulai Prediksi...' : 'PROSES DENGAN AI'}</span>
+                  <span>
+                    {isPredicting 
+                      ? 'Memulai Prediksi...' 
+                      : isAIProcessing 
+                        ? 'Model sedang memproses jawaban...' 
+                        : 'PROSES DENGAN AI'}
+                  </span>
                 </button>
               </div>
             )}
@@ -1228,20 +1389,20 @@ export default function ReviewWorkspace() {
               </h3>
 
               <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-slate-50 border border-slate-200 dark:bg-black/45 dark:border-neutral-900 rounded-xl p-3">
+                <div className="grid grid-cols-1 min-[360px]:grid-cols-3 gap-2.5 sm:gap-4">
+                  <div className="bg-slate-50 border border-slate-200 dark:bg-black/45 dark:border-neutral-900 rounded-xl p-2.5 sm:p-3">
                     <span className="text-[10px] text-slate-400 dark:text-neutral-500 font-bold uppercase tracking-wider block mb-0.5">Skor Bagian</span>
                     <span className="text-2xl font-extrabold text-slate-800 dark:text-white font-mono">{totalSectionScore}</span>
                     <span className="text-[9px] text-slate-400 dark:text-neutral-600 font-mono block mt-0.5">/ 100</span>
                   </div>
 
-                  <div className="bg-slate-50 border border-slate-200 dark:bg-black/45 dark:border-neutral-900 rounded-xl p-3">
+                  <div className="bg-slate-50 border border-slate-200 dark:bg-black/45 dark:border-neutral-900 rounded-xl p-2.5 sm:p-3">
                     <span className="text-[10px] text-purple-400 dark:text-purple-400 font-bold uppercase tracking-wider block mb-0.5">Total Nilai AI</span>
                     <span className="text-2xl font-extrabold text-purple-600 dark:text-purple-400 font-mono">{totalAIScore !== null ? totalAIScore : '-'}</span>
                     <span className="text-[9px] text-purple-400/70 dark:text-purple-500/60 font-mono block mt-0.5">AI Engine</span>
                   </div>
 
-                  <div className="bg-slate-50 border border-slate-200 dark:bg-black/45 dark:border-neutral-900 rounded-xl p-3">
+                  <div className="bg-slate-50 border border-slate-200 dark:bg-black/45 dark:border-neutral-900 rounded-xl p-2.5 sm:p-3">
                     <span className="text-[10px] text-slate-400 dark:text-neutral-500 font-bold uppercase tracking-wider block mb-0.5">Nilai Resmi</span>
                     <span className="text-2xl font-extrabold text-cyan-600 dark:text-cyan-400 font-mono">{totalSectionScore}</span>
                     <span className="text-[9px] text-cyan-600/70 dark:text-cyan-500/60 font-mono block mt-0.5">Official</span>
