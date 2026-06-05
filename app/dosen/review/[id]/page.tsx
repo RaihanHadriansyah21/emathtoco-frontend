@@ -40,7 +40,7 @@ interface Course {
 interface SubmissionData {
   id: string;
   mahasiswa_id: string;
-  status_submit: 'submitted' | 'processing_ai' | 'reviewed' | 'finalized';
+  status_submit: 'submitted' | 'processing_ai' | 'reviewed' | 'finalized' | 'failed';
   ai_status?: string | null;
   waktu_submit: string;
   nilai_akhir: number | null;
@@ -502,7 +502,14 @@ export default function ReviewWorkspace() {
   // Polling logic when the submission is in processing status
   useEffect(() => {
     const activeStatuses = ['pending', 'processing', 'running', 'ai_pending', 'ai_running'];
-    const shouldPoll = submission && activeStatuses.includes(submission.ai_status || '');
+    const stopStatuses = ['completed', 'failed', 'finalized', 'reviewed'];
+
+    const aiStatus = submission?.ai_status || '';
+    const statusSubmit = submission?.status_submit || '';
+
+    // Stop polling if we are in a terminal state
+    const isTerminal = stopStatuses.includes(aiStatus) || stopStatuses.includes(statusSubmit);
+    const shouldPoll = submission && activeStatuses.includes(aiStatus) && !isTerminal;
 
     if (!shouldPoll) {
       if (pollingRef.current) {
@@ -609,8 +616,24 @@ export default function ReviewWorkspace() {
     setAiErrorMessage(null);
     setShowSuccessBanner(false);
 
+    // 11. CLEAR FRONTEND PREDICTION STATE
+    setTotalAIScore(null);
+    setSlots(prev => prev.map(s => ({
+      ...s,
+      aiScore: null,
+      confidence: null,
+      finalScore: s.manualScore !== null ? s.manualScore : null,
+      manualCorrection: 0
+    })));
+
     // Optimistically update local state so the UI updates immediately
-    setSubmission(prev => prev ? { ...prev, ai_status: 'processing', model_ai: selectedModel } : null);
+    setSubmission(prev => prev ? { 
+      ...prev, 
+      ai_status: 'processing', 
+      status_submit: 'processing_ai', 
+      model_ai: selectedModel,
+      nilai_akhir: null
+    } : null);
 
     try {
       // Call actual backend AI endpoint
@@ -650,7 +673,12 @@ export default function ReviewWorkspace() {
 
       setAiErrorMessage(errorToastMsg);
       // Restore submission status so button is not stuck in processing if backend failed
-      setSubmission(prev => prev ? { ...prev, ai_status: 'failed' } : null);
+      setSubmission(prev => prev ? { 
+        ...prev, 
+        ai_status: 'failed', 
+        status_submit: 'failed',
+        nilai_akhir: null
+      } : null);
       toast.error(errorToastTitle, errorToastMsg);
     } finally {
       setIsPredicting(false);
@@ -1125,8 +1153,8 @@ export default function ReviewWorkspace() {
                                 <div>
                                   <label className="block text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-wider mb-1">Hasil AI</label>
                                   <div className="w-full bg-slate-100 border border-slate-200 dark:bg-neutral-950/50 dark:border-neutral-900 rounded-xl py-2 px-3 text-slate-500 dark:text-neutral-400 text-xs font-mono font-bold leading-normal">
-                                    <div>Nilai AI : {slot.aiScore !== null ? slot.aiScore : '-'}</div>
-                                    <div>Confidence : {slot.confidence !== null ? `${Math.round(slot.confidence * 100)}%` : '-'}</div>
+                                    <div>Nilai AI : {isAIProcessing ? '⏳' : (slot.aiScore !== null ? slot.aiScore : '-')}</div>
+                                    <div>Confidence : {isAIProcessing ? '⏳' : (slot.confidence !== null ? `${Math.round(slot.confidence * 100)}%` : '-')}</div>
                                   </div>
                                 </div>
 
@@ -1137,7 +1165,7 @@ export default function ReviewWorkspace() {
                                     placeholder="Belum diatur"
                                     value={slot.manualScore !== null ? slot.manualScore : ''}
                                     onChange={(e) => handleManualScoreChange(slot.label, e.target.value)}
-                                    disabled={isReadOnly}
+                                    disabled={isReadOnly || isAIProcessing}
                                     className="w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 hover:border-slate-350 dark:hover:border-neutral-800 focus:border-cyan-500 dark:focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/10 rounded-xl py-2 px-3 text-slate-800 dark:text-white text-sm font-mono focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
                                   />
                                   <span className="text-[10px] text-slate-400 dark:text-neutral-500/70 mt-1 block">
@@ -1155,7 +1183,7 @@ export default function ReviewWorkspace() {
                                     placeholder="0"
                                     value={slot.finalScore !== null ? slot.finalScore : ''}
                                     onChange={(e) => handleFinalScoreChange(slot.label, e.target.value)}
-                                    disabled={isReadOnly}
+                                    disabled={isReadOnly || isAIProcessing}
                                     className="w-full bg-slate-50 border border-cyan-550/30 hover:border-cyan-500 dark:bg-black dark:border-cyan-500/20 dark:hover:border-cyan-500/40 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 rounded-xl py-2 px-3 text-cyan-600 dark:text-cyan-400 text-base font-mono font-extrabold focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
                                   />
                                   <span className="text-[10px] text-slate-400 dark:text-neutral-500/70 mt-1 block">
@@ -1174,7 +1202,7 @@ export default function ReviewWorkspace() {
                                   placeholder="Tulis koreksi atau arahan..."
                                   value={slot.feedback}
                                   onChange={(e) => handleFeedbackChange(slot.label, e.target.value)}
-                                  disabled={isReadOnly || slot.dbStatus === 'reupload_required'}
+                                  disabled={isReadOnly || slot.dbStatus === 'reupload_required' || isAIProcessing}
                                   rows={3}
                                   className="w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 hover:border-slate-350 dark:hover:border-neutral-800 text-slate-800 dark:text-neutral-200 text-xs focus:outline-none resize-none flex-grow disabled:opacity-40 disabled:cursor-not-allowed"
                                 />
@@ -1183,7 +1211,8 @@ export default function ReviewWorkspace() {
                                 {!isReadOnly && slot.dbStatus !== 'reupload_required' && (
                                   <button
                                     onClick={() => openReuploadModal(slot.label)}
-                                    className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-amber-400/70 hover:text-amber-400 transition-colors cursor-pointer"
+                                    disabled={isAIProcessing}
+                                    className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-amber-400/70 hover:text-amber-400 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
                                     <RotateCcw className="w-3 h-3" />
                                     Request Reupload
@@ -1398,7 +1427,7 @@ export default function ReviewWorkspace() {
 
                   <div className="bg-slate-50 border border-slate-200 dark:bg-black/45 dark:border-neutral-900 rounded-xl p-2.5 sm:p-3">
                     <span className="text-[10px] text-purple-400 dark:text-purple-400 font-bold uppercase tracking-wider block mb-0.5">Total Nilai AI</span>
-                    <span className="text-2xl font-extrabold text-purple-600 dark:text-purple-400 font-mono">{totalAIScore !== null ? totalAIScore : '-'}</span>
+                    <span className="text-2xl font-extrabold text-purple-600 dark:text-purple-400 font-mono">{isAIProcessing ? '⏳' : (totalAIScore !== null ? totalAIScore : '-')}</span>
                     <span className="text-[9px] text-purple-400/70 dark:text-purple-500/60 font-mono block mt-0.5">AI Engine</span>
                   </div>
 
@@ -1450,8 +1479,8 @@ export default function ReviewWorkspace() {
                 <div className="space-y-3">
                   <button
                     onClick={saveDraftReview}
-                    disabled={isSaving || isFinalizing}
-                    className="w-full flex items-center justify-center gap-2 border border-neutral-800 hover:border-neutral-700 hover:bg-white/5 text-neutral-300 py-3 rounded-xl transition-all text-xs font-extrabold tracking-widest cursor-pointer"
+                    disabled={isSaving || isFinalizing || isAIProcessing}
+                    className="w-full flex items-center justify-center gap-2 border border-neutral-800 hover:border-neutral-700 hover:bg-white/5 text-neutral-300 py-3 rounded-xl transition-all text-xs font-extrabold tracking-widest cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSaving ? (
                       <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
@@ -1463,8 +1492,8 @@ export default function ReviewWorkspace() {
 
                   <button
                     onClick={finalizeAssessment}
-                    disabled={isFinalizing || isSaving}
-                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-700 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all duration-300 shadow-lg shadow-emerald-500/10 text-xs tracking-widest cursor-pointer active:scale-[0.99]"
+                    disabled={isFinalizing || isSaving || isAIProcessing}
+                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 hover:from-emerald-600 hover:via-teal-600 hover:to-cyan-700 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all duration-300 shadow-lg shadow-emerald-500/10 text-xs tracking-widest cursor-pointer active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isFinalizing ? (
                       <Loader2 className="w-4 h-4 animate-spin text-white" />
