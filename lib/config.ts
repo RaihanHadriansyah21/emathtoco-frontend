@@ -1,1 +1,1 @@
-export const API_URL = "http://localhost:9999";
+export const API_URL = "https://strife-trapper-dad.ngrok-free.dev";
