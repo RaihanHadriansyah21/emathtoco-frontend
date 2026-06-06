@@ -213,30 +213,7 @@ export default function UploadWorkspace() {
                         if (slot.status === 'success' && slot.imagePath) {
                             const signedUrl = await getSignedPreviewUrl(slot.imagePath);
                             if (!signedUrl) {
-                                console.warn(`Storage object missing or invalid for path: ${slot.imagePath}. Cleaning up database...`);
-
-                                // 6. OPTIONAL AUTO-CLEANUP: delete invalid database row
-                                const sectionCode = `S-${slot.label.toUpperCase()}`;
-                                const matchedSheet = sheets.find(s => s.section_code === sectionCode);
-                                if (matchedSheet) {
-                                    supabase
-                                        .from('lembar_jawaban')
-                                        .delete()
-                                        .eq('id', matchedSheet.id)
-                                        .then(({ error }) => {
-                                            if (error) console.error('Auto-cleanup of orphaned metadata row failed:', error);
-                                            else console.log('Successfully auto-cleaned orphaned metadata row for slot:', slot.label);
-                                        });
-                                }
-
-                                // Reset slot state to empty
-                                return {
-                                    ...slot,
-                                    status: 'empty' as const,
-                                    fileUrl: null,
-                                    imagePath: undefined,
-                                    dbStatus: undefined
-                                };
+                                console.warn(`Failed to generate signed URL for path: ${slot.imagePath}. It might be a temporary network issue.`);
                             }
                             return { ...slot, fileUrl: signedUrl };
                         }
@@ -463,8 +440,9 @@ export default function UploadWorkspace() {
 
             const sectionCode = `S-${label.toUpperCase()}`;
 
-            // 2. DYNAMIC FILE EXTENSION DETECTION
-            const extension = file.name.split('.').pop() || 'jpg';
+            // 2. DYNAMIC FILE EXTENSION DETECTION & STANDARDIZATION
+            const rawExtension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+            const extension = (rawExtension === 'jpeg') ? 'jpg' : rawExtension;
             // Struktur nama file unik: userId/submissionId/section_code.extension
             const filePath = `${userId}/${activeSubmissionId}/${sectionCode}.${extension}`;
 
