@@ -98,10 +98,10 @@ export default function RegisterPage() {
 
                 <form onSubmit={handleRegisterSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Email Mahasiswa</label>
+                        <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Email</label>
                         <input
                             type="email"
-                            placeholder="blablabla@gmail.com"
+                            placeholder="nama@gmail.com"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             className="w-full bg-black border border-neutral-800 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/20 transition-all text-sm placeholder:text-neutral-600"

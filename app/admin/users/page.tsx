@@ -159,48 +159,29 @@ export default function UserManagementPage() {
         return;
       }
 
-      // 2. Backend validation (fetch from DB to verify current state)
-      const { data: currentProfile, error: fetchErr } = await supabase
-        .from('profil_pengguna')
-        .select('role')
-        .eq('id', deleteTarget.id)
-        .single();
-
-      if (fetchErr) {
-        console.error('[Delete User Error] Failed to fetch current profile before deletion:', fetchErr);
-        throw new Error('Gagal memverifikasi data profil pengguna sebelum penghapusan.');
+      // 2. Call backend endpoint to delete from both Auth and DB
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      if (!apiUrl) {
+        throw new Error('API URL belum dikonfigurasi. Pastikan NEXT_PUBLIC_API_URL sudah diatur di .env.local.');
       }
 
-      console.log(`[Delete User DB Check] User Current Role: ${currentProfile?.role}`);
-      if (normalizeRole(currentProfile?.role) === 'admin') {
-        console.warn(`[Delete User Blocked] Backend validation blocked attempt to delete admin: ${deleteTarget.id}`);
-        toast.error('Gagal Menghapus', 'Administrator accounts cannot be deleted.');
-        setDeleteTarget(null);
-        return;
+      const response = await fetch(`${apiUrl}/admin/user/${deleteTarget.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error('[Delete User API Error]', result);
+        throw new Error(result.detail || 'Gagal menghapus pengguna dari server.');
       }
 
-      // Perform delete with .select() to confirm action succeeded
-      const { data, error } = await supabase
-        .from('profil_pengguna')
-        .delete()
-        .eq('id', deleteTarget.id)
-        .select();
-
-      if (error) {
-        console.error('[Delete User DB Error] Delete query error:', error);
-        throw error;
-      }
-
-      console.log('[Delete User DB Response] Data:', data);
-
-      if (!data || data.length === 0) {
-        console.error('[Delete User Blocked] Delete query executed successfully but 0 rows affected. RLS policies likely blocked the deletion.');
-        throw new Error('Gagal menghapus pengguna. Tindakan diblokir oleh sistem keamanan RLS.');
-      }
-
-      console.log('[Delete User Success] DB delete confirmed. Updating local state.');
+      console.log('[Delete User Success]', result);
       setUsers(prev => prev.filter(u => u.id !== deleteTarget.id));
-      toast.success('Hapus Berhasil', `Pengguna "${deleteTarget.name}" berhasil dihapus.`);
+      toast.success('Hapus Berhasil', `Pengguna "${deleteTarget.name}" berhasil dihapus sepenuhnya (profil & akun autentikasi).`);
       setDeleteTarget(null);
     } catch (err: any) {
       console.error('[Delete User Error] Exception occurred:', err);
@@ -405,7 +386,7 @@ export default function UserManagementPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Hapus Pengguna"
-        message={`Apakah Anda yakin ingin menghapus profil "${deleteTarget?.name}"? Tindakan ini tidak dapat dibatalkan.`}
+        message={`Apakah Anda yakin ingin menghapus "${deleteTarget?.name}" sepenuhnya? Akun autentikasi dan semua data profil akan dihapus permanen. Pengguna tidak akan bisa login lagi. Tindakan ini tidak dapat dibatalkan.`}
         confirmLabel="Hapus"
         variant="danger"
         isLoading={isDeleting}

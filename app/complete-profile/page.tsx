@@ -74,6 +74,10 @@ export default function CompleteProfilePage() {
         checkExistingProfile();
     }, [router]);
 
+    // Regex patterns for validation
+    const NIM_PATTERN = /^\d{8,}$/;
+    const KELAS_PATTERN = /^[A-Z]{2,3}-\d{2}-\d{2}$/;
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrorMessage(null);
@@ -81,6 +85,18 @@ export default function CompleteProfilePage() {
 
         if (!namaLengkap.trim() || !nimNip.trim() || !kelas.trim()) {
             setErrorMessage('Seluruh kolom wajib diisi!');
+            return;
+        }
+
+        // Validate NIM: must be digits only, minimum 8 characters
+        if (!NIM_PATTERN.test(nimNip.trim())) {
+            setErrorMessage('Format NIM tidak valid. NIM harus berupa angka minimal 8 digit.');
+            return;
+        }
+
+        // Validate Kelas: must match XX-00-00 format (2-3 uppercase letters, dash, 2 digits, dash, 2 digits)
+        if (!KELAS_PATTERN.test(kelas.trim().toUpperCase())) {
+            setErrorMessage('Format Kelas tidak valid. Gunakan format seperti: TT-46-01 (2-3 huruf kapital, strip, angka, strip, angka).');
             return;
         }
 
@@ -100,7 +116,7 @@ export default function CompleteProfilePage() {
                     role: 'mahasiswa',
                     nama_lengkap: namaLengkap.trim(),
                     nim_nip: nimNip.trim(),
-                    kelas: kelas.trim()
+                    kelas: kelas.trim().toUpperCase()
                 });
 
             if (error) {
@@ -190,13 +206,30 @@ export default function CompleteProfilePage() {
                         <div className="relative">
                             <input
                                 type="text"
-                                placeholder="Masukkan NIM Anda"
+                                inputMode="numeric"
+                                placeholder="Contoh: 1234567890"
                                 value={nimNip}
-                                onChange={(e) => setNimNip(e.target.value)}
-                                className="w-full bg-black border border-neutral-800 rounded-xl py-3 pl-11 pr-4 text-white focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/20 transition-all text-sm placeholder:text-neutral-600"
+                                onChange={(e) => {
+                                    // Only allow digits
+                                    const val = e.target.value.replace(/\D/g, '');
+                                    setNimNip(val);
+                                }}
+                                className={`w-full bg-black border rounded-xl py-3 pl-11 pr-4 text-white focus:outline-none focus:ring-1 transition-all text-sm placeholder:text-neutral-600 ${
+                                    nimNip.length > 0 && !NIM_PATTERN.test(nimNip)
+                                        ? 'border-amber-500/60 focus:border-amber-500/80 focus:ring-amber-500/20'
+                                        : nimNip.length >= 8
+                                            ? 'border-emerald-500/40 focus:border-emerald-500/80 focus:ring-emerald-500/20'
+                                            : 'border-neutral-800 focus:border-cyan-500/80 focus:ring-cyan-500/20'
+                                }`}
                             />
                             <IdCard className="absolute left-4 top-3.5 w-4 h-4 text-neutral-500" />
                         </div>
+                        {nimNip.length > 0 && nimNip.length < 8 && (
+                            <p className="text-[11px] text-amber-400/80 mt-1.5 ml-1">Minimal 8 digit angka ({nimNip.length}/8)</p>
+                        )}
+                        {nimNip.length >= 8 && (
+                            <p className="text-[11px] text-emerald-400/80 mt-1.5 ml-1">✓ Format NIM valid</p>
+                        )}
                     </div>
 
                     <div>
@@ -204,13 +237,30 @@ export default function CompleteProfilePage() {
                         <div className="relative">
                             <input
                                 type="text"
-                                placeholder="IF-44-01"
+                                placeholder="Contoh: TT-46-01"
                                 value={kelas}
-                                onChange={(e) => setKelas(e.target.value)}
-                                className="w-full bg-black border border-neutral-800 rounded-xl py-3 pl-11 pr-4 text-white focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/20 transition-all text-sm placeholder:text-neutral-600"
+                                onChange={(e) => {
+                                    // Auto-uppercase and limit to valid characters
+                                    const val = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+                                    setKelas(val);
+                                }}
+                                maxLength={9}
+                                className={`w-full bg-black border rounded-xl py-3 pl-11 pr-4 text-white focus:outline-none focus:ring-1 transition-all text-sm placeholder:text-neutral-600 uppercase ${
+                                    kelas.length > 0 && !KELAS_PATTERN.test(kelas)
+                                        ? 'border-amber-500/60 focus:border-amber-500/80 focus:ring-amber-500/20'
+                                        : KELAS_PATTERN.test(kelas)
+                                            ? 'border-emerald-500/40 focus:border-emerald-500/80 focus:ring-emerald-500/20'
+                                            : 'border-neutral-800 focus:border-cyan-500/80 focus:ring-cyan-500/20'
+                                }`}
                             />
                             <GraduationCap className="absolute left-4 top-3.5 w-4 h-4 text-neutral-500" />
                         </div>
+                        {kelas.length > 0 && !KELAS_PATTERN.test(kelas) && (
+                            <p className="text-[11px] text-amber-400/80 mt-1.5 ml-1">Format: 2-3 huruf kapital, strip, angka, strip, angka (cth: TT-46-01)</p>
+                        )}
+                        {KELAS_PATTERN.test(kelas) && (
+                            <p className="text-[11px] text-emerald-400/80 mt-1.5 ml-1">✓ Format Kelas valid</p>
+                        )}
                     </div>
 
                     <button

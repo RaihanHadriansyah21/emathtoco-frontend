@@ -59,7 +59,7 @@ export default function LoginPage() {
                         await supabase.auth.signOut();
                     }
                 }
-                
+
                 // Pastikan cookie dihapus di browser
                 document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
             } catch (err) {
@@ -137,7 +137,7 @@ export default function LoginPage() {
             if (data?.session) {
                 console.log("[AUDIT DEBUG] Login success");
                 document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax`;
-                
+
                 let targetHref = '/';
 
                 try {
@@ -146,19 +146,19 @@ export default function LoginPage() {
                         .select('role, nama_lengkap')
                         .eq('id', data.session.user.id)
                         .maybeSingle();
-                    
+
                     const role = normalizeRole(profile?.role);
                     const userName = profile?.nama_lengkap || data.session.user.email || 'Anonymous';
-                    
+
                     // Session storage guard to prevent duplicate login logging
                     const sessionLoggedKey = `logged_${data.session.user.id}`;
                     if (typeof window !== 'undefined' && !sessionStorage.getItem(sessionLoggedKey)) {
                         console.log("[AUDIT DEBUG] About to write audit log");
                         sessionStorage.setItem(sessionLoggedKey, 'true');
-                        
+
                         let auditAction = '';
                         let auditTarget = 'auth';
-                        
+
                         if (role === 'admin') {
                             auditAction = 'ADMIN_LOGIN';
                         } else if (role === 'dosen') {
@@ -228,7 +228,7 @@ export default function LoginPage() {
 
                 <form onSubmit={handleLoginSubmit} className="space-y-5">
                     <div>
-                        <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Email Mahasiswa</label>
+                        <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Email</label>
                         <input
                             type="email"
                             placeholder="nama@gmail.com"

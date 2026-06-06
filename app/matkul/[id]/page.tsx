@@ -71,6 +71,815 @@ const getSignedPreviewUrl = async (path: string): Promise<string | null> => {
     }
 };
 
+const compressImage = (file: File): Promise<File> => {
+    return new Promise((resolve) => {
+        const originalSizeMB = file.size / (1024 * 1024);
+
+        // Task 2: Adaptive Compression
+        if (originalSizeMB <= 1) {
+            if (process.env.NODE_ENV !== 'production') {
+                console.log("[UPLOAD] Skip Compression (File size <= 1MB):", file.size);
+            }
+            resolve(file);
+            return;
+        }
+
+        let maxDimension = 1200;
+        let quality = 0.75;
+
+        if (originalSizeMB <= 5) {
+            maxDimension = 1600;
+            quality = 0.8;
+        } else if (originalSizeMB <= 10) {
+            maxDimension = 1200;
+            quality = 0.75;
+        } else {
+            maxDimension = 1000;
+            quality = 0.7;
+        }
+
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const originalWidth = img.width;
+                const originalHeight = img.height;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > maxDimension) {
+                        height = Math.round((height * maxDimension) / width);
+                        width = maxDimension;
+                    }
+                } else {
+                    if (height > maxDimension) {
+                        width = Math.round((width * maxDimension) / height);
+                        height = maxDimension;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+
+                const finalWidth = width;
+                const finalHeight = height;
+
+                canvas.toBlob(
+                    (blob) => {
+                        // Task 4: Memory Safety
+                        canvas.width = 0;
+                        canvas.height = 0;
+                        img.onload = null;
+                        img.onerror = null;
+
+                        if (blob) {
+                            const compressedFile = new File([blob], file.name, {
+                                type: 'image/jpeg',
+                                lastModified: Date.now(),
+                            });
+
+                            // Task 1: Compression Diagnostics (development-only)
+                            if (process.env.NODE_ENV !== 'production') {
+                                const ratio = ((file.size - compressedFile.size) / file.size * 100).toFixed(2) + "%";
+                                console.log("[UPLOAD] Original Size:", file.size);
+                                console.log("[UPLOAD] Compressed Size:", compressedFile.size);
+                                console.log("[UPLOAD] Compression Ratio:", ratio);
+                                console.log("[UPLOAD] Original Resolution:", originalWidth, originalHeight);
+                                console.log("[UPLOAD] Final Resolution:", finalWidth, finalHeight);
+                            }
+
+                            resolve(compressedFile);
+                        } else {
+                            resolve(file);
+                        }
+                    },
+                    'image/jpeg',
+                    quality
+                );
+            };
+            img.onerror = () => {
+                img.onload = null;
+                img.onerror = null;
+                resolve(file);
+            };
+        };
+        reader.onerror = () => resolve(file);
+    });
+};
+
+interface CustomCameraModalProps {
+    label: string;
+    initialFile?: File;
+    onCapture: (file: File) => void;
+    onClose: () => void;
+}
+
+const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFile, onCapture, onClose }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+    const analysisIntervalRef = useRef<any>(null);
+
+    const [isCameraActive, setIsCameraActive] = useState(false);
+    const [cameraError, setCameraError] = useState(false);
+    const [guideStatus, setGuideStatus] = useState<'red' | 'yellow' | 'green'>('red');
+    const [guideMessage, setGuideMessage] = useState('Posisikan seluruh lembar ke dalam area panduan');
+
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [validationError, setValidationError] = useState<string | null>(null);
+    const [capturedFile, setCapturedFile] = useState<File | null>(null);
+    const [coverageRatio, setCoverageRatio] = useState(0);
+
+    const stopCamera = () => {
+        if (analysisIntervalRef.current) {
+            clearInterval(analysisIntervalRef.current);
+            analysisIntervalRef.current = null;
+        }
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
+        }
+        setIsCameraActive(false);
+    };
+
+    const startCamera = async () => {
+        try {
+            const constraints = {
+                video: {
+                    facingMode: { ideal: 'environment' },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                },
+                audio: false
+            };
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            streamRef.current = stream;
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                videoRef.current.play();
+            }
+            setIsCameraActive(true);
+            setCameraError(false);
+
+            // Start live analysis
+            startLiveAnalysis();
+        } catch (err) {
+            console.error('getUserMedia failed:', err);
+            setCameraError(true);
+            // Fallback immediately
+            stopCamera();
+            onClose();
+        }
+    };
+
+    useEffect(() => {
+        if (!initialFile) {
+            startCamera();
+        }
+        return () => {
+            stopCamera();
+        };
+    }, [initialFile]);
+
+    useEffect(() => {
+        if (!initialFile) return;
+
+        const processInitialFile = async () => {
+            setIsAnalyzing(true);
+            setValidationError(null);
+
+            try {
+                const url = URL.createObjectURL(initialFile);
+                setPreviewUrl(url);
+                setCapturedFile(initialFile);
+
+                const img = new Image();
+                img.src = url;
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                });
+
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) throw new Error('Gagal mengakses canvas rendering.');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                // Create offscreen canvas for analytics (300x300 for performance)
+                const valCanvas = document.createElement('canvas');
+                valCanvas.width = 300;
+                valCanvas.height = 300;
+                const valCtx = valCanvas.getContext('2d');
+                valCtx?.drawImage(canvas, 0, 0, 300, 300);
+                const valImgData = valCtx?.getImageData(0, 0, 300, 300);
+
+                if (!valImgData) throw new Error('Gagal memproses data gambar.');
+
+                // 1. Brightness check (relaxed upper limit to support clean digitized scan images)
+                let totalLum = 0;
+                let brightCount = 0;
+                const data = valImgData.data;
+                for (let i = 0; i < data.length; i += 4) {
+                    const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                    totalLum += lum;
+                    if (lum > 110) {
+                        brightCount++;
+                    }
+                }
+                const avgBrightness = totalLum / (data.length / 4);
+                const whiteRatio = brightCount / (data.length / 4);
+
+                if (avgBrightness < 35) {
+                    setValidationError('Foto terlalu gelap. Pastikan pencahayaan cukup.');
+                    return;
+                }
+                if (avgBrightness > 280) {
+                    setValidationError('Foto terlalu terang/silau.');
+                    return;
+                }
+
+                // 2. Aspect Ratio / Shape check (relaxed to support landscape and wide proportions)
+                const maxDim = Math.max(canvas.width, canvas.height);
+                const minDim = Math.min(canvas.width, canvas.height);
+                const aspectRatio = maxDim / minDim;
+                if (aspectRatio < 1.0 || aspectRatio > 2.5) {
+                    setValidationError('Pastikan seluruh lembar jawaban terlihat dengan proporsi yang benar.');
+                    return;
+                }
+
+                // 3. Document Coverage check (relaxed threshold to 0.3)
+                if (whiteRatio < 0.3) {
+                    setValidationError('Dekatkan kamera ke lembar jawaban.');
+                    return;
+                }
+
+                // 4. Blur check
+                const blurResult = runBlurDetection(valImgData);
+                if (blurResult.isBlur) {
+                    setValidationError('Foto terlalu blur. Silakan ambil ulang foto.');
+                    return;
+                }
+
+                // 5. Correct Perspective
+                const finalCanvas = runPerspectiveCrop(canvas);
+                finalCanvas.toBlob((blob) => {
+                    if (blob) {
+                        const processedFile = new File([blob], initialFile.name, { type: 'image/jpeg' });
+                        setCapturedFile(processedFile);
+                        URL.revokeObjectURL(url);
+                        const newUrl = URL.createObjectURL(blob);
+                        setPreviewUrl(newUrl);
+                    }
+                }, 'image/jpeg', 0.95);
+
+            } catch (e: any) {
+                setValidationError('Kesalahan pemrosesan: ' + e.message);
+            } finally {
+                setIsAnalyzing(false);
+            }
+        };
+
+        processInitialFile();
+    }, [initialFile]);
+
+    const startLiveAnalysis = () => {
+        if (analysisIntervalRef.current) clearInterval(analysisIntervalRef.current);
+
+        analysisIntervalRef.current = setInterval(() => {
+            if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) return;
+
+            try {
+                const video = videoRef.current;
+                const canvas = document.createElement('canvas');
+                canvas.width = 100;
+                canvas.height = 100;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+
+                ctx.drawImage(video, 0, 0, 100, 100);
+                const imgData = ctx.getImageData(0, 0, 100, 100);
+                const data = imgData.data;
+
+                let totalLum = 0;
+                let brightCount = 0;
+
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                    totalLum += lum;
+                    if (lum > 110) {
+                        brightCount++;
+                    }
+                }
+
+                const avgBrightness = totalLum / (data.length / 4);
+                const whiteRatio = brightCount / (data.length / 4);
+
+                setCoverageRatio(whiteRatio);
+
+                if (avgBrightness < 35) {
+                    setGuideStatus('red');
+                    setGuideMessage('Pencahayaan terlalu gelap. Cari tempat yang lebih terang.');
+                } else if (avgBrightness > 280) {
+                    setGuideStatus('red');
+                    setGuideMessage('Pencahayaan terlalu terang/silau.');
+                } else if (whiteRatio < 0.2) {
+                    setGuideStatus('red');
+                    setGuideMessage('Posisikan seluruh lembar ke dalam area panduan');
+                } else if (whiteRatio < 0.3) {
+                    setGuideStatus('yellow');
+                    setGuideMessage('Hampir sesuai. Dekatkan kamera ke lembar jawaban.');
+                } else {
+                    setGuideStatus('green');
+                    setGuideMessage('Siap difoto. Jaga kamera tetap stabil.');
+                }
+            } catch (e) {
+                // Ignore silent errors during live analysis
+            }
+        }, 350);
+    };
+
+    // Grayscale Sobel blur detection helper (Feature 4)
+    const runBlurDetection = (imageData: ImageData): { isBlur: boolean; score: number } => {
+        const w = imageData.width;
+        const h = imageData.height;
+        const data = imageData.data;
+        const gray = new Uint8ClampedArray(w * h);
+
+        for (let i = 0; i < data.length; i += 4) {
+            gray[i / 4] = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+        }
+
+        let edgeSum = 0;
+        let edgeCount = 0;
+
+        for (let y = 1; y < h - 1; y++) {
+            for (let x = 1; x < w - 1; x++) {
+                const idx = y * w + x;
+                const gx =
+                    (gray[idx - w + 1] + 2 * gray[idx + 1] + gray[idx + w + 1]) -
+                    (gray[idx - w - 1] + 2 * gray[idx - 1] + gray[idx + w - 1]);
+                const gy =
+                    (gray[idx + w - 1] + 2 * gray[idx + w] + gray[idx + w + 1]) -
+                    (gray[idx - w - 1] + 2 * gray[idx - w] + gray[idx - w + 1]);
+                const mag = Math.abs(gx) + Math.abs(gy);
+                edgeSum += mag;
+                edgeCount++;
+            }
+        }
+
+        const averageEdgeDensity = edgeSum / edgeCount;
+        // Threshold of edge density for Sobel: 1.5 (relaxed to support clean scans and empty sheets)
+        const isBlur = averageEdgeDensity < 1.5;
+        return { isBlur, score: averageEdgeDensity };
+    };
+
+    // Safe perspective correction crop (Feature 7)
+    const runPerspectiveCrop = (canvas: HTMLCanvasElement): HTMLCanvasElement => {
+        try {
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return canvas;
+
+            const w = canvas.width;
+            const h = canvas.height;
+            const imgData = ctx.getImageData(0, 0, w, h);
+            const data = imgData.data;
+
+            let minX = w, maxX = 0, minY = h, maxY = 0;
+            let count = 0;
+
+            for (let y = 0; y < h; y += 4) {
+                for (let x = 0; x < w; x += 4) {
+                    const idx = (y * w + x) * 4;
+                    const brightness = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+                    if (brightness > 115) {
+                        if (x < minX) minX = x;
+                        if (x > maxX) maxX = x;
+                        if (y < minY) minY = y;
+                        if (y > maxY) maxY = y;
+                        count++;
+                    }
+                }
+            }
+
+            const totalSampled = (w / 4) * (h / 4);
+            const ratio = count / totalSampled;
+
+            // If document bounds detected straight and covers a decent portion of image
+            if (count > 100 && ratio > 0.15 && ratio < 0.85) {
+                const padding = 15;
+                minX = Math.max(0, minX - padding);
+                minY = Math.max(0, minY - padding);
+                maxX = Math.min(w, maxX + padding);
+                maxY = Math.min(h, maxY + padding);
+
+                const cropW = maxX - minX;
+                const cropH = maxY - minY;
+
+                if (cropW > 100 && cropH > 100) {
+                    const croppedCanvas = document.createElement('canvas');
+                    croppedCanvas.width = cropW;
+                    croppedCanvas.height = cropH;
+                    const croppedCtx = croppedCanvas.getContext('2d');
+                    croppedCtx?.drawImage(canvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
+                    return croppedCanvas;
+                }
+            }
+        } catch (e) {
+            console.error('[CAMERA] Corner/perspective correction failed:', e);
+        }
+        return canvas;
+    };
+
+    const handleCapture = async () => {
+        if (!videoRef.current) return;
+        setIsAnalyzing(true);
+        setValidationError(null);
+
+        try {
+            const video = videoRef.current;
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth || 1280;
+            canvas.height = video.videoHeight || 720;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('Gagal mengakses canvas rendering.');
+
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Create offscreen canvas for analytics (300x300 for performance)
+            const valCanvas = document.createElement('canvas');
+            valCanvas.width = 300;
+            valCanvas.height = 300;
+            const valCtx = valCanvas.getContext('2d');
+            valCtx?.drawImage(canvas, 0, 0, 300, 300);
+            const valImgData = valCtx?.getImageData(0, 0, 300, 300);
+
+            if (!valImgData) throw new Error('Gagal memproses data gambar.');
+
+            // 1. Brightness check (Feature 5)
+            let totalLum = 0;
+            let brightCount = 0;
+            const data = valImgData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                totalLum += lum;
+                if (lum > 110) {
+                    brightCount++;
+                }
+            }
+            const avgBrightness = totalLum / (data.length / 4);
+            const whiteRatio = brightCount / (data.length / 4);
+
+            if (avgBrightness < 35) {
+                setValidationError('Foto terlalu gelap. Pastikan pencahayaan cukup.');
+                stopCamera();
+                showPreview(canvas);
+                return;
+            }
+            if (avgBrightness > 280) {
+                setValidationError('Foto terlalu terang/silau.');
+                stopCamera();
+                showPreview(canvas);
+                return;
+            }
+
+            // 2. Aspect Ratio / Shape check (Feature 6 - relaxed aspect ratio to support landscape and wide proportions)
+            const maxDim = Math.max(canvas.width, canvas.height);
+            const minDim = Math.min(canvas.width, canvas.height);
+            const aspectRatio = maxDim / minDim;
+            if (aspectRatio < 1.0 || aspectRatio > 2.5) {
+                setValidationError('Pastikan seluruh lembar jawaban terlihat dengan proporsi yang benar.');
+                stopCamera();
+                showPreview(canvas);
+                return;
+            }
+
+            // 3. Document Coverage check (Feature 3 - relaxed threshold to 0.3)
+            if (whiteRatio < 0.3) {
+                setValidationError('Dekatkan kamera ke lembar jawaban.');
+                stopCamera();
+                showPreview(canvas);
+                return;
+            }
+
+            // 4. Blur check (Feature 4)
+            const blurResult = runBlurDetection(valImgData);
+            if (blurResult.isBlur) {
+                setValidationError('Foto terlalu blur. Silakan ambil ulang foto.');
+                stopCamera();
+                showPreview(canvas);
+                return;
+            }
+
+            // 5. Correct Perspective (Feature 7)
+            const finalCanvas = runPerspectiveCrop(canvas);
+
+            stopCamera();
+            showPreview(finalCanvas);
+
+        } catch (e: any) {
+            setValidationError('Kesalahan pemrosesan: ' + e.message);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
+    const showPreview = (canvas: HTMLCanvasElement) => {
+        canvas.toBlob((blob) => {
+            if (blob) {
+                const file = new File([blob], `capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                setCapturedFile(file);
+                const url = URL.createObjectURL(blob);
+                setPreviewUrl(url);
+            }
+        }, 'image/jpeg', 0.95);
+    };
+
+    const handleRetake = () => {
+        if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+            setPreviewUrl(null);
+        }
+        setCapturedFile(null);
+        setValidationError(null);
+
+        if (initialFile) {
+            // Close the modal and let the parent re-open file selection
+            onClose();
+        } else {
+            startCamera();
+        }
+    };
+
+    const handleUsePhoto = () => {
+        if (capturedFile) {
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            onCapture(capturedFile);
+        }
+    };
+
+    const getBorderColor = () => {
+        if (guideStatus === 'green') return '#10b981';
+        if (guideStatus === 'yellow') return '#f59e0b';
+        return '#f43f5e';
+    };
+
+    const getShadowColor = () => {
+        if (guideStatus === 'green') return 'rgba(16, 185, 129, 0.4)';
+        if (guideStatus === 'yellow') return 'rgba(245, 158, 11, 0.4)';
+        return 'rgba(244, 63, 94, 0.4)';
+    };
+
+    return (
+        <div
+            className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-between text-white select-none"
+            style={{
+                zIndex: 9999,
+                transformStyle: 'preserve-3d',
+                WebkitTransformStyle: 'preserve-3d',
+                transform: 'translate3d(0, 0, 0)',
+                WebkitTransform: 'translate3d(0, 0, 0)'
+            }}
+        >
+            {/* Header bar */}
+            <div
+                className="w-full h-14 bg-black/60 backdrop-blur-md flex items-center justify-between px-4 z-20"
+                style={{
+                    transform: 'translate3d(0, 0, 20px)',
+                    WebkitTransform: 'translate3d(0, 0, 20px)'
+                }}
+            >
+                <button
+                    onClick={() => {
+                        stopCamera();
+                        onClose();
+                    }}
+                    className="p-2 text-white/85 hover:text-white cursor-pointer transition-colors"
+                >
+                    ✕ Batal
+                </button>
+                <span className="font-extrabold text-sm tracking-widest text-cyan-400">PANDUAN FOTO - BAGIAN {label.toUpperCase()}</span>
+                <div className="w-8" />
+            </div>
+
+            {/* Live Camera View */}
+            {!previewUrl ? (
+                <div style={{
+                    position: 'relative',
+                    width: '100%',
+                    flexGrow: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#000000',
+                    overflow: 'hidden',
+                    transformStyle: 'preserve-3d',
+                    WebkitTransformStyle: 'preserve-3d',
+                    isolation: 'isolate'
+                }}>
+                    {/* Live Video Preview */}
+                    <video
+                        ref={videoRef}
+                        playsInline
+                        muted
+                        style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            zIndex: 1,
+                            transform: 'translate3d(0, 0, 0)',
+                            WebkitTransform: 'translate3d(0, 0, 0)'
+                        }}
+                    />
+
+                    {/* Feature 1: Responsive Visual Overlay Guide (Light/Dark themes friendly) */}
+                    <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '24px',
+                        pointerEvents: 'none',
+                        zIndex: 10,
+                        transform: 'translate3d(0, 0, 10px)',
+                        WebkitTransform: 'translate3d(0, 0, 10px)'
+                    }}>
+                        {/* Clear central sheet helper bounding box with giant dark mask shadow */}
+                        <div style={{
+                            position: 'relative',
+                            width: '80vw',
+                            maxWidth: '300px',
+                            height: 'calc(80vw * 1.414)',
+                            maxHeight: '424px',
+                            borderRadius: '16px',
+                            border: `4px dashed ${getBorderColor()}`,
+                            outline: '1.5px solid rgba(255, 255, 255, 0.85)',
+                            outlineOffset: '-3px',
+                            backgroundColor: 'transparent',
+                            boxShadow: `0 0 0 9999px rgba(0, 0, 0, 0.55), 0 0 25px ${getShadowColor()}`,
+                            transition: 'all 0.3s ease',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            padding: '16px',
+                            pointerEvents: 'none',
+                            zIndex: 15,
+                            transform: 'translate3d(0, 0, 15px)',
+                            WebkitTransform: 'translate3d(0, 0, 15px)'
+                        }}>
+                            {/* Inner visual markings */}
+                            <div style={{ width: '100%', textAlign: 'center', padding: '8px 0', borderBottom: '1px dashed rgba(255, 255, 255, 0.25)' }}>
+                                <span style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1px', color: '#ffffff', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                                    Bagian Atas (Nomor Soal)
+                                </span>
+                            </div>
+                            <div style={{ width: '100%', flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <span style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '2px', color: '#ffffff', opacity: 0.5, textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                                    Lembar Jawaban
+                                </span>
+                            </div>
+                            <div style={{ width: '100%', textAlign: 'center', padding: '8px 0', borderTop: '1px dashed rgba(255, 255, 255, 0.25)' }}>
+                                <span style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1px', color: '#ffffff', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                                    Kotak Area Jawaban
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Feature 2: Smart status message overlay banner */}
+                        <div style={{
+                            position: 'absolute',
+                            bottom: '24px',
+                            left: '16px',
+                            right: '16px',
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            borderRadius: '12px',
+                            padding: '12px 16px',
+                            textAlign: 'center',
+                            maxWidth: '320px',
+                            marginLeft: 'auto',
+                            marginRight: 'auto',
+                            pointerEvents: 'none',
+                            zIndex: 25,
+                            transform: 'translate3d(0, 0, 25px)',
+                            WebkitTransform: 'translate3d(0, 0, 25px)'
+                        }}>
+                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: getBorderColor(), transition: 'color 0.3s ease' }}>
+                                {guideMessage}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                // Capture Preview screen (Shows validation results with dashed grid representation)
+                <div className="relative w-full flex-grow flex flex-col items-center justify-center bg-neutral-950 p-4" style={{ transformStyle: 'preserve-3d', WebkitTransformStyle: 'preserve-3d' }}>
+                    <div className="relative max-w-full max-h-[70vh] rounded-2xl overflow-hidden border border-white/10 shadow-2xl animate-in fade-in zoom-in-95 duration-200" style={{ position: 'relative', isolation: 'isolate' }}>
+                        <img src={previewUrl} alt="Captured preview" className="max-w-full max-h-[60vh] object-contain" style={{ display: 'block' }} />
+
+                        {/* Dash Grid Overlay - always visible on preview screen */}
+                        <div style={{
+                            position: 'absolute',
+                            inset: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            pointerEvents: 'none',
+                            zIndex: 10,
+                            transform: 'translate3d(0, 0, 10px)',
+                            WebkitTransform: 'translate3d(0, 0, 10px)'
+                        }}>
+                            <div style={{
+                                width: '80%',
+                                height: '80%',
+                                borderRadius: '12px',
+                                border: `4px dashed ${validationError ? '#f43f5e' : '#10b981'}`,
+                                boxShadow: `0 0 20px ${validationError ? 'rgba(244, 63, 94, 0.35)' : 'rgba(16, 185, 129, 0.35)'}`,
+                                transition: 'all 0.3s ease'
+                            }} />
+                        </div>
+
+                        {/* Floating bottom error banner instead of fullscreen blackout */}
+                        {validationError && (
+                            <div
+                                className="absolute bottom-4 left-4 right-4 bg-rose-950/90 backdrop-blur-md border border-rose-500/40 rounded-xl p-3 flex items-center gap-3 shadow-lg z-30 animate-in slide-in-from-bottom duration-300"
+                                style={{
+                                    transform: 'translate3d(0, 0, 30px)',
+                                    WebkitTransform: 'translate3d(0, 0, 30px)'
+                                }}
+                            >
+                                <div className="w-8 h-8 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center flex-shrink-0">
+                                    <span className="text-sm text-rose-400 font-bold">⚠</span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="text-xs font-bold text-rose-400 uppercase tracking-wider">Validasi Foto Gagal</h4>
+                                    <p className="text-[11px] text-white/95 leading-normal">{validationError}</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Bottom action panel */}
+            <div
+                className="w-full bg-black/90 backdrop-blur-md py-6 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] flex flex-col items-center gap-4 z-20"
+                style={{
+                    transform: 'translate3d(0, 0, 20px)',
+                    WebkitTransform: 'translate3d(0, 0, 20px)'
+                }}
+            >
+                {!previewUrl ? (
+                    // Live camera action: large shutter button
+                    <div className="flex items-center justify-center w-full relative">
+                        <button
+                            onClick={handleCapture}
+                            disabled={!isCameraActive || isAnalyzing}
+                            className="w-18 h-18 rounded-full border-4 border-white bg-transparent hover:bg-white/15 p-1 flex items-center justify-center cursor-pointer transition-all active:scale-95 disabled:opacity-40"
+                        >
+                            <div className="w-full h-full rounded-full bg-white" />
+                        </button>
+                    </div>
+                ) : (
+                    // Preview actions: Retake vs Use Photo
+                    <div className="flex w-full max-w-md gap-3">
+                        <button
+                            onClick={handleRetake}
+                            className="flex-1 h-12 border border-slate-700 bg-neutral-900 hover:bg-neutral-800 text-slate-300 font-bold rounded-xl transition-colors cursor-pointer text-sm"
+                        >
+                            Ambil Ulang
+                        </button>
+                        <button
+                            disabled={!!validationError}
+                            onClick={handleUsePhoto}
+                            className="flex-1 h-12 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-40 disabled:cursor-not-allowed disabled:from-slate-800 disabled:to-slate-800 text-white font-bold rounded-xl transition-all cursor-pointer text-sm shadow-lg shadow-emerald-500/10"
+                        >
+                            Gunakan Foto
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 export default function UploadWorkspace() {
     const router = useRouter();
     const params = useParams();
@@ -78,6 +887,7 @@ export default function UploadWorkspace() {
 
     const [slots, setSlots] = useState<SlotState[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showCustomCamera, setShowCustomCamera] = useState(false);
     const [userId, setUserId] = useState<string | null>(null);
     const [namaMatkul, setNamaMatkul] = useState('');
     const [kodeMatkul, setKodeMatkul] = useState('');
@@ -106,6 +916,27 @@ export default function UploadWorkspace() {
     // Ref to persist the target slot label across async camera/gallery operations
     // This survives React state batching and iOS Safari camera app switching
     const pendingUploadLabelRef = useRef<string | null>(null);
+
+    const [initialCameraFile, setInitialCameraFile] = useState<File | null>(null);
+
+    const setPendingUploadLabel = (label: string | null) => {
+        pendingUploadLabelRef.current = label;
+        if (typeof window !== 'undefined') {
+            if (label) {
+                sessionStorage.setItem('pending_upload_label', label);
+            } else {
+                sessionStorage.removeItem('pending_upload_label');
+            }
+        }
+    };
+
+    const getPendingUploadLabel = (): string | null => {
+        let label = pendingUploadLabelRef.current;
+        if (!label && typeof window !== 'undefined') {
+            label = sessionStorage.getItem('pending_upload_label');
+        }
+        return label;
+    };
 
     const getStatusBadge = (dbStatus?: string) => {
         switch (dbStatus) {
@@ -365,6 +1196,19 @@ export default function UploadWorkspace() {
     const handleFileChange = async (label: string, file: File | undefined) => {
         if (!file || !userId) return;
 
+        const rawExtension = file.name.split('.').pop()?.toLowerCase() || '';
+
+        // Task 3: HEIC/HEIF & Unsupported format validation
+        if (['heic', 'heif'].includes(rawExtension)) {
+            toast.error('Format Tidak Didukung', 'Format HEIC belum didukung. Silakan ubah ke JPG atau PNG terlebih dahulu.');
+            return;
+        }
+
+        if (!['jpg', 'jpeg', 'png'].includes(rawExtension)) {
+            toast.error('Format Tidak Didukung', 'Hanya diperbolehkan mengunggah file JPG, JPEG, atau PNG.');
+            return;
+        }
+
         const currentSlot = slots.find(s => s.label === label);
         if (currentSlot && isSlotLocked(currentSlot)) {
             console.log('Upload blocked: Slot is locked.');
@@ -409,6 +1253,16 @@ export default function UploadWorkspace() {
             console.log('Target Slot Label:', label);
             console.log('File details:', { name: file.name, size: file.size, type: file.type });
 
+            // Compress the image before uploading if it is indeed an image file
+            let fileToUpload = file;
+            if (file.type.startsWith('image/')) {
+                try {
+                    fileToUpload = await compressImage(file);
+                } catch (compressErr) {
+                    console.error('Image compression failed, falling back to original file:', compressErr);
+                }
+            }
+
             // 1. VALIDASI AUTH SESSION SEBELUM UPLOAD
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
@@ -441,8 +1295,8 @@ export default function UploadWorkspace() {
             const sectionCode = `S-${label.toUpperCase()}`;
 
             // 2. DYNAMIC FILE EXTENSION DETECTION & STANDARDIZATION
-            const rawExtension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-            const extension = (rawExtension === 'jpeg') ? 'jpg' : rawExtension;
+            // Task 6: force 'jpg' lowercase extension
+            const extension = 'jpg';
             // Struktur nama file unik: userId/submissionId/section_code.extension
             const filePath = `${userId}/${activeSubmissionId}/${sectionCode}.${extension}`;
 
@@ -453,11 +1307,23 @@ export default function UploadWorkspace() {
                 filePath
             });
 
+            // Task 8: 60-second upload timeout protection wrapper
+            const uploadTimeout = new Promise((_, reject) => {
+                setTimeout(() => {
+                    reject(new Error('Unggahan kedaluwarsa (timeout 60 detik). Silakan coba lagi dengan koneksi yang lebih stabil.'));
+                }, 60000);
+            });
+
             // 3. Upload file ke Storage Bucket Supabase (Private)
             console.log('Uploading file data to storage bucket "lembar-jawaban"...');
-            const { data: storageData, error: storageError } = await supabase.storage
+            const uploadPromise = supabase.storage
                 .from('lembar-jawaban')
-                .upload(filePath, file, { cacheControl: '3600', upsert: true });
+                .upload(filePath, fileToUpload, { cacheControl: '3600', upsert: true });
+
+            const { data: storageData, error: storageError } = await Promise.race([
+                uploadPromise,
+                uploadTimeout
+            ]) as { data: any, error: any };
 
             if (storageError) {
                 console.error('Supabase Storage Upload Failure:', {
@@ -573,7 +1439,7 @@ export default function UploadWorkspace() {
                 lastReuploadAt: s.dbStatus === 'reupload_required' ? new Date().toISOString() : s.lastReuploadAt,
                 reuploadCount: s.dbStatus === 'reupload_required' ? (s.reuploadCount || 0) + 1 : s.reuploadCount,
             } : s));
-            
+
             // Trigger upload success animation
             setJustUploadedLabels(prev => [...prev, label]);
             setTimeout(() => {
@@ -740,6 +1606,33 @@ export default function UploadWorkspace() {
                 }
             });
 
+            // Check if there are any remaining sheets for this submission ID
+            const { data: remainingSheets, error: checkRemainingError } = await supabase
+                .from('lembar_jawaban')
+                .select('id')
+                .eq('pengumpulan_tugas_id', submissionId);
+
+            if (checkRemainingError) {
+                console.error('Failed to check remaining sheets:', checkRemainingError);
+            } else if (!remainingSheets || remainingSheets.length === 0) {
+                // No sheets left! Since the status is draft, delete the parent row in pengumpulan_tugas
+                console.log('No remaining sheets found for this draft submission. Deleting parent row in pengumpulan_tugas...');
+                const { error: deleteParentError } = await supabase
+                    .from('pengumpulan_tugas')
+                    .delete()
+                    .eq('id', submissionId);
+
+                if (deleteParentError) {
+                    console.error('Failed to delete parent pengumpulan_tugas row:', deleteParentError);
+                } else {
+                    console.log('Parent row in pengumpulan_tugas successfully deleted.');
+                    setSubmissionId(null);
+                    setSubmissionStatus(null);
+                    setNilaiAkhir(null);
+                    setModelAi(null);
+                }
+            }
+
             // STEP 3: Reset slot ke status kosong
             setSlots(prev => prev.map(s => s.label === label ? {
                 ...s,
@@ -757,7 +1650,7 @@ export default function UploadWorkspace() {
 
             // Tutup modal
             setShowChoiceModal(false);
-            pendingUploadLabelRef.current = null;
+            setPendingUploadLabel(null);
             setActiveUploadChoiceLabel(null);
 
             toast.success('Foto Dihapus', `Lembar jawaban bagian ${label.toUpperCase()} berhasil dihapus.`);
@@ -774,9 +1667,9 @@ export default function UploadWorkspace() {
         if (isSlotLocked(slot)) return;
         const label = slot.label;
         setActiveUploadChoiceLabel(label);
-        pendingUploadLabelRef.current = label;
+        setPendingUploadLabel(label);
         console.log('[SLOT TRIGGER] label:', label, '| isMobile:', isMobile);
-        
+
         if (isMobile) {
             // On mobile: show the choice modal (Camera / Gallery)
             setShowChoiceModal(true);
@@ -945,23 +1838,20 @@ export default function UploadWorkspace() {
                                     return (
                                         <React.Fragment key={step.key}>
                                             <div className="flex flex-col items-center gap-1">
-                                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs border transition-all duration-300 ${
-                                                    isCompleted
-                                                        ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400'
-                                                        : isActive
-                                                            ? 'bg-cyan-500/10 border-cyan-400 text-slate-800 dark:text-white shadow-[0_0_8px_rgba(6,182,212,0.3)]'
-                                                            : 'bg-slate-100/50 border-slate-200 dark:bg-neutral-900/50 dark:border-neutral-800 text-slate-400 dark:text-neutral-600'
-                                                }`}>
+                                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs border transition-all duration-300 ${isCompleted
+                                                    ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400'
+                                                    : isActive
+                                                        ? 'bg-cyan-500/10 border-cyan-400 text-slate-800 dark:text-white shadow-[0_0_8px_rgba(6,182,212,0.3)]'
+                                                        : 'bg-slate-100/50 border-slate-200 dark:bg-neutral-900/50 dark:border-neutral-800 text-slate-400 dark:text-neutral-600'
+                                                    }`}>
                                                     {isCompleted ? '✓' : step.icon}
                                                 </div>
-                                                <span className={`text-[9px] font-semibold uppercase tracking-wider ${
-                                                    isActive ? 'text-cyan-600 dark:text-cyan-400' : isCompleted ? 'text-slate-500 dark:text-neutral-400' : 'text-slate-400 dark:text-neutral-600'
-                                                }`}>{step.label}</span>
+                                                <span className={`text-[9px] font-semibold uppercase tracking-wider ${isActive ? 'text-cyan-600 dark:text-cyan-400' : isCompleted ? 'text-slate-500 dark:text-neutral-400' : 'text-slate-400 dark:text-neutral-600'
+                                                    }`}>{step.label}</span>
                                             </div>
                                             {i < arr.length - 1 && (
-                                                <div className={`flex-1 h-px mx-1 transition-all duration-300 ${
-                                                    stepIdx < currentIdx ? 'bg-cyan-500/40' : 'bg-slate-200 dark:bg-neutral-800'
-                                                }`} />
+                                                <div className={`flex-1 h-px mx-1 transition-all duration-300 ${stepIdx < currentIdx ? 'bg-cyan-500/40' : 'bg-slate-200 dark:bg-neutral-800'
+                                                    }`} />
                                             )}
                                         </React.Fragment>
                                     );
@@ -1006,28 +1896,27 @@ export default function UploadWorkspace() {
                                                     }
                                                 }}
                                                 onClick={() => {
-                                                     if (slot.status === 'uploading') return;
-                                                     if (locked) {
-                                                         if (slot.status === 'success') {
-                                                             setActiveDetailSlot(slot);
-                                                         }
-                                                         return;
-                                                     }
-                                                     handleSlotTrigger(slot);
-                                                 }}
-                                                className={`h-28 sm:h-32 rounded-2xl border relative flex flex-col items-center justify-center p-2 transition-all duration-350 overflow-hidden group ${
-                                                    isJustUploaded ? 'animate-pop-success ' : ''
-                                                } ${slot.status === 'success'
-                                                    ? 'border-cyan-500/20 dark:border-cyan-500/20 shadow-md dark:shadow-cyan-500/5 hover:border-cyan-500 dark:hover:border-cyan-500/40 bg-cyan-500/5 dark:bg-cyan-950/5'
-                                                    : slot.status === 'uploading'
-                                                        ? 'border-cyan-500/60 animate-pulse bg-cyan-500/5 dark:bg-cyan-950/10'
-                                                        : slot.status === 'error'
-                                                            ? 'border-red-500/30 dark:border-red-500/40 bg-red-500/5 dark:bg-red-950/5 hover:border-red-500'
-                                                            : isDragOver
-                                                                ? 'border-cyan-400 bg-cyan-500/10 shadow-[0_0_15px_rgba(6,182,212,0.15)] scale-[1.02]'
-                                                                : locked
-                                                                    ? 'border-slate-200 dark:border-neutral-900 bg-slate-100 dark:bg-neutral-950/40 cursor-not-allowed opacity-50'
-                                                                    : 'bg-white dark:bg-[#0A0A0F]/80 border-slate-200 dark:border-neutral-900 hover:border-blue-500/40 dark:hover:border-cyan-500/40 hover:bg-blue-500/5 dark:hover:bg-cyan-500/5 hover:shadow-[0_0_10px_rgba(59,130,246,0.05)] dark:hover:shadow-[0_0_10px_rgba(6,182,212,0.05)]'
+                                                    if (slot.status === 'uploading') return;
+                                                    if (locked) {
+                                                        if (slot.status === 'success') {
+                                                            setActiveDetailSlot(slot);
+                                                        }
+                                                        return;
+                                                    }
+                                                    handleSlotTrigger(slot);
+                                                }}
+                                                className={`h-28 sm:h-32 rounded-2xl border relative flex flex-col items-center justify-center p-2 transition-all duration-350 overflow-hidden group ${isJustUploaded ? 'animate-pop-success ' : ''
+                                                    } ${slot.status === 'success'
+                                                        ? 'border-cyan-500/20 dark:border-cyan-500/20 shadow-md dark:shadow-cyan-500/5 hover:border-cyan-500 dark:hover:border-cyan-500/40 bg-cyan-500/5 dark:bg-cyan-950/5'
+                                                        : slot.status === 'uploading'
+                                                            ? 'border-cyan-500/60 animate-pulse bg-cyan-500/5 dark:bg-cyan-950/10'
+                                                            : slot.status === 'error'
+                                                                ? 'border-red-500/30 dark:border-red-500/40 bg-red-500/5 dark:bg-red-950/5 hover:border-red-500'
+                                                                : isDragOver
+                                                                    ? 'border-cyan-400 bg-cyan-500/10 shadow-[0_0_15px_rgba(6,182,212,0.15)] scale-[1.02]'
+                                                                    : locked
+                                                                        ? 'border-slate-200 dark:border-neutral-900 bg-slate-100 dark:bg-neutral-950/40 cursor-not-allowed opacity-50'
+                                                                        : 'bg-white dark:bg-[#0A0A0F]/80 border-slate-200 dark:border-neutral-900 hover:border-blue-500/40 dark:hover:border-cyan-500/40 hover:bg-blue-500/5 dark:hover:bg-cyan-500/5 hover:shadow-[0_0_10px_rgba(59,130,246,0.05)] dark:hover:shadow-[0_0_10px_rgba(6,182,212,0.05)]'
                                                     } ${(!locked && slot.status !== 'uploading') ? 'cursor-pointer select-none active:scale-[0.98]' : ''}`}
                                             >
                                                 {/* Reupload Required Overlay Badge */}
@@ -1035,7 +1924,7 @@ export default function UploadWorkspace() {
                                                     <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-amber-500/10 dark:bg-amber-950/40 border-2 border-dashed border-amber-500/40 rounded-2xl" title={slot.rejectionReason || 'Upload ulang diperlukan'}>
                                                         <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mb-1" />
                                                         <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 font-mono text-center px-1">REUPLOAD</span>
-                                                        <button 
+                                                        <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 handleSlotTrigger(slot);
@@ -1067,72 +1956,72 @@ export default function UploadWorkspace() {
                                                         )}
 
                                                         {/* Hover Overlay Actions (Desktop Only) */}
-                                                         {(() => {
-                                                             const status = submissionStatus || 'draft';
-                                                             const showReplace = status === 'draft' || status === 'submitted' || slot.dbStatus === 'reupload_required';
-                                                             const showDelete = status === 'draft';
+                                                        {(() => {
+                                                            const status = submissionStatus || 'draft';
+                                                            const showReplace = status === 'draft' || status === 'submitted' || slot.dbStatus === 'reupload_required';
+                                                            const showDelete = status === 'draft';
 
-                                                             if (showReplace || showDelete) {
-                                                                 return (
-                                                                     <div className="absolute inset-0 bg-black/60 opacity-0 md:group-hover/card:opacity-100 transition-all duration-200 hidden md:flex items-center justify-center gap-1.5 z-10">
-                                                                         {/* 👁️ View Detail */}
-                                                                         <button
-                                                                             onClick={(e) => {
-                                                                                 e.stopPropagation();
-                                                                                 setActiveDetailSlot(slot);
-                                                                             }}
-                                                                             className="p-1.5 rounded-lg bg-white/10 hover:bg-white/25 border border-white/15 transition-all cursor-pointer"
-                                                                             title="Lihat Detail"
-                                                                         >
-                                                                             <Eye className="w-3.5 h-3.5 text-white" />
-                                                                         </button>
-                                                                         {/* 📷 Replace Photo */}
-                                                                         {showReplace && (
-                                                                             <button
-                                                                                 onClick={(e) => {
-                                                                                     e.stopPropagation();
-                                                                                     pendingUploadLabelRef.current = slot.label;
-                                                                                     setActiveUploadChoiceLabel(slot.label);
-                                                                                     setTimeout(() => {
-                                                                                         galleryInputRef.current?.click();
-                                                                                     }, 50);
-                                                                                 }}
-                                                                                 className="p-1.5 rounded-lg bg-white/10 hover:bg-white/25 border border-white/15 transition-all cursor-pointer"
-                                                                                 title="Ganti Foto"
-                                                                             >
-                                                                                 <RefreshCw className="w-3.5 h-3.5 text-white" />
-                                                                             </button>
-                                                                         )}
-                                                                         {/* 🗑️ Delete Photo */}
-                                                                         {showDelete && (
-                                                                             <button
-                                                                                 onClick={(e) => {
-                                                                                     e.stopPropagation();
-                                                                                     setDesktopDeleteTarget(slot.label);
-                                                                                     setShowDesktopDeleteModal(true);
-                                                                                 }}
-                                                                                 className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/40 border border-red-500/30 transition-all cursor-pointer"
-                                                                                 title="Hapus Foto"
-                                                                             >
-                                                                                 <Trash2 className="w-3.5 h-3.5 text-red-300" />
-                                                                             </button>
-                                                                         )}
-                                                                     </div>
-                                                                 );
-                                                             } else {
-                                                                 return (
-                                                                     <div
-                                                                         className="absolute inset-0 opacity-0 md:group-hover/card:opacity-100 transition-all duration-200 hidden md:flex items-center justify-center z-10 cursor-pointer bg-black/40"
-                                                                         onClick={(e) => {
-                                                                             e.stopPropagation();
-                                                                             setActiveDetailSlot(slot);
-                                                                         }}
-                                                                     >
-                                                                         <Eye className="w-4 h-4 text-white/70" />
-                                                                     </div>
-                                                                 );
-                                                             }
-                                                         })()}
+                                                            if (showReplace || showDelete) {
+                                                                return (
+                                                                    <div className="absolute inset-0 bg-black/60 opacity-0 md:group-hover/card:opacity-100 transition-all duration-200 hidden md:flex items-center justify-center gap-1.5 z-10">
+                                                                        {/* 👁️ View Detail */}
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setActiveDetailSlot(slot);
+                                                                            }}
+                                                                            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/25 border border-white/15 transition-all cursor-pointer"
+                                                                            title="Lihat Detail"
+                                                                        >
+                                                                            <Eye className="w-3.5 h-3.5 text-white" />
+                                                                        </button>
+                                                                        {/* 📷 Replace Photo */}
+                                                                        {showReplace && (
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    pendingUploadLabelRef.current = slot.label;
+                                                                                    setActiveUploadChoiceLabel(slot.label);
+                                                                                    setTimeout(() => {
+                                                                                        galleryInputRef.current?.click();
+                                                                                    }, 50);
+                                                                                }}
+                                                                                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/25 border border-white/15 transition-all cursor-pointer"
+                                                                                title="Ganti Foto"
+                                                                            >
+                                                                                <RefreshCw className="w-3.5 h-3.5 text-white" />
+                                                                            </button>
+                                                                        )}
+                                                                        {/* 🗑️ Delete Photo */}
+                                                                        {showDelete && (
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setDesktopDeleteTarget(slot.label);
+                                                                                    setShowDesktopDeleteModal(true);
+                                                                                }}
+                                                                                className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/40 border border-red-500/30 transition-all cursor-pointer"
+                                                                                title="Hapus Foto"
+                                                                            >
+                                                                                <Trash2 className="w-3.5 h-3.5 text-red-300" />
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            } else {
+                                                                return (
+                                                                    <div
+                                                                        className="absolute inset-0 opacity-0 md:group-hover/card:opacity-100 transition-all duration-200 hidden md:flex items-center justify-center z-10 cursor-pointer bg-black/40"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setActiveDetailSlot(slot);
+                                                                        }}
+                                                                    >
+                                                                        <Eye className="w-4 h-4 text-white/70" />
+                                                                    </div>
+                                                                );
+                                                            }
+                                                        })()}
                                                     </div>
                                                 )}
 
@@ -1240,21 +2129,18 @@ export default function UploadWorkspace() {
                     accept="image/*"
                     capture="environment"
                     onChange={(e) => {
-                        // Use ref — survives iOS Safari camera app switching
-                        const label = pendingUploadLabelRef.current;
+                        // Use session storage fallback — survives Android background activity recreation/reload
+                        const label = getPendingUploadLabel();
                         const files = e.target.files;
                         console.log('FILES', files);
                         console.log('[CAMERA onChange] pendingLabel:', label, '| files:', files?.length);
                         if (label && files?.[0]) {
                             const file = files[0];
                             console.log('FILE', file);
-                            console.log('PREVIEW CREATED');
-                            handleFileChange(label, file);
-                            console.log('STATE UPDATED');
+                            setInitialCameraFile(file);
+                            setShowCustomCamera(true);
                         }
                         e.target.value = '';
-                        pendingUploadLabelRef.current = null;
-                        setActiveUploadChoiceLabel(null);
                     }}
                     className="hidden"
                 />
@@ -1263,21 +2149,18 @@ export default function UploadWorkspace() {
                     ref={galleryInputRef}
                     accept="image/*"
                     onChange={(e) => {
-                        // Use ref — survives async file picker
-                        const label = pendingUploadLabelRef.current;
+                        // Use session storage fallback — survives Android background activity recreation/reload
+                        const label = getPendingUploadLabel();
                         const files = e.target.files;
                         console.log('FILES', files);
                         console.log('[GALLERY onChange] pendingLabel:', label, '| files:', files?.length);
                         if (label && files?.[0]) {
                             const file = files[0];
                             console.log('FILE', file);
-                            console.log('PREVIEW CREATED');
-                            handleFileChange(label, file);
-                            console.log('STATE UPDATED');
+                            setInitialCameraFile(file);
+                            setShowCustomCamera(true);
                         }
                         e.target.value = '';
-                        pendingUploadLabelRef.current = null;
-                        setActiveUploadChoiceLabel(null);
                     }}
                     className="hidden"
                 />
@@ -1550,7 +2433,7 @@ export default function UploadWorkspace() {
                 <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowValidationModal(false)}>
                     <div className="bg-white border border-slate-205 dark:bg-[#0A0A0F] dark:border-neutral-900 rounded-2xl max-w-md w-full p-6 shadow-2xl relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
                         <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full blur-2xl pointer-events-none" />
-                        
+
                         <div className="flex items-center gap-3 mb-4 text-red-500 dark:text-red-400">
                             <AlertTriangle className="w-7 h-7 flex-shrink-0" />
                             <h3 className="text-lg font-bold">Pengumpulan Belum Lengkap</h3>
@@ -1586,7 +2469,7 @@ export default function UploadWorkspace() {
                 <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowSubmitConfirmModal(false)}>
                     <div className="bg-white border border-slate-200 dark:bg-[#0A0A0F] dark:border-neutral-900 rounded-2xl max-w-md w-full p-6 shadow-2xl relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
                         <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
-                        
+
                         <div className="flex items-center gap-3 mb-4 text-cyan-500 dark:text-cyan-400">
                             <CheckCircle className="w-7 h-7 flex-shrink-0 animate-bounce" />
                             <h3 className="text-lg font-bold">Konfirmasi Pengumpulan</h3>
@@ -1637,7 +2520,7 @@ export default function UploadWorkspace() {
 
                 return (
                     <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-250" onClick={!isDeleting ? closeModal : undefined}>
-                        <div 
+                        <div
                             className="bg-white dark:bg-[#0A0A0F] border-t border-slate-200 dark:border-neutral-900 sm:border rounded-t-3xl sm:rounded-2xl max-w-md w-full pt-6 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:p-6 shadow-2xl relative animate-in slide-in-from-bottom duration-300"
                             onClick={(e) => e.stopPropagation()}
                         >
@@ -1654,13 +2537,12 @@ export default function UploadWorkspace() {
                                     </p>
 
                                     <div className="flex flex-col gap-3">
-                                        {/* 👁️ View Detail */}
                                         <button
                                             disabled={isDeleting}
                                             onClick={() => {
                                                 setActiveDetailSlot(targetSlot);
                                                 closeModal();
-                                                pendingUploadLabelRef.current = null;
+                                                setPendingUploadLabel(null);
                                                 setActiveUploadChoiceLabel(null);
                                             }}
                                             className="h-12 border border-slate-200 dark:border-neutral-800 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl font-bold flex items-center justify-center gap-2 text-slate-800 dark:text-white cursor-pointer transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1669,16 +2551,20 @@ export default function UploadWorkspace() {
                                             <span>Lihat Detail &amp; Hasil AI</span>
                                         </button>
 
-                                        {/* 📷 Ganti Foto — Kamera */}
                                         {showReplace && (
                                             <button
                                                 disabled={isDeleting}
                                                 onClick={() => {
-                                                    console.log('[GANTI KAMERA BTN] pendingLabel:', pendingUploadLabelRef.current);
+                                                    console.log('[GANTI KAMERA BTN] pendingLabel:', getPendingUploadLabel());
                                                     closeModal();
-                                                    setTimeout(() => {
-                                                        cameraInputRef.current?.click();
-                                                    }, 100);
+                                                    if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+                                                        setShowCustomCamera(true);
+                                                    } else {
+                                                        toast.info('Beralih ke kamera bawaan sistem.');
+                                                        setTimeout(() => {
+                                                            cameraInputRef.current?.click();
+                                                        }, 100);
+                                                    }
                                                 }}
                                                 className="h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 rounded-xl font-bold flex items-center justify-center gap-2 text-white cursor-pointer shadow-md shadow-cyan-500/10 transition-all active:scale-[0.98] text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
@@ -1687,12 +2573,11 @@ export default function UploadWorkspace() {
                                             </button>
                                         )}
 
-                                        {/* 🖼️ Ganti dari Galeri */}
                                         {showReplace && (
                                             <button
                                                 disabled={isDeleting}
                                                 onClick={() => {
-                                                    console.log('[GANTI GALERI BTN] pendingLabel:', pendingUploadLabelRef.current);
+                                                    console.log('[GANTI GALERI BTN] pendingLabel:', getPendingUploadLabel());
                                                     closeModal();
                                                     setTimeout(() => {
                                                         galleryInputRef.current?.click();
@@ -1705,7 +2590,6 @@ export default function UploadWorkspace() {
                                             </button>
                                         )}
 
-                                        {/* 🗑️ Hapus Foto */}
                                         {showDelete && (
                                             <button
                                                 disabled={isDeleting}
@@ -1726,12 +2610,11 @@ export default function UploadWorkspace() {
                                             </button>
                                         )}
 
-                                        {/* Batal */}
                                         <button
                                             disabled={isDeleting}
                                             onClick={() => {
                                                 closeModal();
-                                                pendingUploadLabelRef.current = null;
+                                                setPendingUploadLabel(null);
                                                 setActiveUploadChoiceLabel(null);
                                             }}
                                             className="h-12 mt-1 bg-slate-100 hover:bg-slate-200 dark:bg-neutral-900 dark:hover:bg-neutral-800 rounded-xl font-bold text-slate-600 dark:text-neutral-400 cursor-pointer transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1741,7 +2624,6 @@ export default function UploadWorkspace() {
                                     </div>
                                 </>
                             ) : (
-                                // ── EMPTY SLOT: show Ambil Foto / Galeri options ──
                                 <>
                                     <h3 className="text-base font-extrabold text-slate-900 dark:text-white mb-1 tracking-wide text-center sm:text-left">
                                         Unggah Lembar Jawaban {activeUploadChoiceLabel.toUpperCase()}
@@ -1751,14 +2633,18 @@ export default function UploadWorkspace() {
                                     </p>
 
                                     <div className="flex flex-col gap-3">
-                                        {/* 📷 Ambil Foto — Kamera */}
                                         <button
                                             onClick={() => {
-                                                console.log('[CAMERA BTN] pendingLabel:', pendingUploadLabelRef.current);
+                                                console.log('[CAMERA BTN] pendingLabel:', getPendingUploadLabel());
                                                 closeModal();
-                                                setTimeout(() => {
-                                                    cameraInputRef.current?.click();
-                                                }, 100);
+                                                if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+                                                    setShowCustomCamera(true);
+                                                } else {
+                                                    toast.info('Beralih ke kamera bawaan sistem.');
+                                                    setTimeout(() => {
+                                                        cameraInputRef.current?.click();
+                                                    }, 100);
+                                                }
                                             }}
                                             className="h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 rounded-xl font-bold flex items-center justify-center gap-2 text-white cursor-pointer shadow-md shadow-cyan-500/10 transition-all active:scale-[0.98] text-sm"
                                         >
@@ -1766,10 +2652,9 @@ export default function UploadWorkspace() {
                                             <span>Ambil Foto (Kamera)</span>
                                         </button>
 
-                                        {/* 🖼️ Pilih dari Galeri */}
                                         <button
                                             onClick={() => {
-                                                console.log('[GALLERY BTN] pendingLabel:', pendingUploadLabelRef.current);
+                                                console.log('[GALLERY BTN] pendingLabel:', getPendingUploadLabel());
                                                 closeModal();
                                                 setTimeout(() => {
                                                     galleryInputRef.current?.click();
@@ -1781,11 +2666,10 @@ export default function UploadWorkspace() {
                                             <span>Pilih dari Galeri</span>
                                         </button>
 
-                                        {/* Batal */}
                                         <button
                                             onClick={() => {
                                                 closeModal();
-                                                pendingUploadLabelRef.current = null;
+                                                setPendingUploadLabel(null);
                                                 setActiveUploadChoiceLabel(null);
                                             }}
                                             className="h-12 mt-1 bg-slate-100 hover:bg-slate-200 dark:bg-neutral-900 dark:hover:bg-neutral-800 rounded-xl font-bold text-slate-600 dark:text-neutral-400 cursor-pointer transition-colors text-sm"
@@ -1799,6 +2683,30 @@ export default function UploadWorkspace() {
                     </div>
                 );
             })()}
+
+            {showCustomCamera && activeUploadChoiceLabel && (
+                <CustomCameraModal
+                    label={activeUploadChoiceLabel}
+                    initialFile={initialCameraFile || undefined}
+                    onCapture={(file) => {
+                        setShowCustomCamera(false);
+                        setInitialCameraFile(null);
+                        handleFileChange(activeUploadChoiceLabel, file);
+                        setActiveUploadChoiceLabel(null);
+                    }}
+                    onClose={() => {
+                        setShowCustomCamera(false);
+                        if (!initialCameraFile) {
+                            toast.info('Beralih ke kamera bawaan sistem.');
+                            setTimeout(() => {
+                                cameraInputRef.current?.click();
+                            }, 100);
+                        }
+                        setInitialCameraFile(null);
+                        setActiveUploadChoiceLabel(null);
+                    }}
+                />
+            )}
         </div>
     );
 }
