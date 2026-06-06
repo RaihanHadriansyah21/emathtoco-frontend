@@ -227,38 +227,40 @@ export default function AdminDashboard() {
               {recentSubmissions.length === 0 ? (
                 <div className="py-12 text-center text-slate-400 dark:text-neutral-500 text-sm">Belum ada pengumpulan tugas.</div>
               ) : (
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black/40">
-                      <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Mahasiswa</th>
-                      <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Mata Kuliah</th>
-                      <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Status</th>
-                      <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Waktu</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
-                    {recentSubmissions.map((sub) => {
-                      const badge = getStatusBadge(sub.status_submit);
-                      const mhs = Array.isArray(sub.mahasiswa) ? sub.mahasiswa[0] : sub.mahasiswa;
-                      const mk = Array.isArray(sub.mata_kuliah) ? sub.mata_kuliah[0] : sub.mata_kuliah;
-                      return (
-                        <tr key={sub.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
-                          <td className="py-3 px-5">
-                            <div className="text-sm font-semibold text-slate-800 dark:text-white">{mhs?.nama_lengkap || 'Unknown'}</div>
-                            <div className="text-[10px] text-slate-400 dark:text-neutral-500 font-mono">{mhs?.nim_nip || '-'}</div>
-                          </td>
-                          <td className="py-3 px-5 text-sm text-slate-600 dark:text-neutral-300">{mk?.nama_matkul || '-'}</td>
-                          <td className="py-3 px-5">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${badge.bg} ${badge.border} ${badge.color}`}>
-                              {badge.icon} {badge.text}
-                            </span>
-                          </td>
-                          <td className="py-3 px-5 text-xs text-slate-400 dark:text-neutral-500">{formatDate(sub.waktu_submit)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse min-w-[650px]">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black/40">
+                        <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mahasiswa</th>
+                        <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mata Kuliah</th>
+                        <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Status</th>
+                        <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Waktu</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
+                      {recentSubmissions.map((sub) => {
+                        const badge = getStatusBadge(sub.status_submit);
+                        const mhs = Array.isArray(sub.mahasiswa) ? sub.mahasiswa[0] : sub.mahasiswa;
+                        const mk = Array.isArray(sub.mata_kuliah) ? sub.mata_kuliah[0] : sub.mata_kuliah;
+                        return (
+                          <tr key={sub.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                            <td className="py-3 px-5 whitespace-nowrap">
+                              <div className="text-sm font-semibold text-slate-800 dark:text-white">{mhs?.nama_lengkap || 'Unknown'}</div>
+                              <div className="text-[10px] text-slate-400 dark:text-neutral-500 font-mono">{mhs?.nim_nip || '-'}</div>
+                            </td>
+                            <td className="py-3 px-5 text-sm text-slate-600 dark:text-neutral-300 whitespace-nowrap">{mk?.nama_matkul || '-'}</td>
+                            <td className="py-3 px-5 whitespace-nowrap">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${badge.bg} ${badge.border} ${badge.color}`}>
+                                {badge.icon} {badge.text}
+                              </span>
+                            </td>
+                            <td className="py-3 px-5 text-xs text-slate-400 dark:text-neutral-500 whitespace-nowrap">{formatDate(sub.waktu_submit)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>

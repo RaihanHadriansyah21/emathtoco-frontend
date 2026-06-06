@@ -7,6 +7,7 @@ import Navbar from '../../components/Navbar';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/app/hooks/useToast';
 import ToastContainer from '@/app/components/Toast';
+import { createAuditLog } from '@/lib/services/audit-service';
 
 const getMaxScore = (label: string): number => {
     return label.toLowerCase().endsWith('f') ? 5 : 4;
@@ -94,6 +95,7 @@ export default function UploadWorkspace() {
     const [activeUploadChoiceLabel, setActiveUploadChoiceLabel] = useState<string | null>(null);
     const [showChoiceModal, setShowChoiceModal] = useState(false);
     const [showValidationModal, setShowValidationModal] = useState(false);
+    const [showSubmitConfirmModal, setShowSubmitConfirmModal] = useState(false);
     const [justUploadedLabels, setJustUploadedLabels] = useState<string[]>([]);
     const [isDeletingSlot, setIsDeletingSlot] = useState<string | null>(null);
     const [showDesktopDeleteModal, setShowDesktopDeleteModal] = useState(false);
@@ -147,6 +149,121 @@ export default function UploadWorkspace() {
         checkMobile();
     }, []);
 
+    const loadSubmissionDetails = async (uid: string) => {
+        try {
+            // Cek data submission yang sudah ada (terbaru)
+            const { data: existingSubmission } = await supabase
+                .from('pengumpulan_tugas')
+                .select('*')
+                .eq('mahasiswa_id', uid)
+                .eq('mata_kuliah_id', matkulId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (existingSubmission) {
+                setSubmissionId(existingSubmission.id);
+                setSubmissionStatus(existingSubmission.status_submit);
+                setNilaiAkhir(existingSubmission.nilai_akhir ?? null);
+                setModelAi(existingSubmission.model_ai ?? null);
+
+                const lockedStatuses = ['processing_ai', 'reviewed', 'finalized'];
+                if (lockedStatuses.includes(existingSubmission.status_submit)) {
+                    setIsReadOnly(true);
+                } else {
+                    setIsReadOnly(false);
+                }
+
+                // Ambil detail lembar jawaban yang sudah diupload sebelumnya
+                const { data: sheets } = await supabase
+                    .from('lembar_jawaban')
+                    .select('*')
+                    .eq('pengumpulan_tugas_id', existingSubmission.id);
+
+                const initialSlots = generateSlots().map(s => ({
+                    ...s,
+                    status: 'empty' as const,
+                    fileUrl: null
+                }));
+
+                if (sheets && sheets.length > 0) {
+                    const updatedSlots = initialSlots.map(slot => {
+                        const sectionCode = `S-${slot.label.toUpperCase()}`;
+                        const matchedSheet = sheets.find(s => s.section_code === sectionCode);
+                        if (matchedSheet && matchedSheet.image_url) {
+                            return {
+                                ...slot,
+                                status: 'success' as const,
+                                imagePath: matchedSheet.image_url,
+                                dbStatus: matchedSheet.status,
+                                prediksiAi: matchedSheet.prediksi_ai || undefined,
+                                feedback: matchedSheet.feedback || undefined,
+                                nilaiFinal: matchedSheet.nilai_final ?? null,
+                                rejectionReason: matchedSheet.rejection_reason || null,
+                                wasReuploaded: matchedSheet.was_reuploaded || false,
+                                lastReuploadAt: matchedSheet.last_reupload_at || null,
+                                reuploadCount: matchedSheet.reupload_count || 0,
+                            };
+                        }
+                        return slot;
+                    });
+
+                    // Ambil signed preview URL untuk render gambar secara paralel
+                    const urlPromises = updatedSlots.map(async (slot) => {
+                        if (slot.status === 'success' && slot.imagePath) {
+                            const signedUrl = await getSignedPreviewUrl(slot.imagePath);
+                            if (!signedUrl) {
+                                console.warn(`Storage object missing or invalid for path: ${slot.imagePath}. Cleaning up database...`);
+
+                                // 6. OPTIONAL AUTO-CLEANUP: delete invalid database row
+                                const sectionCode = `S-${slot.label.toUpperCase()}`;
+                                const matchedSheet = sheets.find(s => s.section_code === sectionCode);
+                                if (matchedSheet) {
+                                    supabase
+                                        .from('lembar_jawaban')
+                                        .delete()
+                                        .eq('id', matchedSheet.id)
+                                        .then(({ error }) => {
+                                            if (error) console.error('Auto-cleanup of orphaned metadata row failed:', error);
+                                            else console.log('Successfully auto-cleaned orphaned metadata row for slot:', slot.label);
+                                        });
+                                }
+
+                                // Reset slot state to empty
+                                return {
+                                    ...slot,
+                                    status: 'empty' as const,
+                                    fileUrl: null,
+                                    imagePath: undefined,
+                                    dbStatus: undefined
+                                };
+                            }
+                            return { ...slot, fileUrl: signedUrl };
+                        }
+                        return slot;
+                    });
+
+                    const resolvedSlots = await Promise.all(urlPromises);
+
+                    // Merge with current slots to preserve local 'uploading' and deleting state
+                    setSlots(prevSlots => {
+                        return resolvedSlots.map(fetchedSlot => {
+                            const currentSlot = prevSlots.find(s => s.label === fetchedSlot.label);
+                            if (currentSlot && (currentSlot.status === 'uploading' || isDeletingSlot === fetchedSlot.label)) {
+                                return currentSlot; // Preserve the local state
+                            }
+                            return fetchedSlot;
+                        });
+                    });
+                } else {
+                    setSlots(initialSlots);
+                }
+            }
+        } catch (err) {
+            console.error('Error fetching submission details:', err);
+        }
+    };
+
     useEffect(() => {
         // Inisialisasi struktur 24 slot lembar kerja kosong
         const initialSlots = generateSlots().map(s => ({
@@ -164,7 +281,7 @@ export default function UploadWorkspace() {
                 // Cek apakah profil sudah lengkap
                 const { data: profile, error } = await supabase
                     .from('profil_pengguna')
-                    .select('nama_lengkap')
+                    .select('nama_lengkap, role')
                     .eq('id', user.id)
                     .maybeSingle();
 
@@ -212,99 +329,41 @@ export default function UploadWorkspace() {
                     setKodeMatkul(course.kode_matkul || '');
                 }
 
-                // Cek data submission yang sudah ada (terbaru)
-                const { data: existingSubmission } = await supabase
-                    .from('pengumpulan_tugas')
-                    .select('*')
-                    .eq('mahasiswa_id', user.id)
-                    .eq('mata_kuliah_id', matkulId)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
-
-                if (existingSubmission) {
-                    setSubmissionId(existingSubmission.id);
-                    setSubmissionStatus(existingSubmission.status_submit);
-                    setNilaiAkhir(existingSubmission.nilai_akhir ?? null);
-                    setModelAi(existingSubmission.model_ai ?? null);
-
-                    const lockedStatuses = ['processing_ai', 'reviewed', 'finalized'];
-                    if (lockedStatuses.includes(existingSubmission.status_submit)) {
-                        setIsReadOnly(true);
-                    }
-
-                    // Ambil detail lembar jawaban yang sudah diupload sebelumnya
-                    const { data: sheets } = await supabase
-                        .from('lembar_jawaban')
-                        .select('*')
-                        .eq('pengumpulan_tugas_id', existingSubmission.id);
-
-                    if (sheets && sheets.length > 0) {
-                        const updatedSlots = initialSlots.map(slot => {
-                            const sectionCode = `S-${slot.label.toUpperCase()}`;
-                            const matchedSheet = sheets.find(s => s.section_code === sectionCode);
-                            if (matchedSheet && matchedSheet.image_url) {
-                                return {
-                                    ...slot,
-                                    status: 'success' as const,
-                                    imagePath: matchedSheet.image_url,
-                                    dbStatus: matchedSheet.status,
-                                    prediksiAi: matchedSheet.prediksi_ai || undefined,
-                                    feedback: matchedSheet.feedback || undefined,
-                                    nilaiFinal: matchedSheet.nilai_final ?? null,
-                                    rejectionReason: matchedSheet.rejection_reason || null,
-                                    wasReuploaded: matchedSheet.was_reuploaded || false,
-                                    lastReuploadAt: matchedSheet.last_reupload_at || null,
-                                    reuploadCount: matchedSheet.reupload_count || 0,
-                                };
-                            }
-                            return slot;
-                        });
-
-                        // Ambil signed preview URL untuk render gambar secara paralel
-                        const urlPromises = updatedSlots.map(async (slot) => {
-                            if (slot.status === 'success' && slot.imagePath) {
-                                const signedUrl = await getSignedPreviewUrl(slot.imagePath);
-                                if (!signedUrl) {
-                                    console.warn(`Storage object missing or invalid for path: ${slot.imagePath}. Cleaning up database...`);
-
-                                    // 6. OPTIONAL AUTO-CLEANUP: delete invalid database row
-                                    const sectionCode = `S-${slot.label.toUpperCase()}`;
-                                    const matchedSheet = sheets.find(s => s.section_code === sectionCode);
-                                    if (matchedSheet) {
-                                        supabase
-                                            .from('lembar_jawaban')
-                                            .delete()
-                                            .eq('id', matchedSheet.id)
-                                            .then(({ error }) => {
-                                                if (error) console.error('Auto-cleanup of orphaned metadata row failed:', error);
-                                                else console.log('Successfully auto-cleaned orphaned metadata row for slot:', slot.label);
-                                            });
-                                    }
-
-                                    // Reset slot state to empty
-                                    return {
-                                        ...slot,
-                                        status: 'empty' as const,
-                                        fileUrl: null,
-                                        imagePath: undefined,
-                                        dbStatus: undefined
-                                    };
-                                }
-                                return { ...slot, fileUrl: signedUrl };
-                            }
-                            return slot;
-                        });
-
-                        const resolvedSlots = await Promise.all(urlPromises);
-                        setSlots(resolvedSlots);
-                    }
-                }
+                await loadSubmissionDetails(user.id);
             } else {
                 router.push('/login');
             }
         });
     }, [router, matkulId]);
+
+    // Polling submission status to ensure synchronization with Dosen dashboard and AI workflow
+    useEffect(() => {
+        if (!userId) return;
+
+        // Poll every 3 seconds to keep student UI perfectly in sync
+        const interval = setInterval(() => {
+            loadSubmissionDetails(userId);
+        }, 3000);
+
+        return () => clearInterval(interval);
+    }, [userId]);
+
+    // Synchronize on focus/tab visibility change
+    useEffect(() => {
+        if (!userId) return;
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                console.log('[SYNC] Tab visible, loading latest submission details...');
+                loadSubmissionDetails(userId);
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [userId]);
 
     // Auto scroll/focus to problematic section from hash on load
     useEffect(() => {
@@ -326,7 +385,6 @@ export default function UploadWorkspace() {
         }
     }, [slots]);
 
-    // LOGIKA UTAMA: Upload Gambar Mandiri ke Supabase Storage (Bucket: lembar-jawaban)
     const handleFileChange = async (label: string, file: File | undefined) => {
         if (!file || !userId) return;
 
@@ -334,6 +392,32 @@ export default function UploadWorkspace() {
         if (currentSlot && isSlotLocked(currentSlot)) {
             console.log('Upload blocked: Slot is locked.');
             return;
+        }
+
+        // Real-time status lock check from database (source of truth)
+        if (submissionId) {
+            try {
+                const { data: latestSub, error: subErr } = await supabase
+                    .from('pengumpulan_tugas')
+                    .select('status_submit')
+                    .eq('id', submissionId)
+                    .maybeSingle();
+
+                if (subErr) throw subErr;
+
+                if (latestSub) {
+                    const lockedStatuses = ['processing_ai', 'ready_review', 'reviewed', 'finalized'];
+                    if (lockedStatuses.includes(latestSub.status_submit)) {
+                        setSubmissionStatus(latestSub.status_submit);
+                        setIsReadOnly(true);
+                        loadSubmissionDetails(userId);
+                        toast.error('Aksi Ditolak', 'Tugas sedang/sudah diproses oleh AI.');
+                        return;
+                    }
+                }
+            } catch (dbCheckErr) {
+                console.error('Realtime status lock check failed:', dbCheckErr);
+            }
         }
 
         // Ubah status komponen kotak slot menjadi Loading/Uploading
@@ -411,7 +495,7 @@ export default function UploadWorkspace() {
             console.log('Upserting lembar_jawaban metadata row...');
             const { data: existingRow, error: checkError } = await supabase
                 .from('lembar_jawaban')
-                .select('id')
+                .select('id, image_url')
                 .eq('pengumpulan_tugas_id', activeSubmissionId)
                 .eq('section_code', sectionCode)
                 .maybeSingle();
@@ -447,6 +531,19 @@ export default function UploadWorkspace() {
                     console.error('Metadata database update failed:', dbError);
                     throw dbError;
                 }
+
+                // Log ANSWER_REPLACED
+                const oldFile = existingRow.image_url ? existingRow.image_url.split('/').pop() || '' : '';
+                const newFile = file.name;
+                createAuditLog({
+                    action: 'ANSWER_REPLACED',
+                    target: 'lembar_jawaban',
+                    detail: {
+                        section: sectionCode,
+                        old_file: oldFile,
+                        new_file: newFile
+                    }
+                });
             } else {
                 console.log('No existing row found. Inserting new lembar_jawaban metadata...');
                 const { error: dbError } = await supabase
@@ -462,6 +559,16 @@ export default function UploadWorkspace() {
                     console.error('Metadata database insert failed:', dbError);
                     throw dbError;
                 }
+
+                // Log ANSWER_UPLOADED
+                createAuditLog({
+                    action: 'ANSWER_UPLOADED',
+                    target: 'lembar_jawaban',
+                    detail: {
+                        section: sectionCode,
+                        filename: file.name
+                    }
+                });
             }
             console.log('Database metadata successfully persisted.');
 
@@ -511,11 +618,16 @@ export default function UploadWorkspace() {
     };
 
     // AKSI AKHIR: Kirim Transaksi Akhir (Mark status_submit menjadi 'submitted')
-    const handleFinalSubmit = async () => {
+    const handleFinalSubmit = async (confirmed = false) => {
         const totalSlots = slots.length;
         const uploadedCount = slots.filter(s => s.status === 'success').length;
         if (uploadedCount < totalSlots) {
             setShowValidationModal(true);
+            return;
+        }
+
+        if (!confirmed) {
+            setShowSubmitConfirmModal(true);
             return;
         }
 
@@ -556,6 +668,15 @@ export default function UploadWorkspace() {
 
             setSubmissionStatus('submitted');
             setSlots(prev => prev.map(s => s.status === 'success' ? { ...s, dbStatus: 'submitted' } : s));
+
+            // Log SUBMISSION_SUBMITTED
+            createAuditLog({
+                action: 'SUBMISSION_SUBMITTED',
+                target: 'pengumpulan_tugas',
+                detail: {
+                    submission_id: submissionId
+                }
+            });
         } catch (err) {
             console.error("FULL ERROR:", err);
             if (typeof err === 'object') {
@@ -570,10 +691,37 @@ export default function UploadWorkspace() {
         }
     };
 
-    // AKSI HAPUS FOTO: Hapus gambar dari storage dan DB, kembalikan slot ke kosong
     const handleDeleteSlot = async (label: string) => {
         const slot = slots.find(s => s.label === label);
         if (!slot || slot.status !== 'success' || !submissionId) return;
+        if (isSlotLocked(slot) || submissionStatus === 'submitted') {
+            console.log('Delete blocked: Slot is locked or already submitted.');
+            toast.error('Aksi Ditolak', 'Jawaban tidak dapat dihapus setelah tugas dikumpulkan.');
+            return;
+        }
+
+        // Real-time status lock check from database (source of truth)
+        try {
+            const { data: latestSub, error: subErr } = await supabase
+                .from('pengumpulan_tugas')
+                .select('status_submit')
+                .eq('id', submissionId)
+                .maybeSingle();
+
+            if (subErr) throw subErr;
+
+            if (latestSub) {
+                const lockedStatuses = ['processing_ai', 'ready_review', 'reviewed', 'finalized'];
+                if (lockedStatuses.includes(latestSub.status_submit) || latestSub.status_submit === 'submitted') {
+                    setSubmissionStatus(latestSub.status_submit);
+                    loadSubmissionDetails(userId || '');
+                    toast.error('Aksi Ditolak', 'Jawaban tidak dapat dihapus setelah tugas dikumpulkan.');
+                    return;
+                }
+            }
+        } catch (dbCheckErr) {
+            console.error('Realtime status lock check failed:', dbCheckErr);
+        }
 
         setIsDeletingSlot(label);
         try {
@@ -604,6 +752,15 @@ export default function UploadWorkspace() {
                 throw new Error(`Gagal menghapus data dari database: ${dbError.message}`);
             }
             console.log('[DELETE] DB row removed for section_code:', sectionCode);
+
+            // Log ANSWER_DELETED
+            createAuditLog({
+                action: 'ANSWER_DELETED',
+                target: 'lembar_jawaban',
+                detail: {
+                    section: sectionCode
+                }
+            });
 
             // STEP 3: Reset slot ke status kosong
             setSlots(prev => prev.map(s => s.label === label ? {
@@ -1190,7 +1347,9 @@ export default function UploadWorkspace() {
                                     disabled: false,
                                     text: allUploaded ? 'KUMPULKAN 24 JAWABAN SEKARANG' : `KUMPULKAN JAWABAN (${uploadedCount}/24)`,
                                     subtext: allUploaded ? null : 'Ada bagian yang belum diunggah',
-                                    className: 'bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-600 hover:via-blue-600 hover:to-indigo-700 text-white shadow-cyan-500/10 cursor-pointer'
+                                    className: allUploaded
+                                        ? 'bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-600 hover:via-blue-600 hover:to-indigo-700 text-white shadow-cyan-500/10 cursor-pointer'
+                                        : 'bg-slate-100 dark:bg-neutral-900 text-slate-400 dark:text-neutral-500 border border-slate-200 dark:border-neutral-800 shadow-none cursor-pointer hover:bg-slate-200 dark:hover:bg-neutral-800/80 transition-colors'
                                 };
                         }
                     };
@@ -1207,7 +1366,7 @@ export default function UploadWorkspace() {
                             </div>
                             <div className="flex flex-col items-center sm:items-end gap-1">
                                 <button
-                                    onClick={handleFinalSubmit}
+                                    onClick={() => handleFinalSubmit(false)}
                                     disabled={btn.disabled || isSubmitting}
                                     className={`w-full sm:w-auto font-extrabold px-8 py-3.5 rounded-xl transition-all duration-300 shadow-lg text-sm tracking-wider active:scale-[0.98] flex items-center justify-center gap-2 ${btn.className}`}
                                 >
@@ -1440,6 +1599,45 @@ export default function UploadWorkspace() {
                         >
                             Tutup
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Submit Confirmation Modal */}
+            {showSubmitConfirmModal && (
+                <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowSubmitConfirmModal(false)}>
+                    <div className="bg-white border border-slate-200 dark:bg-[#0A0A0F] dark:border-neutral-900 rounded-2xl max-w-md w-full p-6 shadow-2xl relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
+                        
+                        <div className="flex items-center gap-3 mb-4 text-cyan-500 dark:text-cyan-400">
+                            <CheckCircle className="w-7 h-7 flex-shrink-0 animate-bounce" />
+                            <h3 className="text-lg font-bold">Konfirmasi Pengumpulan</h3>
+                        </div>
+
+                        <p className="text-sm text-slate-600 dark:text-neutral-300 mb-5 leading-relaxed">
+                            Apakah Anda yakin ingin mengumpulkan 24 bagian jawaban tugas ini sekarang?
+                            <span className="block mt-2 font-semibold text-slate-500 dark:text-neutral-400 text-xs">
+                                Catatan: Setelah dikumpulkan, tugas Anda akan langsung diproses oleh sistem AI. Harap periksa kembali untuk memastikan semua foto lembar jawaban sudah benar dan jelas.
+                            </span>
+                        </p>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowSubmitConfirmModal(false)}
+                                className="flex-1 h-11 bg-slate-100 hover:bg-slate-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-slate-700 dark:text-neutral-300 font-bold rounded-xl transition-colors text-sm cursor-pointer"
+                            >
+                                Periksa Lagi
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    setShowSubmitConfirmModal(false);
+                                    await handleFinalSubmit(true);
+                                }}
+                                className="flex-1 h-11 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-xl transition-all text-sm cursor-pointer shadow-lg shadow-cyan-500/20"
+                            >
+                                Ya, Kumpulkan
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

@@ -1,11 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { normalizeRole } from '@/lib/utils';
+import { API_URL } from '@/lib/config';
 import Image from 'next/image';
 import Logo from '../Emathtoco.png';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -13,6 +16,30 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Auto-cleanup timer on unmount
+    useEffect(() => {
+        return () => {
+            if (timerRef.current) {
+                clearTimeout(timerRef.current);
+            }
+        };
+    }, []);
+
+    const togglePasswordVisibility = () => {
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+
+        setShowPassword(true);
+
+        timerRef.current = setTimeout(() => {
+            setShowPassword(false);
+        }, 2000);
+    };
 
     useEffect(() => {
         const checkSession = async () => {
@@ -42,6 +69,48 @@ export default function LoginPage() {
         checkSession();
     }, [router]);
 
+    /**
+     * Sends audit log using keepalive fetch (survives page navigation/unload).
+     * Falls back to navigator.sendBeacon if fetch fails.
+     * This is used ONLY for login events because window.location.href
+     * causes a hard page reload that aborts normal async fetch requests.
+     */
+    const sendLoginAuditLog = (auditPayload: {
+        action: string;
+        target: string;
+        detail: any;
+        user_id: string;
+        user_name: string;
+        role: string;
+    }) => {
+        const url = `${API_URL}/audit/log`;
+        const body = JSON.stringify(auditPayload);
+
+        // Primary: fetch with keepalive — survives page navigation, supports custom headers
+        try {
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'ngrok-skip-browser-warning': 'true',
+                    'Accept': 'application/json',
+                },
+                body,
+                keepalive: true,
+            }).catch(() => {
+                // silently ignore — non-blocking
+            });
+            console.log('[AUDIT DEBUG] keepalive fetch fired');
+        } catch {
+            // Fallback: navigator.sendBeacon — also survives page unload
+            if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+                const blob = new Blob([body], { type: 'application/json' });
+                const sent = navigator.sendBeacon(url, blob);
+                console.log(`[AUDIT DEBUG] sendBeacon fallback result: ${sent}`);
+            }
+        }
+    };
+
     const handleLoginSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrorMessage(null);
@@ -66,8 +135,57 @@ export default function LoginPage() {
             }
 
             if (data?.session) {
+                console.log("[AUDIT DEBUG] Login success");
                 document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax`;
-                window.location.href = '/';
+                
+                let targetHref = '/';
+
+                try {
+                    const { data: profile } = await supabase
+                        .from('profil_pengguna')
+                        .select('role, nama_lengkap')
+                        .eq('id', data.session.user.id)
+                        .maybeSingle();
+                    
+                    const role = normalizeRole(profile?.role);
+                    const userName = profile?.nama_lengkap || data.session.user.email || 'Anonymous';
+                    
+                    // Session storage guard to prevent duplicate login logging
+                    const sessionLoggedKey = `logged_${data.session.user.id}`;
+                    if (typeof window !== 'undefined' && !sessionStorage.getItem(sessionLoggedKey)) {
+                        console.log("[AUDIT DEBUG] About to write audit log");
+                        sessionStorage.setItem(sessionLoggedKey, 'true');
+                        
+                        let auditAction = '';
+                        let auditTarget = 'auth';
+                        
+                        if (role === 'admin') {
+                            auditAction = 'ADMIN_LOGIN';
+                        } else if (role === 'dosen') {
+                            auditAction = 'LECTURER_LOGIN';
+                        } else if (role === 'mahasiswa') {
+                            auditAction = 'STUDENT_LOGIN';
+                            auditTarget = 'profil_pengguna';
+                        }
+
+                        if (auditAction) {
+                            // Use sendBeacon — survives page navigation/unload
+                            sendLoginAuditLog({
+                                action: auditAction,
+                                target: auditTarget,
+                                detail: { role },
+                                user_id: data.session.user.id,
+                                user_name: userName,
+                                role: role,
+                            });
+                            console.log("[AUDIT DEBUG] Audit log request sent via sendBeacon");
+                        }
+                    }
+                } catch (auditErr) {
+                    console.error('[AUDIT] Failed to log user login:', auditErr);
+                }
+
+                window.location.href = targetHref;
             }
         } catch (err) {
             setErrorMessage('Terjadi gangguan jaringan pada sistem autentikasi.');
@@ -122,13 +240,27 @@ export default function LoginPage() {
 
                     <div>
                         <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Password</label>
-                        <input
-                            type="password"
-                            placeholder="••••••••"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full bg-black border border-neutral-800 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/20 transition-all text-sm placeholder:text-neutral-600"
-                        />
+                        <div className="relative">
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                placeholder="••••••••"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full bg-black border border-neutral-800 rounded-xl py-3 pl-4 pr-12 text-white focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/20 transition-all text-sm placeholder:text-neutral-600"
+                            />
+                            <button
+                                type="button"
+                                onClick={togglePasswordVisibility}
+                                aria-label={showPassword ? "Hide password" : "Show password"}
+                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-350 active:scale-95 transition-all p-1 rounded-lg hover:bg-neutral-900/50 cursor-pointer flex items-center justify-center"
+                            >
+                                {showPassword ? (
+                                    <EyeOff className="w-4 h-4" />
+                                ) : (
+                                    <Eye className="w-4 h-4" />
+                                )}
+                            </button>
+                        </div>
                     </div>
 
                     <button

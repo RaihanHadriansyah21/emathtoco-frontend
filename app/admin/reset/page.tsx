@@ -4,7 +4,9 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RotateCcw, Loader2, AlertTriangle, Trash2, ShieldAlert } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { createAuditLog } from '@/lib/services/audit-service';
 import { normalizeRole } from '@/lib/utils';
+import { API_URL } from '@/lib/config';
 
 export default function DemoResetPage() {
   const router = useRouter();
@@ -50,44 +52,84 @@ export default function DemoResetPage() {
     let submissionsDeleted = 0;
     let enrollmentsDeleted = 0;
 
+    let currentStep = '';
+
     try {
       if (resetType === 'submissions' || resetType === 'all') {
         // ==========================================
-        // STEP 1: Fetch all lembar_jawaban records
+        // STEP 1: Ambil seluruh submission target reset
         // ==========================================
-        console.log('[RESET] Step 1: Fetching all lembar_jawaban records...');
-        const { data: sheets, error: fetchError } = await supabase
-          .from('lembar_jawaban')
-          .select('id, image_url');
+        currentStep = 'STEP 1 (Fetch Submissions)';
+        console.log('[RESET] Step 1: Fetching submissions...');
+        const { data: submissions, error: fetchSubsError } = await supabase
+          .from('pengumpulan_tugas')
+          .select('id');
 
-        if (fetchError) {
-          throw new Error(`Gagal membaca data lembar_jawaban: ${fetchError.message}`);
+        if (fetchSubsError) {
+          throw new Error(fetchSubsError.message);
         }
 
-        const allSheets = sheets || [];
-        console.log(`[RESET] Found ${allSheets.length} lembar_jawaban records`);
+        const subIds = submissions?.map(s => s.id) || [];
+        console.log(`[RESET] Submissions found: ${subIds.length}`);
 
         // ==========================================
-        // STEP 2: Compile storage paths
+        // STEP 2: Ambil seluruh lembar_jawaban yang terkait
         // ==========================================
-        const paths = allSheets
+        currentStep = 'STEP 2 (Fetch Answer Sheets)';
+        console.log('[RESET] Step 2: Fetching related lembar_jawaban...');
+        let sheets: { id: string; image_url: string | null }[] = [];
+        if (subIds.length > 0) {
+          const { data: fetchSheets, error: fetchSheetsError } = await supabase
+            .from('lembar_jawaban')
+            .select('id, image_url')
+            .in('pengumpulan_tugas_id', subIds);
+
+          if (fetchSheetsError) {
+            throw new Error(fetchSheetsError.message);
+          }
+          sheets = fetchSheets || [];
+        }
+        const answerSheetIds = sheets.map(s => s.id);
+        console.log(`[RESET] Answer sheets found: ${answerSheetIds.length}`);
+
+        // ==========================================
+        // STEP 3: Ambil seluruh hasil_prediksi yang terkait
+        // ==========================================
+        currentStep = 'STEP 3 (Fetch Predictions)';
+        console.log('[RESET] Step 3: Fetching related hasil_prediksi...');
+        let initialPredCount = 0;
+        if (answerSheetIds.length > 0) {
+          const countRes = await fetch(`${API_URL}/admin/predictions/count`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lembar_jawaban_ids: answerSheetIds })
+          });
+          if (!countRes.ok) {
+            const errText = await countRes.text();
+            throw new Error(`Gagal menghitung hasil_prediksi: ${errText}`);
+          }
+          const countData = await countRes.json();
+          initialPredCount = countData.count;
+        }
+        console.log(`[RESET] Predictions found: ${initialPredCount}`);
+
+        // ==========================================
+        // STEP 4: Delete file storage. WAIT UNTIL COMPLETE.
+        // ==========================================
+        currentStep = 'STEP 4 (Delete Storage Files)';
+        const paths = sheets
           .map((s) => s.image_url)
           .filter((url): url is string => typeof url === 'string' && url.length > 0);
 
-        console.log(`[RESET] Found ${paths.length} storage file paths to delete`);
-
-        // ==========================================
-        // STEP 3: Delete storage files FIRST
-        // ==========================================
         if (paths.length > 0) {
-          console.log(`[RESET] Step 3: Deleting ${paths.length} files from bucket "lembar-jawaban"...`);
+          console.log(`[RESET] Step 4: Deleting ${paths.length} files from bucket "lembar-jawaban"...`);
           const { data: deleteData, error: deleteStorageError } = await supabase.storage
             .from('lembar-jawaban')
             .remove(paths);
 
           if (deleteStorageError) {
             console.error('[RESET] Storage deletion failed:', deleteStorageError);
-            throw new Error(`Gagal menghapus file Storage: ${deleteStorageError.message}`);
+            throw new Error(deleteStorageError.message);
           }
 
           storageFilesDeleted = deleteData?.length ?? paths.length;
@@ -97,63 +139,137 @@ export default function DemoResetPage() {
         }
 
         // ==========================================
-        // STEP 4: Delete hasil_prediksi
+        // STEP 5: Delete seluruh hasil_prediksi. WAIT UNTIL COMPLETE.
         // ==========================================
-        console.log('[RESET] Step 4: Deleting hasil_prediksi...');
-        const { data: deletedHasil, error: deleteHasilError } = await supabase
-          .from('hasil_prediksi')
-          .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000')
-          .select('id');
-        if (deleteHasilError) {
-          throw new Error(`Gagal menghapus hasil_prediksi: ${deleteHasilError.message}`);
+        currentStep = 'STEP 5 (Delete Predictions)';
+        console.log("[RESET] Answer sheet IDs:", answerSheetIds);
+        console.log(`[RESET] answerSheetIds length: ${answerSheetIds.length}`);
+
+        if (answerSheetIds.length > 0) {
+          console.log('[RESET] Step 5: Deleting all related hasil_prediksi...');
+          const deleteRes = await fetch(`${API_URL}/admin/predictions/delete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lembar_jawaban_ids: answerSheetIds })
+          });
+          if (!deleteRes.ok) {
+            const errText = await deleteRes.text();
+            throw new Error(`Gagal menghapus hasil_prediksi: ${errText}`);
+          }
+          const deleteData = await deleteRes.json();
+          predictionsDeleted = deleteData.deleted;
+
+          // Verifikasi: SELECT COUNT(*) harus 0 untuk prediksi yang terkait.
+          const verifyRes = await fetch(`${API_URL}/admin/predictions/count`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lembar_jawaban_ids: answerSheetIds })
+          });
+          if (!verifyRes.ok) {
+            const errText = await verifyRes.text();
+            throw new Error(`Gagal memverifikasi sisa hasil_prediksi: ${errText}`);
+          }
+          const verifyData = await verifyRes.json();
+          const remaining = verifyData.count;
+
+          // Wajib log sesuai format permintaan
+          console.log(`[RESET] Predictions found: ${initialPredCount}`);
+          console.log(`[RESET] Predictions deleted: ${predictionsDeleted}`);
+          console.log(`[RESET] Predictions remaining: ${remaining}`);
+
+          if (remaining > 0) {
+            throw new Error(`Reset aborted. ${remaining} predictions still reference answer sheets.`);
+          }
+        } else {
+          console.log(`[RESET] Predictions found: 0`);
+          console.log(`[RESET] Predictions deleted: 0`);
+          console.log(`[RESET] Predictions remaining: 0`);
         }
-        predictionsDeleted = deletedHasil?.length ?? 0;
-        console.log(`[RESET] ✓ Predictions deleted: ${predictionsDeleted}`);
 
         // ==========================================
-        // STEP 5: Delete lembar_jawaban
+        // STEP 6: Delete seluruh lembar_jawaban. WAIT UNTIL COMPLETE.
         // ==========================================
-        console.log('[RESET] Step 5: Deleting lembar_jawaban...');
-        const { data: deletedLembar, error: deleteLembarError } = await supabase
-          .from('lembar_jawaban')
-          .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000')
-          .select('id');
-        if (deleteLembarError) {
-          throw new Error(`Gagal menghapus lembar_jawaban: ${deleteLembarError.message}`);
+        currentStep = 'STEP 6 (Delete Answer Sheets)';
+        if (answerSheetIds.length > 0) {
+          console.log('[RESET] Step 6: Deleting related lembar_jawaban...');
+          const { data: deletedLembar, error: deleteLembarError } = await supabase
+            .from('lembar_jawaban')
+            .delete()
+            .in('id', answerSheetIds)
+            .select('id');
+
+          if (deleteLembarError) {
+            throw new Error(deleteLembarError.message);
+          }
+
+          answerSheetsDeleted = deletedLembar?.length ?? 0;
+          console.log(`[RESET] Answer sheets found: ${answerSheetIds.length}`);
+          console.log(`[RESET] Answer sheets deleted: ${answerSheetsDeleted}`);
+
+          // Verifikasi: SELECT COUNT(*) harus 0 untuk lembar_jawaban yang terkait.
+          const { count: remainingSheetsCount, error: countSheetsError } = await supabase
+            .from('lembar_jawaban')
+            .select('*', { count: 'exact', head: true })
+            .in('id', answerSheetIds);
+
+          if (countSheetsError) {
+            throw new Error(`Gagal memverifikasi sisa lembar_jawaban: ${countSheetsError.message}`);
+          }
+
+          const remainingSheets = remainingSheetsCount ?? 0;
+          console.log(`[RESET] Remaining answer sheets: ${remainingSheets}`);
+
+          if (remainingSheets > 0) {
+            throw new Error(`Masih tersisa ${remainingSheets} record lembar_jawaban.`);
+          }
+        } else {
+          console.log('[RESET] Step 6: No related lembar_jawaban found to delete.');
+          console.log('[RESET] Answer sheets found: 0');
+          console.log('[RESET] Answer sheets deleted: 0');
         }
-        answerSheetsDeleted = deletedLembar?.length ?? 0;
-        console.log(`[RESET] ✓ Answer sheets deleted: ${answerSheetsDeleted}`);
 
         // ==========================================
-        // STEP 6: Delete pengumpulan_tugas
+        // STEP 7: Delete seluruh pengumpulan_tugas. WAIT UNTIL COMPLETE.
         // ==========================================
-        console.log('[RESET] Step 6: Deleting pengumpulan_tugas...');
-        const { data: deletedSubs, error: deleteSubsError } = await supabase
-          .from('pengumpulan_tugas')
-          .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000')
-          .select('id');
-        if (deleteSubsError) {
-          throw new Error(`Gagal menghapus pengumpulan_tugas: ${deleteSubsError.message}`);
+        currentStep = 'STEP 7 (Delete Submissions)';
+        if (subIds.length > 0) {
+          console.log('[RESET] Step 7: Deleting related pengumpulan_tugas...');
+          const { data: deletedSubs, error: deleteSubsError } = await supabase
+            .from('pengumpulan_tugas')
+            .delete()
+            .in('id', subIds)
+            .select('id');
+
+          if (deleteSubsError) {
+            throw new Error(deleteSubsError.message);
+          }
+
+          submissionsDeleted = deletedSubs?.length ?? 0;
+          console.log(`[RESET] Submissions deleted: ${submissionsDeleted}`);
+        } else {
+          console.log('[RESET] Step 7: No related pengumpulan_tugas found to delete.');
+          console.log('[RESET] Submissions deleted: 0');
         }
-        submissionsDeleted = deletedSubs?.length ?? 0;
-        console.log(`[RESET] ✓ Submissions deleted: ${submissionsDeleted}`);
       }
 
+      // ==========================================
+      // STEP 8: Delete mahasiswa_mata_kuliah (jika reset enrollment atau full reset).
+      // ==========================================
       if (resetType === 'enrollments' || resetType === 'all') {
-        console.log('[RESET] Deleting mahasiswa_mata_kuliah...');
+        currentStep = 'STEP 8 (Delete Enrollments)';
+        console.log('[RESET] Step 8: Deleting mahasiswa_mata_kuliah...');
         const { data: deletedEnrollments, error: deleteEnrollmentsError } = await supabase
           .from('mahasiswa_mata_kuliah')
           .delete()
           .neq('id', '00000000-0000-0000-0000-000000000000')
           .select('id');
+
         if (deleteEnrollmentsError) {
-          throw new Error(`Gagal menghapus enrollment: ${deleteEnrollmentsError.message}`);
+          throw new Error(deleteEnrollmentsError.message);
         }
+
         enrollmentsDeleted = deletedEnrollments?.length ?? 0;
-        console.log(`[RESET] ✓ Enrollments deleted: ${enrollmentsDeleted}`);
+        console.log(`[RESET] Enrollments deleted: ${enrollmentsDeleted}`);
       }
 
       // Build audit summary
@@ -171,11 +287,24 @@ export default function DemoResetPage() {
       console.log('[RESET] === AUDIT SUMMARY ===');
       auditLines.forEach(line => console.log(`[RESET] ${line}`));
 
+      // Log SYSTEM_RESET
+      await createAuditLog({
+        action: 'SYSTEM_RESET',
+        target: 'system',
+        detail: {
+          storage_deleted: storageFilesDeleted,
+          predictions_deleted: predictionsDeleted,
+          answer_sheets_deleted: answerSheetsDeleted,
+          submissions_deleted: submissionsDeleted,
+          enrollments_deleted: enrollmentsDeleted
+        }
+      });
+
       setResultMessage({ type: 'success', text: auditLines.join('\n') });
       setShowConfirmModal(false);
     } catch (err: any) {
       console.error('[RESET] Reset process failed:', err);
-      setResultMessage({ type: 'error', text: `Gagal melakukan reset: ${err.message}` });
+      setResultMessage({ type: 'error', text: `Reset berhenti pada ${currentStep}` });
     } finally {
       setIsResetting(false);
     }
@@ -275,37 +404,89 @@ export default function DemoResetPage() {
       </div>
 
       {/* Confirmation Modal */}
-      {showConfirmModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowConfirmModal(false)} />
-          <div className="relative w-full max-w-md bg-white dark:bg-[#0D0D14] border border-red-500/30 rounded-2xl p-6 shadow-2xl">
-            <div className="w-14 h-14 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center justify-center mx-auto mb-5">
-              <AlertTriangle className="w-7 h-7 text-red-500" />
-            </div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white text-center mb-2">Konfirmasi Reset</h3>
-            <p className="text-sm text-slate-500 dark:text-neutral-400 text-center mb-5">
-              Ketik <code className="bg-red-500/10 text-red-500 dark:text-red-400 px-1.5 py-0.5 rounded font-mono font-bold">RESET</code> untuk mengkonfirmasi penghapusan data.
-            </p>
-            <input
-              type="text"
-              value={confirmText}
-              onChange={(e) => setConfirmText(e.target.value)}
-              placeholder="Ketik RESET di sini..."
-              className="w-full bg-slate-50 dark:bg-black border border-slate-200 dark:border-neutral-800 rounded-xl py-3 px-4 text-sm text-center font-mono font-bold text-slate-800 dark:text-white focus:outline-none focus:border-red-500/60 transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600 uppercase tracking-widest"
-            />
-            <div className="flex items-center justify-end gap-3 mt-5">
-              <button onClick={() => setShowConfirmModal(false)} disabled={isResetting} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-500 dark:text-neutral-400 bg-slate-100 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 cursor-pointer transition-all">Batal</button>
-              <button
-                onClick={handleReset}
-                disabled={confirmText !== 'RESET' || isResetting}
-                className="px-4 py-2.5 rounded-xl text-sm font-bold bg-red-600 hover:bg-red-500 text-white cursor-pointer disabled:opacity-30 transition-all shadow-[0_0_20px_rgba(239,68,68,0.15)]"
-              >
-                {isResetting ? 'Menghapus...' : 'Konfirmasi Reset'}
-              </button>
+      {showConfirmModal && (() => {
+        const isExactMatch = confirmText === 'RESET';
+        const hasInput = confirmText.length > 0;
+        const isCaseError = hasInput && !isExactMatch && confirmText.toUpperCase() === 'RESET';
+        const isWrongText = hasInput && !isExactMatch && !isCaseError;
+
+        const borderClass = isExactMatch
+          ? 'border-emerald-500 dark:border-emerald-500 ring-1 ring-emerald-500/20'
+          : (isCaseError || isWrongText)
+            ? 'border-red-500 dark:border-red-500 ring-1 ring-red-500/20'
+            : 'border-slate-200 dark:border-neutral-800 focus:border-red-500/60';
+
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowConfirmModal(false)} />
+            <div className="relative w-full max-w-md bg-white dark:bg-[#0D0D14] border border-red-500/30 rounded-2xl p-6 shadow-2xl">
+              <div className="w-14 h-14 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                <AlertTriangle className="w-7 h-7 text-red-500" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white text-center mb-2">Konfirmasi Reset</h3>
+              <p className="text-sm text-slate-500 dark:text-neutral-400 text-center mb-5">
+                Ketik <code className="bg-red-500/10 text-red-500 dark:text-red-400 px-1.5 py-0.5 rounded font-mono font-bold">RESET</code> untuk mengkonfirmasi penghapusan data.
+              </p>
+              <input
+                type="text"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="Ketik RESET di sini..."
+                autoComplete="off"
+                spellCheck={false}
+                className={`w-full bg-slate-50 dark:bg-black ${borderClass} rounded-xl py-3 px-4 text-sm text-center font-mono font-bold text-slate-800 dark:text-white focus:outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600 tracking-widest`}
+              />
+
+              {/* Real-time validation feedback */}
+              <div className="mt-2.5 min-h-[2.5rem]">
+                {isExactMatch ? (
+                  <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 text-center flex items-center justify-center gap-1.5">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Input valid. Tombol reset aktif.
+                  </p>
+                ) : isCaseError ? (
+                  <div className="text-center space-y-1">
+                    <p className="text-[11px] text-slate-500 dark:text-neutral-500 font-mono">
+                      Input saat ini: <span className="text-red-500 dark:text-red-400 font-bold">{confirmText}</span>
+                    </p>
+                    <p className="text-xs font-semibold text-red-500 dark:text-red-400">
+                      RESET harus menggunakan huruf kapital penuh.
+                    </p>
+                  </div>
+                ) : isWrongText ? (
+                  <div className="text-center space-y-1">
+                    <p className="text-[11px] text-slate-500 dark:text-neutral-500 font-mono">
+                      Input saat ini: <span className="text-red-500 dark:text-red-400 font-bold">{confirmText}</span>
+                    </p>
+                    <p className="text-xs font-semibold text-red-500 dark:text-red-400">
+                      Ketik tepat: RESET
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-400 dark:text-neutral-500 text-center">
+                    Masukkan <span className="font-mono font-bold">RESET</span> dengan huruf kapital penuh untuk mengaktifkan tombol reset.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-3 mt-4">
+                <button onClick={() => setShowConfirmModal(false)} disabled={isResetting} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-500 dark:text-neutral-400 bg-slate-100 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 cursor-pointer transition-all">Batal</button>
+                <button
+                  onClick={handleReset}
+                  disabled={confirmText !== 'RESET' || isResetting}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-bold text-white cursor-pointer transition-all duration-300 ${
+                    isExactMatch && !isResetting
+                      ? 'bg-red-600 hover:bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.15)] opacity-100'
+                      : 'bg-red-600/50 opacity-30 cursor-not-allowed'
+                  }`}
+                >
+                  {isResetting ? 'Menghapus...' : 'Konfirmasi Reset'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

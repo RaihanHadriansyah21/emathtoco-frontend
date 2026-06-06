@@ -81,6 +81,23 @@ export default function LecturerCoursePortal() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
 
+  // Export dropdown state and ref
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close export dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsExportDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   useEffect(() => {
     const verifyAccess = async () => {
       try {
@@ -533,7 +550,7 @@ export default function LecturerCoursePortal() {
 
       <Navbar />
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10 w-full flex-grow">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10 w-full flex-grow">
         {/* Back navigation and Welcome message */}
         <div className="mb-8 flex items-start gap-4">
           <button
@@ -544,7 +561,7 @@ export default function LecturerCoursePortal() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Portal Penilaian AI</h1>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Portal Penilaian AI</h1>
             <p className="text-slate-500 dark:text-neutral-400 mt-1">
               Mata Kuliah: <span className="text-cyan-600 dark:text-cyan-400 font-semibold">{courseName || 'Memuat...'}</span> {courseCode ? `(${courseCode})` : ''} • Halo Dosen <span className="text-cyan-600 dark:text-cyan-400 font-semibold">{lecturerName}</span>
             </p>
@@ -576,74 +593,110 @@ export default function LecturerCoursePortal() {
         </div>
 
         {/* SEARCH AND FILTERS */}
-        <div className="bg-white dark:bg-[#0A0A0F]/70 border border-slate-200 dark:border-neutral-900 rounded-2xl p-4 sm:p-5 mb-8 backdrop-blur-md flex flex-col gap-4">
-          <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center w-full">
-            {/* Tab Filters */}
-            <div className="flex flex-wrap items-center gap-1.5 w-full lg:w-auto border-b lg:border-b-0 border-slate-100 dark:border-neutral-900 pb-2 lg:pb-0">
-              {[
-                { id: 'all', label: 'Semua', count: counts.total },
-                { id: 'pending', label: 'Menunggu AI', count: counts.pending },
-                { id: 'processing', label: 'Diproses AI', count: counts.processing },
-                { id: 'completed', label: 'Siap Direview', count: counts.completed },
-                { id: 'reviewed', label: 'Direview Dosen', count: counts.reviewed },
-                { id: 'finalized', label: 'Finalized', count: counts.finalized },
-              ].map(tab => (
+        <div className="relative z-20 bg-white/90 dark:bg-[#0A0A0F]/70 border border-slate-200 dark:border-neutral-900 rounded-2xl p-4 sm:p-5 mb-8 backdrop-blur-md flex flex-col gap-4 shadow-lg">
+          {/* Segmented Status Tabs */}
+          <div 
+            className="flex items-center gap-1.5 overflow-x-auto w-full pb-1.5 flex-nowrap border-b border-slate-100 dark:border-neutral-900/60 scroll-smooth"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            {[
+              { id: 'all', label: 'Semua', count: counts.total },
+              { id: 'pending', label: 'Menunggu AI', count: counts.pending },
+              { id: 'processing', label: 'Diproses AI', count: counts.processing },
+              { id: 'completed', label: 'Siap Direview', count: counts.completed },
+              { id: 'reviewed', label: 'Direview', count: counts.reviewed },
+              { id: 'finalized', label: 'Finalized', count: counts.finalized },
+            ].map(tab => {
+              const active = selectedStatus === tab.id;
+              return (
                 <button
                   key={tab.id}
                   onClick={() => setSelectedStatus(tab.id)}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                    selectedStatus === tab.id
-                      ? 'bg-cyan-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400'
-                      : 'bg-slate-100 dark:bg-neutral-950/40 border border-slate-200 dark:border-transparent hover:border-slate-300 dark:hover:border-neutral-850 hover:bg-slate-200 dark:hover:bg-neutral-900/30 text-slate-600 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-neutral-200'
+                  className={`group relative flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                    active
+                      ? 'bg-cyan-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.06)]'
+                      : 'bg-transparent border border-transparent text-slate-500 hover:text-slate-800 dark:text-neutral-500 dark:hover:text-neutral-200 hover:bg-slate-100 dark:hover:bg-neutral-900/40'
                   }`}
                 >
-                  {tab.label} <span className="ml-1 font-mono text-[10px] opacity-60">({tab.count})</span>
+                  <span>{tab.label}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold transition-colors ${
+                    active
+                      ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400'
+                      : 'bg-slate-100 dark:bg-neutral-900 text-slate-500 dark:text-neutral-550 group-hover:bg-slate-200 dark:group-hover:bg-neutral-800'
+                  }`}>
+                    [{tab.count}]
+                  </span>
                 </button>
-              ))}
+              );
+            })}
+          </div>
+
+          {/* Search Bar + Actions Row */}
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full">
+            {/* Search Input */}
+            <div className="relative flex-grow w-full">
+              <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-neutral-600" />
+              <input
+                type="text"
+                placeholder="Cari nama mahasiswa atau NIM..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 rounded-xl py-3 pl-11 pr-4 text-sm text-slate-800 dark:text-white focus:outline-none focus:border-cyan-500/60 dark:focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/10 dark:focus:ring-cyan-500/10 transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600 focus:shadow-[0_0_15px_rgba(6,182,212,0.06)]"
+              />
             </div>
 
-            {/* Search + Batch AI Button Row */}
-            <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 w-full lg:w-auto">
-              <div className="relative w-full lg:w-80">
-                <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-neutral-600" />
-                <input
-                  type="text"
-                  placeholder="Cari mahasiswa atau NIM..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 rounded-xl py-3 pl-11 pr-4 text-sm text-slate-800 dark:text-white focus:outline-none focus:border-blue-500/60 dark:focus:border-cyan-500/60 focus:ring-1 focus:ring-blue-500/10 dark:focus:ring-cyan-500/10 transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600"
-                />
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+            {/* Run AI & Export Actions */}
+            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+              {/* Run AI Batch Button (Primary action with purple gradient and glow) */}
+              <button
+                onClick={handleRunAIBatch}
+                disabled={isRunningAI || counts.pending === 0}
+                title={counts.pending === 0 ? "Tidak ada submission yang perlu diproses" : undefined}
+                className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 hover:scale-[1.02] active:scale-[0.98] text-white px-5 py-3 rounded-xl text-xs font-bold tracking-wider transition-all duration-200 shadow-[0_0_15px_rgba(168,85,247,0.25)] hover:shadow-[0_0_25px_rgba(168,85,247,0.4)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none cursor-pointer whitespace-nowrap w-full sm:w-auto"
+              >
+                {isRunningAI ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Cpu className="w-4 h-4 animate-pulse" />
+                )}
+                <span className="font-mono">{isRunningAI ? 'PROCESSING...' : 'RUN AI BATCH'}</span>
+              </button>
+
+              {/* Combined Export Dropdown */}
+              <div className="relative w-full sm:w-auto" ref={dropdownRef}>
                 <button
-                  onClick={handleRunAIBatch}
-                  disabled={isRunningAI || counts.pending === 0}
-                  title={counts.pending === 0 ? "Tidak ada submission yang perlu diproses" : undefined}
-                  className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-4 py-3 rounded-xl text-xs font-bold tracking-wider transition-all duration-300 shadow-[0_0_20px_rgba(168,85,247,0.1)] hover:shadow-[0_0_30px_rgba(168,85,247,0.2)] cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto py-2.5 px-3 text-[11px] sm:text-xs lg:w-auto"
+                  onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+                  className="w-full flex items-center justify-center gap-2.5 bg-slate-50 border border-slate-200 dark:bg-neutral-950 dark:border-neutral-900 hover:border-cyan-500/40 hover:bg-slate-100 dark:hover:bg-neutral-900/60 text-slate-700 dark:text-neutral-350 px-4 py-3 rounded-xl text-xs font-bold tracking-wider transition-all duration-200 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99]"
                 >
-                  {isRunningAI ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Cpu className="w-4 h-4" />
-                  )}
-                  <span>{isRunningAI ? 'Processing AI...' : 'Run AI Batch'}</span>
+                  <Download className="w-4 h-4 text-cyan-500" />
+                  <span>Export</span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 dark:text-neutral-550 transition-transform duration-200 ${isExportDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
-                <div className="grid grid-cols-2 gap-3 w-full sm:w-auto sm:flex">
-                  <button
-                    onClick={() => setShowExportModal(true)}
-                    className="flex items-center justify-center gap-2 bg-emerald-50/50 dark:bg-[#0D1E16] border border-emerald-500/30 hover:border-emerald-500/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100/50 dark:hover:bg-emerald-500/10 hover:text-slate-800 dark:hover:text-white px-4 py-3 rounded-xl text-xs font-bold tracking-wider transition-all duration-300 cursor-pointer whitespace-nowrap py-2.5 px-3 text-[11px] sm:text-xs w-full sm:w-auto"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>Export CSV</span>
-                  </button>
-                  <button
-                    onClick={() => setShowExportModal(true)}
-                    className="flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white px-4 py-3 rounded-xl text-xs font-bold tracking-wider transition-all duration-300 shadow-[0_0_20px_rgba(6,182,212,0.1)] hover:shadow-[0_0_30px_rgba(6,182,212,0.2)] cursor-pointer whitespace-nowrap py-2.5 px-3 text-[11px] sm:text-xs w-full sm:w-auto"
-                  >
-                    <FileSpreadsheet className="w-4 h-4" />
-                    <span>Export Excel</span>
-                  </button>
-                </div>
+
+                {isExportDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-full sm:w-48 bg-white border border-slate-200 dark:bg-[#0A0A0F]/95 dark:border-neutral-900 rounded-xl shadow-xl z-30 py-1.5 animate-in fade-in slide-in-from-top-1 duration-150 backdrop-blur-md">
+                    <button
+                      onClick={() => {
+                        setIsExportDropdownOpen(false);
+                        setShowExportModal(true);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-neutral-300 hover:bg-slate-50 dark:hover:bg-neutral-900/60 transition-colors flex items-center gap-2 cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>Export CSV</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsExportDropdownOpen(false);
+                        setShowExportModal(true);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-neutral-300 hover:bg-slate-50 dark:hover:bg-neutral-900/60 transition-colors flex items-center gap-2 cursor-pointer"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-cyan-500" />
+                      <span>Export Excel</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -668,72 +721,74 @@ export default function LecturerCoursePortal() {
           <>
             {/* Desktop Table View */}
             <div className="hidden md:block bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl overflow-hidden shadow-xl dark:shadow-2xl backdrop-blur-md">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black/40">
-                    <th className="py-4 px-6 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Mahasiswa</th>
-                    <th className="py-4 px-6 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Kelas</th>
-                    <th className="py-4 px-6 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Mata Kuliah</th>
-                    <th className="py-4 px-6 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center">Jumlah Jawaban</th>
-                    <th className="py-4 px-6 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center">Nilai AI</th>
-                    <th className="py-4 px-6 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Status</th>
-                    <th className="py-4 px-6 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Waktu Submit</th>
-                    <th className="py-4 px-6 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
-                  {filteredSubmissions.map((sub) => {
-                    console.log("submission", sub.id, sub.ai_status);
-                    console.log("MAHASISWA DATA", sub.mahasiswa);
-                    console.log("LEMBAR DATA", sub.lembar_jawaban);
-                    const statusBadge = getStatusBadge(sub.ai_status);
-                    const uploadedCount = sub.lembar_jawaban ? sub.lembar_jawaban.length : 0;
-                    const mhs = Array.isArray(sub.mahasiswa) ? sub.mahasiswa[0] : sub.mahasiswa;
-                    const mk = Array.isArray(sub.mata_kuliah) ? sub.mata_kuliah[0] : sub.mata_kuliah;
-                    return (
-                      <tr key={sub.id} className="hover:bg-slate-50/50 dark:hover:bg-white/1 transition-colors duration-200 group">
-                        <td className="py-4 px-6">
-                          <div className="font-bold text-slate-800 dark:text-white group-hover:text-cyan-600 dark:group-hover:text-cyan-300 transition-colors duration-200">{mhs?.nama_lengkap || 'Unknown'}</div>
-                          <div className="text-xs text-slate-500 dark:text-neutral-400 font-mono mt-0.5">{mhs?.nim_nip || '-'}</div>
-                        </td>
-                        <td className="py-4 px-6 text-sm font-semibold text-slate-700 dark:text-neutral-300">{mhs?.kelas || '-'}</td>
-                        <td className="py-4 px-6">
-                          <div className="text-sm font-semibold text-slate-700 dark:text-neutral-300">{mk?.nama_matkul || 'Unknown'}</div>
-                          <div className="text-[10px] text-slate-500 dark:text-neutral-400 font-mono tracking-wider mt-0.5 uppercase">{mk?.kode_matkul || '-'}</div>
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 text-sm font-mono font-bold">
-                            <span className={uploadedCount === 24 ? 'text-cyan-600 dark:text-cyan-400' : 'text-slate-500 dark:text-neutral-400'}>{uploadedCount}</span>
-                            <span className="text-slate-300 dark:text-neutral-600">/</span>
-                            <span className="text-slate-400 dark:text-neutral-500">24</span>
-                          </div>
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 text-sm font-mono font-bold text-purple-600 dark:text-purple-400">
-                            {sub.nilai_akhir !== null ? sub.nilai_akhir : '-'}
-                          </div>
-                        </td>
-                        <td className="py-4 px-6">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-bold uppercase tracking-wider ${statusBadge.bg} ${statusBadge.border} ${statusBadge.color}`}>
-                            <span>{statusBadge.icon}</span>
-                            <span>{statusBadge.text}</span>
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 text-xs text-slate-500 dark:text-neutral-400 font-medium">{formatDate(sub.waktu_submit)}</td>
-                        <td className="py-4 px-6 text-right">
-                          <button
-                            onClick={() => router.push(`/dosen/review/${sub.id}`)}
-                            className="inline-flex items-center gap-2 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500 hover:to-blue-600 border border-cyan-500/30 hover:border-transparent text-cyan-600 dark:text-cyan-400 hover:text-white px-4 py-2 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-300 shadow-md cursor-pointer"
-                          >
-                            <span>REVIEW</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[950px]">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black/40">
+                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mahasiswa</th>
+                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Kelas</th>
+                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mata Kuliah</th>
+                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Jumlah Jawaban</th>
+                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Nilai AI</th>
+                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Status</th>
+                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Waktu Submit</th>
+                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right whitespace-nowrap">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
+                    {filteredSubmissions.map((sub) => {
+                      console.log("submission", sub.id, sub.ai_status);
+                      console.log("MAHASISWA DATA", sub.mahasiswa);
+                      console.log("LEMBAR DATA", sub.lembar_jawaban);
+                      const statusBadge = getStatusBadge(sub.ai_status);
+                      const uploadedCount = sub.lembar_jawaban ? sub.lembar_jawaban.length : 0;
+                      const mhs = Array.isArray(sub.mahasiswa) ? sub.mahasiswa[0] : sub.mahasiswa;
+                      const mk = Array.isArray(sub.mata_kuliah) ? sub.mata_kuliah[0] : sub.mata_kuliah;
+                      return (
+                        <tr key={sub.id} className="hover:bg-slate-50/50 dark:hover:bg-white/1 transition-colors duration-200 group">
+                          <td className="py-4 px-6 whitespace-nowrap">
+                            <div className="text-sm font-semibold text-slate-800 dark:text-white group-hover:text-cyan-600 dark:group-hover:text-cyan-300 transition-colors duration-200">{mhs?.nama_lengkap || 'Unknown'}</div>
+                            <div className="text-xs text-slate-500 dark:text-neutral-400 font-mono mt-0.5">{mhs?.nim_nip || '-'}</div>
+                          </td>
+                          <td className="py-4 px-6 text-sm font-semibold text-slate-700 dark:text-neutral-300 whitespace-nowrap">{mhs?.kelas || '-'}</td>
+                          <td className="py-4 px-6 whitespace-nowrap">
+                            <div className="text-sm font-semibold text-slate-700 dark:text-neutral-300">{mk?.nama_matkul || 'Unknown'}</div>
+                            <div className="text-[10px] text-slate-500 dark:text-neutral-400 font-mono tracking-wider mt-0.5 uppercase">{mk?.kode_matkul || '-'}</div>
+                          </td>
+                          <td className="py-4 px-6 text-center whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 text-sm font-mono font-bold">
+                              <span className={uploadedCount === 24 ? 'text-cyan-600 dark:text-cyan-400' : 'text-slate-500 dark:text-neutral-400'}>{uploadedCount}</span>
+                              <span className="text-slate-300 dark:text-neutral-600">/</span>
+                              <span className="text-slate-400 dark:text-neutral-500">24</span>
+                            </div>
+                          </td>
+                          <td className="py-4 px-6 text-center whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 text-sm font-mono font-bold text-purple-600 dark:text-purple-400">
+                              {sub.nilai_akhir !== null ? sub.nilai_akhir : '-'}
+                            </div>
+                          </td>
+                          <td className="py-4 px-6 whitespace-nowrap">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-bold uppercase tracking-wider ${statusBadge.bg} ${statusBadge.border} ${statusBadge.color}`}>
+                              <span>{statusBadge.icon}</span>
+                              <span>{statusBadge.text}</span>
+                            </span>
+                          </td>
+                          <td className="py-4 px-6 text-xs text-slate-500 dark:text-neutral-400 font-medium whitespace-nowrap">{formatDate(sub.waktu_submit)}</td>
+                          <td className="py-4 px-6 text-right whitespace-nowrap">
+                            <button
+                              onClick={() => router.push(`/dosen/review/${sub.id}`)}
+                              className="inline-flex items-center gap-2 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500 hover:to-blue-600 border border-cyan-500/30 hover:border-transparent text-cyan-600 dark:text-cyan-400 hover:text-white px-4 py-2 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-300 shadow-md cursor-pointer"
+                            >
+                              <span>REVIEW</span>
+                              <ArrowRight className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Mobile Cards Stack */}

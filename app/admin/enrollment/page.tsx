@@ -205,14 +205,14 @@ export default function EnrollmentPage() {
       ) : (
         <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[750px]">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black/40">
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Mahasiswa</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">NIM</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Kelas</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Mata Kuliah</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right">Aksi</th>
+                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mahasiswa</th>
+                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">NIM</th>
+                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Kelas</th>
+                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mata Kuliah</th>
+                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right whitespace-nowrap">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
@@ -220,13 +220,13 @@ export default function EnrollmentPage() {
                   <tr><td colSpan={5} className="py-12 text-center text-slate-400 dark:text-neutral-500 text-sm">Belum ada enrollment.</td></tr>
                 ) : paginated.map(e => (
                   <tr key={e.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
-                    <td className="py-3 px-5 text-sm font-semibold text-slate-800 dark:text-white">{e.student_name}</td>
-                    <td className="py-3 px-5 text-xs font-mono text-slate-500 dark:text-neutral-400">{e.student_nim}</td>
-                    <td className="py-3 px-5 text-sm text-slate-600 dark:text-neutral-300">{e.student_class}</td>
-                    <td className="py-3 px-5">
+                    <td className="py-3 px-5 text-sm font-semibold text-slate-800 dark:text-white whitespace-nowrap">{e.student_name}</td>
+                    <td className="py-3 px-5 text-xs font-mono text-slate-500 dark:text-neutral-400 whitespace-nowrap">{e.student_nim}</td>
+                    <td className="py-3 px-5 text-sm text-slate-600 dark:text-neutral-300 whitespace-nowrap">{e.student_class}</td>
+                    <td className="py-3 px-5 whitespace-nowrap">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-xs font-semibold text-indigo-600 dark:text-indigo-400">{e.course_name}</span>
                     </td>
-                    <td className="py-3 px-5 text-right">
+                    <td className="py-3 px-5 text-right whitespace-nowrap">
                       <button onClick={() => setDeleteTarget(e)} className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 hover:bg-red-500/20 transition-all cursor-pointer">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>

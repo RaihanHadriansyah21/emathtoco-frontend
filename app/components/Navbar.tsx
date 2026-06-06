@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { GraduationCap, ArrowLeft, ChevronDown, User, Settings, LogOut, Sun, Moon } from 'lucide-react';
+import { GraduationCap, ArrowLeft, ChevronDown, User, Settings, LogOut, Sun, Moon, Menu } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import { useTheme } from 'next-themes';
@@ -12,6 +12,7 @@ interface NavbarProps {
   backUrl?: string;
   title?: string;
   subtitle?: string;
+  onMenuClick?: () => void;
 }
 
 const getDisplayName = (fullName: string) => {
@@ -34,7 +35,7 @@ const getInitials = (displayName: string) => {
   return displayName.charAt(0).toUpperCase();
 };
 
-export default function Navbar({ showBack = false, backUrl = '/', title, subtitle }: NavbarProps) {
+export default function Navbar({ showBack = false, backUrl = '/', title, subtitle, onMenuClick }: NavbarProps) {
   const router = useRouter();
   const [userEmail, setUserEmail] = useState('');
   const [fullName, setFullName] = useState('');
@@ -107,6 +108,16 @@ export default function Navbar({ showBack = false, backUrl = '/', title, subtitl
       <div className="h-16 flex items-center justify-between">
         {/* Left section: Back button + Logo + Page context */}
         <div className="flex items-center gap-3 md:gap-4 overflow-hidden mr-4">
+          {onMenuClick && (
+            <button
+              onClick={onMenuClick}
+              className="p-2 hover:bg-slate-100 dark:hover:bg-neutral-950 border border-transparent hover:border-slate-200 dark:hover:border-neutral-900 rounded-xl text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white transition-all cursor-pointer flex-shrink-0 md:hidden"
+              title="Open menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
+
           {showBack && (
             <button
               onClick={() => router.push(backUrl)}

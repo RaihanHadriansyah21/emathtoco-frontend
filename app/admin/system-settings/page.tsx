@@ -6,6 +6,7 @@ import { Settings, Loader2, Globe, Database, Palette, Server, CheckCircle2, XCir
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import { useTheme } from 'next-themes';
+import { createAuditLog } from '@/lib/services/audit-service';
 
 export default function SystemSettingsPage() {
   const router = useRouter();
@@ -13,10 +14,40 @@ export default function SystemSettingsPage() {
   const [dbConnected, setDbConnected] = useState<boolean | null>(null);
   const { theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  
+  // Toggles for Observability Settings
+  const [verboseLogging, setVerboseLogging] = useState(false);
+  const [autoRunAi, setAutoRunAi] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    if (typeof window !== 'undefined') {
+      setVerboseLogging(localStorage.getItem('setting_verbose_logging') === 'true');
+      setAutoRunAi(localStorage.getItem('setting_auto_run_ai') === 'true');
+    }
   }, []);
+
+  const handleSettingChange = async (
+    settingName: string,
+    oldVal: boolean,
+    newVal: boolean,
+    setter: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    setter(newVal);
+    const keyName = settingName === 'Verbose Logging' ? 'setting_verbose_logging' : 'setting_auto_run_ai';
+    localStorage.setItem(keyName, String(newVal));
+    
+    // Log SYSTEM_SETTING_CHANGED
+    createAuditLog({
+      action: 'SYSTEM_SETTING_CHANGED',
+      target: 'system',
+      detail: {
+        setting_name: settingName,
+        old_value: String(oldVal),
+        new_value: String(newVal)
+      }
+    });
+  };
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -108,6 +139,48 @@ export default function SystemSettingsPage() {
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* Setelan Observabilitas */}
+      <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md p-6 space-y-4">
+        <div>
+          <h2 className="text-xs font-bold text-slate-550 dark:text-neutral-405 uppercase tracking-widest">Setelan Aplikasi (Observabilitas)</h2>
+          <p className="text-[10px] text-slate-450 dark:text-neutral-500 mt-1">Sesuaikan perilaku observability dan otomasi sistem di bawah ini.</p>
+        </div>
+        
+        <div className="flex items-center justify-between border-t border-slate-100 dark:border-neutral-900/40 pt-4">
+          <div>
+            <h3 className="text-xs font-bold text-slate-800 dark:text-white">Verbose Logging</h3>
+            <p className="text-[10px] text-slate-500 dark:text-neutral-500">Mencatat detail payload log audit secara lebih rinci.</p>
+          </div>
+          <button
+            onClick={() => handleSettingChange('Verbose Logging', verboseLogging, !verboseLogging, setVerboseLogging)}
+            className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+              verboseLogging ? 'bg-cyan-500' : 'bg-slate-200 dark:bg-neutral-800'
+            }`}
+          >
+            <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-all ${
+              verboseLogging ? 'left-6' : 'left-1'
+            }`} />
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-slate-100 dark:border-neutral-900/40 pt-4">
+          <div>
+            <h3 className="text-xs font-bold text-slate-800 dark:text-white">Auto-Run AI on Submission</h3>
+            <p className="text-[10px] text-slate-500 dark:text-neutral-500">Menjalankan pipeline kecerdasan buatan secara otomatis saat berkas dikirim.</p>
+          </div>
+          <button
+            onClick={() => handleSettingChange('Auto-Run AI on Submission', autoRunAi, !autoRunAi, setAutoRunAi)}
+            className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+              autoRunAi ? 'bg-cyan-500' : 'bg-slate-200 dark:bg-neutral-800'
+            }`}
+          >
+            <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-all ${
+              autoRunAi ? 'left-6' : 'left-1'
+            }`} />
+          </button>
         </div>
       </div>
 

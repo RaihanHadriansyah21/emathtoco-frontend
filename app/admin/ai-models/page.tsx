@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Cpu, Loader2, BarChart3, Hash, Award, CheckCircle2, Layers, BrainCircuit, Code2, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
+import { createAuditLog, standardizeModelName } from '@/lib/services/audit-service';
 import { fetchAvailableModels } from '@/lib/services/model-service';
 import { fetchModelsInfo, type ModelInfo } from '@/lib/services/model-info-service';
 
@@ -17,7 +18,7 @@ interface ModelStat {
 
 /** Color themes for each model card — visually distinguishes architectures */
 const MODEL_THEMES: Record<string, { gradient: string; border: string; icon: string; bg: string }> = {
-  DenseNet201: {
+  DenseNet121: {
     gradient: 'from-purple-500/15 to-violet-500/5',
     border: 'border-purple-500/25',
     icon: 'text-purple-500 dark:text-purple-400',
@@ -59,6 +60,34 @@ export default function AIModelInventoryPage() {
   const [isLoadingBackend, setIsLoadingBackend] = useState(false);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>('');
+  const [adminName, setAdminName] = useState<string>('Administrator');
+
+  const handleModelChange = async (newModel: string) => {
+    const oldModel = selectedModel;
+    if (oldModel === newModel) return;
+    setSelectedModel(newModel);
+    
+    // Log MODEL_CHANGED with extended details
+    createAuditLog({
+      action: 'MODEL_CHANGED',
+      target: 'ai_models',
+      detail: {
+        changed_by: adminName,
+        old_model: standardizeModelName(oldModel || 'None'),
+        new_model: standardizeModelName(newModel),
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    // Log AI_MODEL_SELECTED (Bonus event)
+    createAuditLog({
+      action: 'AI_MODEL_SELECTED',
+      target: 'ai_models',
+      detail: {
+        selected_model: standardizeModelName(newModel)
+      }
+    });
+  };
 
   // FastAPI backend state — model info (cards)
   const [modelsInfo, setModelsInfo] = useState<ModelInfo[]>([]);
@@ -114,8 +143,11 @@ export default function AIModelInventoryPage() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { router.push('/login'); return; }
-        const { data: profile } = await supabase.from('profil_pengguna').select('role').eq('id', user.id).maybeSingle();
+        const { data: profile } = await supabase.from('profil_pengguna').select('role, nama_lengkap').eq('id', user.id).maybeSingle();
         if (normalizeRole(profile?.role) !== 'admin') { router.push('/'); return; }
+        if (profile?.nama_lengkap) {
+          setAdminName(profile.nama_lengkap);
+        }
         setIsChecking(false);
         fetchModelsFromDB();
         loadBackendModels();
@@ -211,7 +243,7 @@ export default function AIModelInventoryPage() {
               <select
                 id="model-selector"
                 value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
+                onChange={(e) => handleModelChange(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 rounded-xl py-2.5 px-4 text-sm text-slate-800 dark:text-white focus:outline-none focus:border-cyan-500/60 transition-all cursor-pointer"
               >
                 <option value="">Select Model</option>
@@ -266,7 +298,7 @@ export default function AIModelInventoryPage() {
                   key={info.name}
                   id={`model-card-${info.name}`}
                   type="button"
-                  onClick={() => setSelectedModel(info.name)}
+                  onClick={() => handleModelChange(info.name)}
                   className={`
                     relative text-left w-full
                     bg-white dark:bg-[#0A0A0F]
@@ -453,26 +485,28 @@ export default function AIModelInventoryPage() {
 
           {/* Table Detail */}
           <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black/40">
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Model AI</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center">Penggunaan</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center">Rata-rata Nilai</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center">Finalized</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
-                {models.map((m, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
-                    <td className="py-3 px-5 text-sm font-semibold text-slate-800 dark:text-white">{m.model_name}</td>
-                    <td className="py-3 px-5 text-center text-sm font-mono text-slate-600 dark:text-neutral-300">{m.count}</td>
-                    <td className="py-3 px-5 text-center text-sm font-mono text-emerald-600 dark:text-emerald-400">{m.avg_score !== null ? m.avg_score : '-'}</td>
-                    <td className="py-3 px-5 text-center text-sm font-mono text-slate-600 dark:text-neutral-300">{m.finalized_count}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[650px]">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black/40">
+                    <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Model AI</th>
+                    <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Penggunaan</th>
+                    <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Rata-rata Nilai</th>
+                    <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Finalized</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
+                  {models.map((m, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                      <td className="py-3 px-5 text-sm font-semibold text-slate-800 dark:text-white whitespace-nowrap">{m.model_name}</td>
+                      <td className="py-3 px-5 text-center text-sm font-mono text-slate-600 dark:text-neutral-300 whitespace-nowrap">{m.count}</td>
+                      <td className="py-3 px-5 text-center text-sm font-mono text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{m.avg_score !== null ? m.avg_score : '-'}</td>
+                      <td className="py-3 px-5 text-center text-sm font-mono text-slate-600 dark:text-neutral-300 whitespace-nowrap">{m.finalized_count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </>
       )}

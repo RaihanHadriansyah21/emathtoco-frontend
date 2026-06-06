@@ -157,7 +157,7 @@ export default function LecturerDashboard() {
 
       <Navbar />
 
-      <main className="max-w-4xl mx-auto px-4 py-12 relative z-10 w-full flex-grow">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10 w-full flex-grow">
         {/* Welcome message */}
         <div className="mb-10">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Selamat Datang, Dosen!</h1>
@@ -192,47 +192,51 @@ export default function LecturerDashboard() {
               <p className="text-slate-500 dark:text-neutral-400 text-sm max-w-md mx-auto">Administrator belum menugaskan Anda ke mata kuliah mana pun. Silakan hubungi administrator.</p>
             </div>
           ) : (
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-4 grid-cols-1">
               {courses.map((course) => {
                 const stats = getCourseStats(course.id);
                 return (
                   <div
                     key={course.id}
                     onClick={() => router.push(`/dosen/course/${course.id}`)}
-                    className="group border border-slate-200 dark:border-neutral-900 bg-white dark:bg-[#0A0A0F]/80 rounded-2xl p-5 flex flex-col justify-between cursor-pointer transition-all duration-300 hover:border-blue-500/40 dark:hover:border-cyan-500/40 hover:shadow-[0_0_30px_rgba(59,130,246,0.05)] dark:hover:shadow-[0_0_30px_rgba(6,182,212,0.05)]"
+                    className="group border border-slate-200 dark:border-neutral-900 bg-white dark:bg-[#0A0A0F]/80 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-8 cursor-pointer transition-all duration-300 hover:border-blue-500/40 dark:hover:border-cyan-500/40 hover:shadow-[0_0_30px_rgba(59,130,246,0.05)] dark:hover:shadow-[0_0_30px_rgba(6,182,212,0.05)]"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-4 min-w-0">
-                        <div className="w-12 h-12 rounded-xl border border-slate-200 dark:border-neutral-800 bg-slate-50 dark:bg-black flex items-center justify-center text-2xl group-hover:bg-blue-500/10 dark:group-hover:bg-cyan-500/10 group-hover:border-blue-500/40 dark:group-hover:border-cyan-500/60 transition-colors duration-300 flex-shrink-0">
-                          {getCourseIcon(course.icon_name)}
-                        </div>
-                        <div className="min-w-0">
-                          <span className="text-xs font-mono text-blue-600 dark:text-cyan-400 font-bold">{course.kode_matkul}</span>
-                          <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-white mt-0.5 group-hover:text-blue-500 dark:group-hover:text-cyan-300 transition-colors duration-200 break-words">{course.nama_matkul}</h3>
-                        </div>
+                    {/* Left: Info */}
+                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                      <div className="w-12 h-12 rounded-xl border border-slate-200 dark:border-neutral-800 bg-slate-50 dark:bg-black flex items-center justify-center text-2xl group-hover:bg-blue-500/10 dark:group-hover:bg-cyan-500/10 group-hover:border-blue-500/40 dark:group-hover:border-cyan-500/60 transition-colors duration-300 flex-shrink-0">
+                        {getCourseIcon(course.icon_name)}
                       </div>
-                      <div className="w-8 h-8 rounded-full border border-slate-200 dark:border-neutral-800 bg-slate-100 dark:bg-neutral-950 text-slate-400 dark:text-neutral-400 flex items-center justify-center group-hover:bg-gradient-to-r group-hover:from-blue-500 group-hover:to-indigo-600 dark:group-hover:from-cyan-500 dark:group-hover:to-indigo-600 group-hover:border-transparent group-hover:text-white transition-all duration-300 flex-shrink-0">
-                        <ChevronRight className="w-4 h-4 transform group-hover:translate-x-0.5 transition-transform" />
+                      <div className="min-w-0">
+                        <span className="text-xs font-mono text-blue-600 dark:text-cyan-400 font-bold">{course.kode_matkul}</span>
+                        <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-white mt-0.5 group-hover:text-blue-500 dark:group-hover:text-cyan-300 transition-colors duration-200 break-words">{course.nama_matkul}</h3>
                       </div>
                     </div>
 
-                    {/* Breakdown Stats inside Course Card */}
-                    <div className="mt-6 pt-4 border-t border-slate-100 dark:border-neutral-900 grid grid-cols-4 gap-1.5 sm:gap-2 text-center">
-                      <div className="bg-slate-50 dark:bg-black/30 rounded-xl py-2 px-0.5 border border-slate-100 dark:border-neutral-950">
-                        <div className="text-[9px] min-[360px]:text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-wider">Total</div>
-                        <div className="text-base sm:text-lg font-extrabold text-slate-700 dark:text-neutral-200 mt-0.5 font-mono">{stats.total}</div>
+                    {/* Right: Stats and Chevron */}
+                    <div className="flex items-center gap-4 md:gap-6 justify-between md:justify-end w-full md:w-auto mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-neutral-900">
+                      {/* Breakdown Stats */}
+                      <div className="grid grid-cols-4 gap-1.5 sm:gap-2 text-center w-full md:w-auto flex-1 md:flex-initial">
+                        <div className="bg-slate-50 dark:bg-black/30 rounded-xl py-1.5 px-2.5 sm:px-4 border border-slate-100 dark:border-neutral-950 md:min-w-[80px]">
+                          <div className="text-[9px] sm:text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-wider">Total</div>
+                          <div className="text-sm sm:text-base font-extrabold text-slate-700 dark:text-neutral-200 mt-0.5 font-mono">{stats.total}</div>
+                        </div>
+                        <div className="bg-amber-500/5 rounded-xl py-1.5 px-2.5 sm:px-4 border border-amber-500/10 md:min-w-[80px]">
+                          <div className="text-[9px] sm:text-[10px] font-bold text-amber-500/80 dark:text-amber-500/60 uppercase tracking-wider whitespace-nowrap">Wait AI</div>
+                          <div className="text-sm sm:text-base font-extrabold text-amber-600 dark:text-amber-400 mt-0.5 font-mono">{stats.submitted}</div>
+                        </div>
+                        <div className="bg-blue-500/5 rounded-xl py-1.5 px-2.5 sm:px-4 border border-blue-500/10 md:min-w-[80px]">
+                          <div className="text-[9px] sm:text-[10px] font-bold text-blue-500/80 dark:text-blue-500/60 uppercase tracking-wider">Review</div>
+                          <div className="text-sm sm:text-base font-extrabold text-blue-600 dark:text-blue-400 mt-0.5 font-mono">{stats.reviewed}</div>
+                        </div>
+                        <div className="bg-emerald-500/5 rounded-xl py-1.5 px-2.5 sm:px-4 border border-emerald-500/10 md:min-w-[80px]">
+                          <div className="text-[9px] sm:text-[10px] font-bold text-emerald-500/80 dark:text-emerald-500/60 uppercase tracking-wider">Final</div>
+                          <div className="text-sm sm:text-base font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5 font-mono">{stats.finalized}</div>
+                        </div>
                       </div>
-                      <div className="bg-amber-500/5 rounded-xl py-2 px-0.5 border border-amber-500/10">
-                        <div className="text-[9px] min-[360px]:text-[10px] font-bold text-amber-500/80 dark:text-amber-500/60 uppercase tracking-wider">Wait AI</div>
-                        <div className="text-base sm:text-lg font-extrabold text-amber-600 dark:text-amber-400 mt-0.5 font-mono">{stats.submitted}</div>
-                      </div>
-                      <div className="bg-blue-500/5 rounded-xl py-2 px-0.5 border border-blue-500/10">
-                        <div className="text-[9px] min-[360px]:text-[10px] font-bold text-blue-500/80 dark:text-blue-500/60 uppercase tracking-wider">Review</div>
-                        <div className="text-base sm:text-lg font-extrabold text-blue-600 dark:text-blue-400 mt-0.5 font-mono">{stats.reviewed}</div>
-                      </div>
-                      <div className="bg-emerald-500/5 rounded-xl py-2 px-0.5 border border-emerald-500/10">
-                        <div className="text-[9px] min-[360px]:text-[10px] font-bold text-emerald-500/80 dark:text-emerald-500/60 uppercase tracking-wider">Final</div>
-                        <div className="text-base sm:text-lg font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5 font-mono">{stats.finalized}</div>
+
+                      {/* Chevron */}
+                      <div className="w-8 h-8 rounded-full border border-slate-200 dark:border-neutral-800 bg-slate-100 dark:bg-neutral-950 text-slate-400 dark:text-neutral-400 flex items-center justify-center group-hover:bg-gradient-to-r group-hover:from-blue-500 group-hover:to-indigo-600 dark:group-hover:from-cyan-500 dark:group-hover:to-indigo-600 group-hover:border-transparent group-hover:text-white transition-all duration-300 flex-shrink-0">
+                        <ChevronRight className="w-4 h-4 transform group-hover:translate-x-0.5 transition-transform" />
                       </div>
                     </div>
                   </div>

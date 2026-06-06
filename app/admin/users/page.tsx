@@ -285,15 +285,15 @@ export default function UserManagementPage() {
       ) : (
         <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[800px]">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black/40">
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Nama Lengkap</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">NIM/NIP</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Kelas</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Role</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Terdaftar</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right">Aksi</th>
+                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Nama Lengkap</th>
+                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">NIM/NIP</th>
+                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Kelas</th>
+                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Role</th>
+                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Terdaftar</th>
+                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right whitespace-nowrap">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
@@ -304,18 +304,18 @@ export default function UserManagementPage() {
                   const Icon = badge.icon;
                   return (
                     <tr key={user.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors group">
-                      <td className="py-3 px-5">
+                      <td className="py-3 px-5 whitespace-nowrap">
                         <span className="text-sm font-semibold text-slate-800 dark:text-white">{user.nama_lengkap}</span>
                       </td>
-                      <td className="py-3 px-5 text-sm font-mono text-slate-500 dark:text-neutral-400">{user.nim_nip || '-'}</td>
-                      <td className="py-3 px-5 text-sm text-slate-600 dark:text-neutral-300">{user.kelas || '-'}</td>
-                      <td className="py-3 px-5">
+                      <td className="py-3 px-5 text-sm font-mono text-slate-500 dark:text-neutral-400 whitespace-nowrap">{user.nim_nip || '-'}</td>
+                      <td className="py-3 px-5 text-sm text-slate-600 dark:text-neutral-300 whitespace-nowrap">{user.kelas || '-'}</td>
+                      <td className="py-3 px-5 whitespace-nowrap">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${badge.bg} ${badge.border} ${badge.text}`}>
                           <Icon className="w-3 h-3" /> {normalizeRole(user.role) === 'admin' ? 'Administrator Utama' : user.role}
                         </span>
                       </td>
-                      <td className="py-3 px-5 text-xs text-slate-400 dark:text-neutral-500">{formatDate(user.created_at)}</td>
-                      <td className="py-3 px-5 text-right">
+                      <td className="py-3 px-5 text-xs text-slate-400 dark:text-neutral-500 whitespace-nowrap">{formatDate(user.created_at)}</td>
+                      <td className="py-3 px-5 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-2">
                           {normalizeRole(user.role) === 'admin' ? (
                             <>

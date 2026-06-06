@@ -4,7 +4,7 @@
 // ============================================================
 
 /** Valid AI model identifiers — matches backend model directory names */
-export type AIModel = 'DenseNet201' | 'InceptionV3' | 'MobilenetV2' | (string & {});
+export type AIModel = 'DenseNet121' | 'InceptionV3' | 'MobilenetV2' | (string & {});
 
 /**
  * Request payload for POST /predict (future integration).

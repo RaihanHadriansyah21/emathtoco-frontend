@@ -179,15 +179,15 @@ export default function CourseManagementPage() {
       ) : (
         <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[800px]">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black/40">
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Icon</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Nama Mata Kuliah</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Kode</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Dosen</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400">Dibuat</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right">Aksi</th>
+                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Icon</th>
+                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Nama Mata Kuliah</th>
+                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Kode</th>
+                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Dosen</th>
+                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Dibuat</th>
+                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right whitespace-nowrap">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
@@ -195,12 +195,12 @@ export default function CourseManagementPage() {
                   <tr><td colSpan={6} className="py-12 text-center text-slate-400 dark:text-neutral-500 text-sm">Tidak ada mata kuliah ditemukan.</td></tr>
                 ) : filteredCourses.map((course) => (
                   <tr key={course.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
-                    <td className="py-3 px-5 text-xl">{iconMap[course.icon_name] || '📚'}</td>
-                    <td className="py-3 px-5 text-sm font-semibold text-slate-800 dark:text-white">{course.nama_matkul}</td>
-                    <td className="py-3 px-5 text-xs font-mono text-slate-500 dark:text-neutral-400 uppercase tracking-wider">{course.kode_matkul}</td>
-                    <td className="py-3 px-5 text-sm text-slate-600 dark:text-neutral-300">{course.nama_dosen || '-'}</td>
-                    <td className="py-3 px-5 text-xs text-slate-400 dark:text-neutral-500">{formatDate(course.created_at)}</td>
-                    <td className="py-3 px-5 text-right">
+                    <td className="py-3 px-5 text-xl whitespace-nowrap">{iconMap[course.icon_name] || '📚'}</td>
+                    <td className="py-3 px-5 text-sm font-semibold text-slate-800 dark:text-white whitespace-nowrap">{course.nama_matkul}</td>
+                    <td className="py-3 px-5 text-xs font-mono text-slate-500 dark:text-neutral-400 uppercase tracking-wider whitespace-nowrap">{course.kode_matkul}</td>
+                    <td className="py-3 px-5 text-sm text-slate-600 dark:text-neutral-300 whitespace-nowrap">{course.nama_dosen || '-'}</td>
+                    <td className="py-3 px-5 text-xs text-slate-400 dark:text-neutral-500 whitespace-nowrap">{formatDate(course.created_at)}</td>
+                    <td className="py-3 px-5 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-2">
                         <button onClick={() => openEditForm(course)} className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 dark:text-cyan-400 hover:bg-cyan-500/20 transition-all cursor-pointer">
                           <Pencil className="w-3.5 h-3.5" />
