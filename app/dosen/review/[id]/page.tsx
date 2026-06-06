@@ -1142,8 +1142,8 @@ export default function ReviewWorkspace() {
                           {/* Label Section Code */}
                           <div className="absolute top-4 left-4 flex items-center gap-2 flex-wrap">
                             <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded uppercase ${slot.dbStatus === 'reupload_required'
-                                ? 'bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400'
-                                : 'bg-slate-100 dark:bg-neutral-950 border border-slate-300 dark:border-neutral-900 text-slate-700 dark:text-neutral-400'
+                              ? 'bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400'
+                              : 'bg-slate-100 dark:bg-neutral-950 border border-slate-300 dark:border-neutral-900 text-slate-700 dark:text-neutral-400'
                               }`}>
                               {slot.dbStatus === 'reupload_required' ? '⚠ ' : ''}Bagian {slot.label.toUpperCase()}
                             </span>
