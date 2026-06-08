@@ -8,6 +8,7 @@ import { normalizeRole } from '@/lib/utils';
 import { createAuditLog, standardizeModelName } from '@/lib/services/audit-service';
 import { fetchAvailableModels } from '@/lib/services/model-service';
 import { fetchModelsInfo, type ModelInfo } from '@/lib/services/model-info-service';
+import { apiGet, apiPost } from '@/lib/api-client';
 
 interface ModelStat {
   model_name: string;
@@ -60,33 +61,52 @@ export default function AIModelInventoryPage() {
   const [isLoadingBackend, setIsLoadingBackend] = useState(false);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>('');
+  
+  // Admin details for audit logs
   const [adminName, setAdminName] = useState<string>('Administrator');
+  const [adminRole, setAdminRole] = useState<string>('admin');
+  const [adminId, setAdminId] = useState<string | null>(null);
+
+  const loadActiveModelFromDB = async () => {
+    try {
+      const res = await apiGet('/settings');
+      if (res.ok) {
+        const settings = await res.json();
+        if (settings.active_model) {
+          setSelectedModel(settings.active_model);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load active model setting:', err);
+    }
+  };
 
   const handleModelChange = async (newModel: string) => {
     const oldModel = selectedModel;
     if (oldModel === newModel) return;
+    
+    // Optimistic Update
     setSelectedModel(newModel);
     
-    // Log MODEL_CHANGED with extended details
-    createAuditLog({
-      action: 'MODEL_CHANGED',
-      target: 'ai_models',
-      detail: {
+    try {
+      const payload = {
         changed_by: adminName,
-        old_model: standardizeModelName(oldModel || 'None'),
-        new_model: standardizeModelName(newModel),
-        timestamp: new Date().toISOString()
+        role: adminRole,
+        user_id: adminId,
+        settings: {
+          active_model: newModel
+        }
+      };
+      
+      const res = await apiPost('/settings', payload);
+      if (!res.ok) {
+        throw new Error('Failed to save settings');
       }
-    });
-
-    // Log AI_MODEL_SELECTED (Bonus event)
-    createAuditLog({
-      action: 'AI_MODEL_SELECTED',
-      target: 'ai_models',
-      detail: {
-        selected_model: standardizeModelName(newModel)
-      }
-    });
+    } catch (err) {
+      console.error('Failed to update active model:', err);
+      // Rollback
+      setSelectedModel(oldModel);
+    }
   };
 
   // FastAPI backend state — model info (cards)
@@ -145,13 +165,18 @@ export default function AIModelInventoryPage() {
         if (!user) { router.push('/login'); return; }
         const { data: profile } = await supabase.from('profil_pengguna').select('role, nama_lengkap').eq('id', user.id).maybeSingle();
         if (normalizeRole(profile?.role) !== 'admin') { router.push('/'); return; }
+        
+        setAdminId(user.id);
         if (profile?.nama_lengkap) {
           setAdminName(profile.nama_lengkap);
         }
+        setAdminRole(normalizeRole(profile?.role));
+        
         setIsChecking(false);
         fetchModelsFromDB();
         loadBackendModels();
         loadModelsInfo();
+        loadActiveModelFromDB();
       } catch { router.push('/'); }
     };
     checkAdmin();

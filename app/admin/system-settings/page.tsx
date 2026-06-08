@@ -6,7 +6,7 @@ import { Settings, Loader2, Globe, Database, Palette, Server, CheckCircle2, XCir
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import { useTheme } from 'next-themes';
-import { createAuditLog } from '@/lib/services/audit-service';
+import { apiGet, apiPost } from '@/lib/api-client';
 
 export default function SystemSettingsPage() {
   const router = useRouter();
@@ -19,12 +19,26 @@ export default function SystemSettingsPage() {
   const [verboseLogging, setVerboseLogging] = useState(false);
   const [autoRunAi, setAutoRunAi] = useState(false);
 
+  // Admin details for audit logging
+  const [adminName, setAdminName] = useState('Administrator');
+  const [adminRole, setAdminRole] = useState('admin');
+  const [adminId, setAdminId] = useState<string | null>(null);
+
+  const loadSettingsFromDB = async () => {
+    try {
+      const res = await apiGet('/settings');
+      if (res.ok) {
+        const settings = await res.json();
+        setVerboseLogging(settings.verbose_logging === 'true');
+        setAutoRunAi(settings.auto_run_ai === 'true');
+      }
+    } catch (err) {
+      console.error('Failed to load settings from database:', err);
+    }
+  };
+
   useEffect(() => {
     setMounted(true);
-    if (typeof window !== 'undefined') {
-      setVerboseLogging(localStorage.getItem('setting_verbose_logging') === 'true');
-      setAutoRunAi(localStorage.getItem('setting_auto_run_ai') === 'true');
-    }
   }, []);
 
   const handleSettingChange = async (
@@ -33,20 +47,30 @@ export default function SystemSettingsPage() {
     newVal: boolean,
     setter: React.Dispatch<React.SetStateAction<boolean>>
   ) => {
+    // Optimistic Update
     setter(newVal);
-    const keyName = settingName === 'Verbose Logging' ? 'setting_verbose_logging' : 'setting_auto_run_ai';
-    localStorage.setItem(keyName, String(newVal));
     
-    // Log SYSTEM_SETTING_CHANGED
-    createAuditLog({
-      action: 'SYSTEM_SETTING_CHANGED',
-      target: 'system',
-      detail: {
-        setting_name: settingName,
-        old_value: String(oldVal),
-        new_value: String(newVal)
+    const keyName = settingName === 'Verbose Logging' ? 'verbose_logging' : 'auto_run_ai';
+    
+    try {
+      const payload = {
+        changed_by: adminName,
+        role: adminRole,
+        user_id: adminId,
+        settings: {
+          [keyName]: String(newVal)
+        }
+      };
+      
+      const res = await apiPost('/settings', payload);
+      if (!res.ok) {
+        throw new Error('API update failed');
       }
-    });
+    } catch (err) {
+      console.error('Failed to save settings:', err);
+      // Rollback
+      setter(oldVal);
+    }
   };
 
   useEffect(() => {
@@ -54,10 +78,18 @@ export default function SystemSettingsPage() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { router.push('/login'); return; }
-        const { data: profile } = await supabase.from('profil_pengguna').select('role').eq('id', user.id).maybeSingle();
+        const { data: profile } = await supabase.from('profil_pengguna').select('role, nama_lengkap').eq('id', user.id).maybeSingle();
         if (normalizeRole(profile?.role) !== 'admin') { router.push('/'); return; }
+        
+        setAdminId(user.id);
+        if (profile?.nama_lengkap) {
+          setAdminName(profile.nama_lengkap);
+        }
+        setAdminRole(normalizeRole(profile?.role));
+        
         setIsChecking(false);
         checkDbConnection();
+        loadSettingsFromDB();
       } catch { router.push('/'); }
     };
     checkAdmin();

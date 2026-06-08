@@ -175,6 +175,29 @@ export default function ReviewWorkspace() {
     }
   }, [selectedModel]);
 
+  useEffect(() => {
+    const loadDefaultModel = async () => {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('emathtoco_selected_model');
+        if (saved === 'MobileNetV2' || saved === 'DenseNet121' || saved === 'InceptionV3') {
+          return; // Priority 1: lecturer has explicit choice, skip loading global setting
+        }
+      }
+      try {
+        const res = await apiGet('/settings');
+        if (res.ok) {
+          const settings = await res.json();
+          if (settings.active_model) {
+            setSelectedModel(settings.active_model);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load global active model configuration:', err);
+      }
+    };
+    loadDefaultModel();
+  }, []);
+
   const [isSimulatingAI, setIsSimulatingAI] = useState(false);
   const [aiSimStep, setAiSimStep] = useState(0);
 

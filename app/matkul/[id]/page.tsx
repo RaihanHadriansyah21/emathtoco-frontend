@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { useToast } from '@/app/hooks/useToast';
 import ToastContainer from '@/app/components/Toast';
 import { createAuditLog } from '@/lib/services/audit-service';
+import { apiPost } from '@/lib/api-client';
 
 const getMaxScore = (label: string): number => {
     return label.toLowerCase().endsWith('f') ? 5 : 4;
@@ -2620,6 +2621,20 @@ export default function UploadWorkspace() {
                     submission_id: submissionId
                 }
             });
+
+            // Trigger AI auto-run check on backend (SST configuration)
+            try {
+                const autoRunRes = await apiPost(`/submission/${submissionId}/submit`);
+                if (autoRunRes.ok) {
+                    const autoRunData = await autoRunRes.json();
+                    console.log('[AI AutoRun] Backend response:', autoRunData);
+                    if (autoRunData.auto_run) {
+                        toast.success('AI Dipicu', 'Pipeline evaluasi AI otomatis berjalan.');
+                    }
+                }
+            } catch (autoRunErr) {
+                console.error('[AI AutoRun] Failed to trigger auto-run:', autoRunErr);
+            }
         } catch (err) {
             console.error("FULL ERROR:", err);
             if (typeof err === 'object') {

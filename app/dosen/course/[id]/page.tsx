@@ -283,11 +283,28 @@ export default function LecturerCoursePortal() {
     setIsLoadingModels(true);
     setSelectedBatchModel(null);
     try {
+      // Fetch settings first to get the active model
+      const settingsRes = await apiGet('/settings');
+      let defaultModel = null;
+      if (settingsRes.ok) {
+        const settings = await settingsRes.json();
+        if (settings.active_model) {
+          defaultModel = settings.active_model;
+        }
+      }
+
       const res = await apiGet('/ai-models');
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.models) {
-          setAvailableModels(data.models.map((m: { name: string }) => m.name));
+          const modelsList = data.models.map((m: { name: string }) => m.name);
+          setAvailableModels(modelsList);
+          // Pre-select the global active model if it exists in the list
+          if (defaultModel && modelsList.includes(defaultModel)) {
+            setSelectedBatchModel(defaultModel);
+          } else {
+            setSelectedBatchModel(modelsList[0] || 'MobileNetV2');
+          }
         }
       }
     } catch (err) {
