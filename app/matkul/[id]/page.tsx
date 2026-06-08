@@ -959,7 +959,7 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
         >
             {/* Header bar */}
             <div
-                className="w-full h-14 bg-black/60 backdrop-blur-md flex items-center justify-between px-4 z-20"
+                className="w-full h-14 bg-gradient-to-b from-black/80 to-transparent flex items-center justify-between px-4 z-20 relative"
             >
                 <button
                     onClick={() => {
@@ -977,14 +977,16 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
             {/* Live Camera View */}
             {!previewUrl ? (
                 <div style={{
-                    position: 'relative',
+                    position: 'absolute',
+                    inset: 0,
                     width: '100%',
-                    flexGrow: 1,
+                    height: '100%',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     backgroundColor: '#000000',
                     overflow: 'hidden',
+                    zIndex: 0,
                     // CSS custom properties for guide box dimensions
                     // @ts-ignore
                     '--guide-width': 'min(85vw, 450px)',
@@ -1197,7 +1199,11 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
 
             {/* Bottom action panel */}
             <div
-                className="w-full bg-black/90 backdrop-blur-md py-6 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] flex flex-col items-center gap-4 z-20"
+                className={`w-full py-6 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] flex flex-col items-center gap-4 z-20 relative ${
+                    !previewUrl
+                        ? 'bg-gradient-to-t from-black/85 via-black/45 to-transparent'
+                        : 'bg-black/90 backdrop-blur-md'
+                }`}
                 style={{
                     transform: 'translate3d(0, 0, 20px)',
                     WebkitTransform: 'translate3d(0, 0, 20px)'
@@ -1265,6 +1271,15 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
     const [isAligned, setIsAligned] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
 
+    // States for draggable/resizable crop box
+    const [cropBox, setCropBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+    const isDraggingCropBox = useRef(false);
+    const dragBoxStart = useRef({ x: 0, y: 0 });
+
+    const [resizeActiveCorner, setResizeActiveCorner] = useState<'TL' | 'TR' | 'BL' | 'BR' | null>(null);
+    const [resizeStartBox, setResizeStartBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+    const [resizeStartCursor, setResizeStartCursor] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
     const containerRef = useRef<HTMLDivElement>(null);
     const imgRef = useRef<HTMLImageElement>(null);
     
@@ -1274,10 +1289,32 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
     const initialScale = useRef(1);
 
     const isQuestionF = label.toLowerCase().endsWith('f');
-    const guideWidthStr = 'min(80vw, 400px)';
-    const guideHeightStr = isQuestionF
-        ? 'calc(min(80vw, 400px) / 1.4)'
-        : 'calc(min(80vw, 400px) / 1.8)';
+
+    const initializeCropBox = () => {
+        if (!containerRef.current) return;
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const W_c = containerRect.width;
+        const H_c = containerRect.height;
+        if (W_c === 0 || H_c === 0) return;
+
+        const ratio = isQuestionF ? 1.4 : 1.8;
+        // Default width: 80% of container width or max 450px
+        let w = Math.min(W_c * 0.8, 450);
+        let h = w / ratio;
+
+        // If height is too big for the container, scale down
+        if (h > H_c * 0.8) {
+            h = H_c * 0.8;
+            w = h * ratio;
+        }
+
+        setCropBox({
+            left: (W_c - w) / 2,
+            top: (H_c - h) / 2,
+            width: w,
+            height: h
+        });
+    };
 
     useEffect(() => {
         const url = URL.createObjectURL(file);
@@ -1287,19 +1324,40 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
         };
     }, [file]);
 
+    // Initialize crop box on load/resize
+    useEffect(() => {
+        if (imgUrl) {
+            const timer = setTimeout(initializeCropBox, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [imgUrl]);
+
+    useEffect(() => {
+        const handleResize = () => {
+            initializeCropBox();
+        };
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+        };
+    }, [isQuestionF]);
+
     const checkCoverage = () => {
-        if (!imgRef.current || !containerRef.current) return false;
+        if (!imgRef.current || !containerRef.current || !cropBox) return false;
         const imgRect = imgRef.current.getBoundingClientRect();
-        const guideEl = containerRef.current.querySelector('.editor-guide-box');
-        if (!guideEl) return false;
-        const guideRect = guideEl.getBoundingClientRect();
+        const containerRect = containerRef.current.getBoundingClientRect();
+        
+        const cropBoxLeftAbsolute = containerRect.left + cropBox.left;
+        const cropBoxRightAbsolute = cropBoxLeftAbsolute + cropBox.width;
+        const cropBoxTopAbsolute = containerRect.top + cropBox.top;
+        const cropBoxBottomAbsolute = cropBoxTopAbsolute + cropBox.height;
 
         const buffer = 5;
         const covers =
-            imgRect.left <= guideRect.left + buffer &&
-            imgRect.right >= guideRect.right - buffer &&
-            imgRect.top <= guideRect.top + buffer &&
-            imgRect.bottom >= guideRect.bottom - buffer;
+            imgRect.left <= cropBoxLeftAbsolute + buffer &&
+            imgRect.right >= cropBoxRightAbsolute - buffer &&
+            imgRect.top <= cropBoxTopAbsolute + buffer &&
+            imgRect.bottom >= cropBoxBottomAbsolute - buffer;
         return covers;
     };
 
@@ -1308,12 +1366,13 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
             setIsAligned(checkCoverage());
         }, 50);
         return () => clearTimeout(timer);
-    }, [scale, offset, rotation]);
+    }, [scale, offset, rotation, cropBox]);
 
     const handleReset = () => {
         setScale(1);
         setOffset({ x: 0, y: 0 });
         setRotation(0);
+        initializeCropBox();
     };
 
     const handleRotateLeft = () => {
@@ -1338,16 +1397,122 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
         dragStart.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
     };
 
-    const handleMouseMove = (e: React.MouseEvent) => {
-        if (!isDragging.current) return;
-        setOffset({
-            x: e.clientX - dragStart.current.x,
-            y: e.clientY - dragStart.current.y
+    const handleCropBoxMouseDown = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!cropBox) return;
+        isDraggingCropBox.current = true;
+        dragBoxStart.current = {
+            x: e.clientX - cropBox.left,
+            y: e.clientY - cropBox.top
+        };
+    };
+
+    const handleCropBoxTouchStart = (e: React.TouchEvent) => {
+        e.stopPropagation();
+        if (!cropBox || e.touches.length !== 1) return;
+        isDraggingCropBox.current = true;
+        dragBoxStart.current = {
+            x: e.touches[0].clientX - cropBox.left,
+            y: e.touches[0].clientY - cropBox.top
+        };
+    };
+
+    const handleResizeStart = (corner: 'TL' | 'TR' | 'BL' | 'BR', clientX: number, clientY: number) => {
+        if (!cropBox) return;
+        setResizeActiveCorner(corner);
+        setResizeStartBox({ ...cropBox });
+        setResizeStartCursor({ x: clientX, y: clientY });
+    };
+
+    const handleResizeMove = (clientX: number, clientY: number) => {
+        if (!resizeActiveCorner || !resizeStartBox || !containerRef.current) return;
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const W_c = containerRect.width;
+        const H_c = containerRect.height;
+        const ratio = isQuestionF ? 1.4 : 1.8;
+
+        const dx = clientX - resizeStartCursor.x;
+        const dy = clientY - resizeStartCursor.y;
+
+        let newWidth = resizeStartBox.width;
+        let newHeight = resizeStartBox.height;
+        let newLeft = resizeStartBox.left;
+        let newTop = resizeStartBox.top;
+
+        if (resizeActiveCorner === 'BR') {
+            newWidth = resizeStartBox.width + dx;
+            newWidth = Math.max(120, Math.min(newWidth, W_c - resizeStartBox.left));
+            newHeight = newWidth / ratio;
+            if (newHeight > H_c - resizeStartBox.top) {
+                newHeight = H_c - resizeStartBox.top;
+                newWidth = newHeight * ratio;
+            }
+        } else if (resizeActiveCorner === 'BL') {
+            newWidth = resizeStartBox.width - dx;
+            newWidth = Math.max(120, Math.min(newWidth, resizeStartBox.left + resizeStartBox.width));
+            newHeight = newWidth / ratio;
+            if (newHeight > H_c - resizeStartBox.top) {
+                newHeight = H_c - resizeStartBox.top;
+                newWidth = newHeight * ratio;
+            }
+            newLeft = resizeStartBox.left + (resizeStartBox.width - newWidth);
+        } else if (resizeActiveCorner === 'TR') {
+            newWidth = resizeStartBox.width + dx;
+            newWidth = Math.max(120, Math.min(newWidth, W_c - resizeStartBox.left));
+            newHeight = newWidth / ratio;
+            if (newHeight > resizeStartBox.top + resizeStartBox.height) {
+                newHeight = resizeStartBox.top + resizeStartBox.height;
+                newWidth = newHeight * ratio;
+            }
+            newTop = resizeStartBox.top + (resizeStartBox.height - newHeight);
+        } else if (resizeActiveCorner === 'TL') {
+            newWidth = resizeStartBox.width - dx;
+            newWidth = Math.max(120, Math.min(newWidth, resizeStartBox.left + resizeStartBox.width));
+            newHeight = newWidth / ratio;
+            if (newHeight > resizeStartBox.top + resizeStartBox.height) {
+                newHeight = resizeStartBox.top + resizeStartBox.height;
+                newWidth = newHeight * ratio;
+            }
+            newLeft = resizeStartBox.left + (resizeStartBox.width - newWidth);
+            newTop = resizeStartBox.top + (resizeStartBox.height - newHeight);
+        }
+
+        setCropBox({
+            left: Math.max(0, Math.min(newLeft, W_c - newWidth)),
+            top: Math.max(0, Math.min(newTop, H_c - newHeight)),
+            width: newWidth,
+            height: newHeight
         });
+    };
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (resizeActiveCorner) {
+            handleResizeMove(e.clientX, e.clientY);
+        } else if (isDraggingCropBox.current && cropBox && containerRef.current) {
+            const containerRect = containerRef.current.getBoundingClientRect();
+            const W_c = containerRect.width;
+            const H_c = containerRect.height;
+            const nextLeft = e.clientX - dragBoxStart.current.x;
+            const nextTop = e.clientY - dragBoxStart.current.y;
+
+            setCropBox({
+                ...cropBox,
+                left: Math.max(0, Math.min(nextLeft, W_c - cropBox.width)),
+                top: Math.max(0, Math.min(nextTop, H_c - cropBox.height))
+            });
+        } else if (isDragging.current) {
+            setOffset({
+                x: e.clientX - dragStart.current.x,
+                y: e.clientY - dragStart.current.y
+            });
+        }
     };
 
     const handleMouseUpOrLeave = () => {
         isDragging.current = false;
+        isDraggingCropBox.current = false;
+        setResizeActiveCorner(null);
+        setResizeStartBox(null);
     };
 
     const handleTouchStart = (e: React.TouchEvent) => {
@@ -1369,7 +1534,23 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
-        if (e.touches.length === 1 && isDragging.current) {
+        if (resizeActiveCorner) {
+            if (e.touches[0]) {
+                handleResizeMove(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        } else if (isDraggingCropBox.current && cropBox && containerRef.current && e.touches[0]) {
+            const containerRect = containerRef.current.getBoundingClientRect();
+            const W_c = containerRect.width;
+            const H_c = containerRect.height;
+            const nextLeft = e.touches[0].clientX - dragBoxStart.current.x;
+            const nextTop = e.touches[0].clientY - dragBoxStart.current.y;
+
+            setCropBox({
+                ...cropBox,
+                left: Math.max(0, Math.min(nextLeft, W_c - cropBox.width)),
+                top: Math.max(0, Math.min(nextTop, H_c - cropBox.height))
+            });
+        } else if (e.touches.length === 1 && isDragging.current) {
             setOffset({
                 x: e.touches[0].clientX - dragStart.current.x,
                 y: e.touches[0].clientY - dragStart.current.y
@@ -1386,7 +1567,10 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
 
     const handleTouchEnd = () => {
         isDragging.current = false;
+        isDraggingCropBox.current = false;
         initialPinchDist.current = null;
+        setResizeActiveCorner(null);
+        setResizeStartBox(null);
     };
 
     const handleWheel = (e: React.WheelEvent) => {
@@ -1417,16 +1601,14 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, targetWidth, targetHeight);
 
-                const guideEl = containerRef.current?.querySelector('.editor-guide-box');
-                if (guideEl) {
-                    const guideRect = guideEl.getBoundingClientRect();
+                if (cropBox) {
                     const containerRect = containerRef.current!.getBoundingClientRect();
 
-                    const canvasToVisualRatio = targetWidth / guideRect.width;
+                    const canvasToVisualRatio = targetWidth / cropBox.width;
 
                     const guideCenterContainer = {
-                        x: (guideRect.left + guideRect.right) / 2 - containerRect.left,
-                        y: (guideRect.top + guideRect.bottom) / 2 - containerRect.top
+                        x: cropBox.left + cropBox.width / 2,
+                        y: cropBox.top + cropBox.height / 2
                     };
 
                     const containerCenter = {
@@ -1510,11 +1692,6 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
                 className="relative flex-grow w-full overflow-hidden bg-black flex items-center justify-center cursor-move"
-                style={{
-                    // @ts-ignore
-                    '--guide-width': guideWidthStr,
-                    '--guide-height': guideHeightStr
-                } as React.CSSProperties}
             >
                 {imgUrl && (
                     <img
@@ -1537,144 +1714,201 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                     />
                 )}
 
-                <div style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: 'calc(50% - (var(--guide-height) / 2))',
-                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                    zIndex: 90,
-                    pointerEvents: 'none'
-                }} />
-                <div style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    width: '100%',
-                    height: 'calc(50% - (var(--guide-height) / 2))',
-                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                    zIndex: 90,
-                    pointerEvents: 'none'
-                }} />
-                <div style={{
-                    position: 'absolute',
-                    top: 'calc(50% - (var(--guide-height) / 2))',
-                    bottom: 'calc(50% - (var(--guide-height) / 2))',
-                    left: 0,
-                    width: 'calc(50% - (var(--guide-width) / 2))',
-                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                    zIndex: 90,
-                    pointerEvents: 'none'
-                }} />
-                <div style={{
-                    position: 'absolute',
-                    top: 'calc(50% - (var(--guide-height) / 2))',
-                    bottom: 'calc(50% - (var(--guide-height) / 2))',
-                    right: 0,
-                    width: 'calc(50% - (var(--guide-width) / 2))',
-                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                    zIndex: 90,
-                    pointerEvents: 'none'
-                }} />
-
-                <div
-                    className="editor-guide-box"
-                    style={{
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        width: 'var(--guide-width)',
-                        height: 'var(--guide-height)',
-                        borderRadius: '12px',
-                        border: `3px dashed ${isAligned ? '#10b981' : '#f59e0b'}`,
-                        outline: '1.5px solid rgba(255, 255, 255, 0.8)',
-                        outlineOffset: '-3px',
-                        backgroundColor: 'transparent',
-                        boxShadow: `0 0 25px ${isAligned ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
-                        transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        pointerEvents: 'none',
-                        zIndex: 100
-                    }}
-                >
-                    <div style={{
-                        width: '100%',
-                        textAlign: 'center',
-                        padding: '8px 0',
-                        borderBottom: '1.5px dashed rgba(255, 255, 255, 0.3)',
-                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                        borderTopLeftRadius: '10px',
-                        borderTopRightRadius: '10px'
-                    }}>
-                        <span style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1.5px', color: '#06b6d4', textShadow: '0 1px 2px rgba(0,0,0,0.9)' }}>
-                            Nomor Soal {label.toUpperCase()}
-                        </span>
-                    </div>
-
-                    <div style={{
-                        width: '100%',
-                        flexGrow: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: 'rgba(0, 0, 0, 0.15)',
-                        borderBottomLeftRadius: '10px',
-                        borderBottomRightRadius: '10px',
-                        padding: '10px'
-                    }}>
+                {cropBox && (
+                    <>
+                        {/* Masks */}
                         <div style={{
-                            border: '1px dashed rgba(255, 255, 255, 0.2)',
-                            borderRadius: '6px',
-                            width: '85%',
-                            height: '75%',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: `${cropBox.top}px`,
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                            zIndex: 90,
+                            pointerEvents: 'none'
+                        }} />
+                        <div style={{
+                            position: 'absolute',
+                            top: `${cropBox.top + cropBox.height}px`,
+                            bottom: 0,
+                            left: 0,
+                            width: '100%',
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                            zIndex: 90,
+                            pointerEvents: 'none'
+                        }} />
+                        <div style={{
+                            position: 'absolute',
+                            top: `${cropBox.top}px`,
+                            height: `${cropBox.height}px`,
+                            left: 0,
+                            width: `${cropBox.left}px`,
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                            zIndex: 90,
+                            pointerEvents: 'none'
+                        }} />
+                        <div style={{
+                            position: 'absolute',
+                            top: `${cropBox.top}px`,
+                            height: `${cropBox.height}px`,
+                            left: `${cropBox.left + cropBox.width}px`,
+                            right: 0,
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                            zIndex: 90,
+                            pointerEvents: 'none'
+                        }} />
+
+                        {/* Interactive Crop Box Overlay */}
+                        <div
+                            className="editor-guide-box"
+                            style={{
+                                position: 'absolute',
+                                left: `${cropBox.left}px`,
+                                top: `${cropBox.top}px`,
+                                width: `${cropBox.width}px`,
+                                height: `${cropBox.height}px`,
+                                borderRadius: '12px',
+                                border: `3px dashed ${isAligned ? '#10b981' : '#f59e0b'}`,
+                                outline: '1.5px solid rgba(255, 255, 255, 0.8)',
+                                outlineOffset: '-3px',
+                                backgroundColor: 'transparent',
+                                boxShadow: `0 0 25px ${isAligned ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+                                transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                pointerEvents: 'auto',
+                                zIndex: 100
+                            }}
+                            onMouseDown={handleCropBoxMouseDown}
+                            onTouchStart={handleCropBoxTouchStart}
+                        >
+                            {/* Corner Handles */}
+                            {['TL', 'TR', 'BL', 'BR'].map((corner) => {
+                                const handleStyle: React.CSSProperties = {
+                                    position: 'absolute',
+                                    width: '18px',
+                                    height: '18px',
+                                    backgroundColor: '#06b6d4',
+                                    border: '2px solid #ffffff',
+                                    borderRadius: '50%',
+                                    zIndex: 110,
+                                    cursor: corner === 'TL' || corner === 'BR' ? 'nwse-resize' : 'nesw-resize',
+                                };
+
+                                if (corner === 'TL') {
+                                    handleStyle.top = '-9px';
+                                    handleStyle.left = '-9px';
+                                } else if (corner === 'TR') {
+                                    handleStyle.top = '-9px';
+                                    handleStyle.right = '-9px';
+                                } else if (corner === 'BL') {
+                                    handleStyle.bottom = '-9px';
+                                    handleStyle.left = '-9px';
+                                } else if (corner === 'BR') {
+                                    handleStyle.bottom = '-9px';
+                                    handleStyle.right = '-9px';
+                                }
+
+                                return (
+                                    <div
+                                        key={corner}
+                                        style={handleStyle}
+                                        onMouseDown={(e) => {
+                                            e.stopPropagation();
+                                            handleResizeStart(corner as any, e.clientX, e.clientY);
+                                        }}
+                                        onTouchStart={(e) => {
+                                            e.stopPropagation();
+                                            if (e.touches[0]) {
+                                                handleResizeStart(corner as any, e.touches[0].clientX, e.touches[0].clientY);
+                                            }
+                                        }}
+                                    />
+                                );
+                            })}
+
+                            <div style={{
+                                width: '100%',
+                                textAlign: 'center',
+                                padding: '8px 0',
+                                borderBottom: '1.5px dashed rgba(255, 255, 255, 0.3)',
+                                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                borderTopLeftRadius: '10px',
+                                borderTopRightRadius: '10px',
+                                userSelect: 'none',
+                                pointerEvents: 'none'
+                            }}>
+                                <span style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1.5px', color: '#06b6d4', textShadow: '0 1px 2px rgba(0,0,0,0.9)' }}>
+                                    Nomor Soal {label.toUpperCase()}
+                                </span>
+                            </div>
+
+                            <div style={{
+                                width: '100%',
+                                flexGrow: 1,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: 'rgba(0, 0, 0, 0.15)',
+                                borderBottomLeftRadius: '10px',
+                                borderBottomRightRadius: '10px',
+                                padding: '10px',
+                                userSelect: 'none',
+                                pointerEvents: 'none'
+                            }}>
+                                <div style={{
+                                    border: '1px dashed rgba(255, 255, 255, 0.2)',
+                                    borderRadius: '6px',
+                                    width: '85%',
+                                    height: '75%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexDirection: 'column',
+                                    gap: '4px'
+                                }}>
+                                    <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', color: '#ffffff', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                                        AREA JAWABAN LANSKAP
+                                    </span>
+                                    <span style={{ fontSize: '8px', color: 'rgba(255, 255, 255, 0.5)', textAlign: 'center', padding: '0 4px' }}>
+                                        Geser/ubah ukuran bingkai atau geser gambar agar pas di dalam garis putus-putus
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Top Alignment Warning */}
+                        <div style={{
+                            position: 'absolute',
+                            top: '16px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            borderRadius: '20px',
+                            padding: '6px 16px',
+                            textAlign: 'center',
+                            pointerEvents: 'none',
+                            zIndex: 110,
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            flexDirection: 'column',
-                            gap: '4px'
+                            gap: '6px'
                         }}>
-                            <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', color: '#ffffff', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
-                                AREA JAWABAN LANSKAP
-                            </span>
-                            <span style={{ fontSize: '8px', color: 'rgba(255, 255, 255, 0.5)', textAlign: 'center', padding: '0 4px' }}>
-                                Geser dan perbesar lembar agar pas di dalam garis putus-putus
+                            <span style={{
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                backgroundColor: isAligned ? '#10b981' : '#f59e0b',
+                                boxShadow: `0 0 8px ${isAligned ? '#10b981' : '#f59e0b'}`
+                            }} />
+                            <span style={{ fontSize: '11px', fontWeight: 'bold', color: isAligned ? '#10b981' : '#f59e0b' }}>
+                                {isAligned ? 'Area Jawaban Sesuai' : 'Geser/ubah ukuran gambar/bingkai agar sesuai'}
                             </span>
                         </div>
-                    </div>
-                </div>
-
-                <div style={{
-                    position: 'absolute',
-                    top: '16px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    borderRadius: '20px',
-                    padding: '6px 16px',
-                    textAlign: 'center',
-                    pointerEvents: 'none',
-                    zIndex: 110,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                }}>
-                    <span style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        backgroundColor: isAligned ? '#10b981' : '#f59e0b',
-                        boxShadow: `0 0 8px ${isAligned ? '#10b981' : '#f59e0b'}`
-                    }} />
-                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: isAligned ? '#10b981' : '#f59e0b' }}>
-                        {isAligned ? 'Area Jawaban Sesuai' : 'Geser gambar agar sesuai area panduan'}
-                    </span>
-                </div>
+                    </>
+                )}
             </div>
 
             <div className="w-full bg-black/95 border-t border-white/10 py-5 px-6 flex flex-col items-center gap-5 z-20 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
