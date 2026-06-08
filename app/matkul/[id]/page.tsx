@@ -178,15 +178,18 @@ interface CustomCameraModalProps {
     initialFile?: File;
     onCapture: (file: File) => void;
     onClose: () => void;
+    onFallbackToNative?: () => void;
 }
 
-const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFile, onCapture, onClose }) => {
+const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFile, onCapture, onClose, onFallbackToNative }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const analysisIntervalRef = useRef<any>(null);
 
     const [isCameraActive, setIsCameraActive] = useState(false);
     const [cameraError, setCameraError] = useState(false);
+    const [cameraErrorName, setCameraErrorName] = useState<string>('');
+    const [cameraErrorMessage, setCameraErrorMessage] = useState<string>('');
     const [guideStatus, setGuideStatus] = useState<'red' | 'yellow' | 'green'>('red');
     const [guideMessage, setGuideMessage] = useState('Posisikan seluruh lembar ke dalam area panduan');
 
@@ -210,6 +213,7 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
 
     const startCamera = async () => {
         try {
+            console.log("[CAMERA] opening web camera");
             const constraints = {
                 video: {
                     facingMode: { ideal: 'environment' },
@@ -219,6 +223,8 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
                 audio: false
             };
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            console.log("[CAMERA] web camera active");
+            console.log("[TRACE] using web camera");
             streamRef.current = stream;
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
@@ -229,12 +235,18 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
 
             // Start live analysis
             startLiveAnalysis();
-        } catch (err) {
+        } catch (err: any) {
             console.error('getUserMedia failed:', err);
+            const errName = err?.name || (err instanceof Error ? err.name : "UnknownError");
+            const errMsg = err?.message || (err instanceof Error ? err.message : String(err));
+            setCameraErrorName(errName);
+            setCameraErrorMessage(errMsg);
+            console.log("[CAMERA ERROR NAME]", errName);
+            console.log("[CAMERA ERROR MESSAGE]", errMsg);
+            console.log("[SECURE CONTEXT]", window.isSecureContext);
+            console.log("[MEDIA DEVICES]", !!navigator.mediaDevices);
             setCameraError(true);
-            // Fallback immediately
             stopCamera();
-            onClose();
         }
     };
 
@@ -246,6 +258,22 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
             stopCamera();
         };
     }, [initialFile]);
+
+    useEffect(() => {
+        console.log("[TRACE] CustomCameraModal mounted");
+        console.log("[CAMERA] overlay mounted");
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        console.log("[CAMERA] mobile detected", isMobile);
+        console.log("[CAMERA] analysis state", { isAnalyzing, guideStatus, guideMessage });
+    }, [isAnalyzing, guideStatus, guideMessage]);
+
+    useEffect(() => {
+        if (!previewUrl) {
+            console.log("[CAMERA] overlay rendered");
+            console.log("[CAMERA] overlay visible");
+        }
+    }, [previewUrl]);
+
 
     useEffect(() => {
         if (!initialFile) return;
@@ -640,24 +668,156 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
         return 'rgba(244, 63, 94, 0.4)';
     };
 
+    const debugPanel = process.env.NODE_ENV !== "production" && (
+        <div style={{
+            position: 'absolute',
+            bottom: '16px',
+            left: '16px',
+            right: '16px',
+            maxHeight: '200px',
+            overflowY: 'auto',
+            fontSize: '11px',
+            fontFamily: 'monospace',
+            zIndex: 9999,
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            border: '1px solid rgba(255, 255, 255, 0.25)',
+            borderRadius: '8px',
+            padding: '12px',
+            pointerEvents: 'auto',
+            color: '#a5f3fc',
+            textAlign: 'left'
+        }}>
+            <div style={{ fontWeight: 'bold', borderBottom: '1px solid rgba(255, 255, 255, 0.15)', paddingBottom: '4px', marginBottom: '6px', color: '#38bdf8' }}>
+                🐞 CAMERA DEBUG PANEL
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '4px' }}>
+                <div>Secure Context:</div>
+                <div style={{ color: typeof window !== 'undefined' && window.isSecureContext ? '#34d399' : '#f87171' }}>
+                    {String(typeof window !== 'undefined' && window.isSecureContext)}
+                </div>
+
+                <div>Media Devices:</div>
+                <div style={{ color: typeof navigator !== 'undefined' && !!navigator.mediaDevices ? '#34d399' : '#f87171' }}>
+                    {String(typeof navigator !== 'undefined' && !!navigator.mediaDevices)}
+                </div>
+
+                <div>getUserMedia:</div>
+                <div style={{ color: typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia ? '#34d399' : '#f87171' }}>
+                    {String(typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia)}
+                </div>
+
+                <div>Camera Active:</div>
+                <div style={{ color: isCameraActive ? '#34d399' : '#f87171' }}>
+                    {String(isCameraActive)}
+                </div>
+
+                <div>Preview Mode:</div>
+                <div style={{ color: !!previewUrl ? '#f59e0b' : '#38bdf8' }}>
+                    {String(!!previewUrl)}
+                </div>
+
+                <div>Camera Error:</div>
+                <div style={{ color: cameraError ? '#f87171' : '#34d399' }}>
+                    {String(cameraError)}
+                </div>
+
+                {cameraError && (
+                    <>
+                        <div>Error Name:</div>
+                        <div style={{ color: '#fca5a5' }}>{cameraErrorName || 'N/A'}</div>
+
+                        <div>Error Msg:</div>
+                        <div style={{ color: '#fca5a5' }}>{cameraErrorMessage || 'N/A'}</div>
+                    </>
+                )}
+
+                <div style={{ gridColumn: 'span 2', marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+                    <div style={{ fontWeight: 'bold', color: '#94a3b8' }}>User Agent:</div>
+                    <div style={{ color: '#e2e8f0', wordBreak: 'break-all', fontSize: '9px', marginTop: '2px' }}>
+                        {typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A'}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
+    if (cameraError) {
+        return (
+            <div
+                className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-between text-white select-none"
+                style={{ zIndex: 9999 }}
+            >
+                {/* Header bar */}
+                <div className="w-full h-14 bg-black/60 backdrop-blur-md flex items-center justify-between px-4 z-20">
+                    <button
+                        onClick={() => {
+                            stopCamera();
+                            onClose();
+                        }}
+                        className="p-2 text-white/85 hover:text-white cursor-pointer transition-colors"
+                    >
+                        ✕ Batal
+                    </button>
+                    <span className="font-extrabold text-sm tracking-widest text-cyan-400">PANDUAN FOTO - BAGIAN {label.toUpperCase()}</span>
+                    <div className="w-8" />
+                </div>
+
+                <div className="flex-grow flex flex-col items-center justify-center p-6 text-center space-y-6 bg-neutral-950 w-full z-10">
+                    <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+                        <AlertTriangle className="w-8 h-8 text-rose-500" />
+                    </div>
+                    <div className="space-y-2 max-w-xs">
+                        <h3 className="text-lg font-bold text-white tracking-wide">Gagal Membuka Kamera Web</h3>
+                        <p className="text-xs text-neutral-400 leading-relaxed">
+                            Sistem tidak dapat mengakses live camera stream. Pastikan koneksi aman (HTTPS), izin kamera diberikan, dan kamera perangkat tidak sedang digunakan aplikasi lain.
+                        </p>
+                    </div>
+                    <div className="flex flex-col gap-3 w-full max-w-xs">
+                        <button
+                            onClick={() => {
+                                setCameraError(false);
+                                startCamera();
+                            }}
+                            className="h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 rounded-xl font-bold flex items-center justify-center gap-2 text-white cursor-pointer shadow-md shadow-cyan-500/10 transition-all active:scale-[0.98] text-sm"
+                        >
+                            <RefreshCw className="w-4 h-4" />
+                            <span>Coba Lagi</span>
+                        </button>
+                        <button
+                            onClick={() => {
+                                console.log("[CAMERA] user selected native camera");
+                                stopCamera();
+                                if (onFallbackToNative) {
+                                    onFallbackToNative();
+                                } else {
+                                    onClose();
+                                }
+                            }}
+                            className="h-12 border border-neutral-800 hover:bg-white/5 rounded-xl font-bold flex items-center justify-center gap-2 text-neutral-300 hover:text-white cursor-pointer transition-colors text-sm"
+                        >
+                            <Camera className="w-4 h-4 text-cyan-500" />
+                            <span>Gunakan Kamera Bawaan HP</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Empty bottom element for layout alignment */}
+                <div className="w-full h-14 bg-black/60 z-20" />
+                {debugPanel}
+            </div>
+        );
+    }
+
     return (
         <div
             className="fixed inset-0 bg-black z-50 flex flex-col items-center justify-between text-white select-none"
             style={{
-                zIndex: 9999,
-                transformStyle: 'preserve-3d',
-                WebkitTransformStyle: 'preserve-3d',
-                transform: 'translate3d(0, 0, 0)',
-                WebkitTransform: 'translate3d(0, 0, 0)'
+                zIndex: 9999
             }}
         >
             {/* Header bar */}
             <div
                 className="w-full h-14 bg-black/60 backdrop-blur-md flex items-center justify-between px-4 z-20"
-                style={{
-                    transform: 'translate3d(0, 0, 20px)',
-                    WebkitTransform: 'translate3d(0, 0, 20px)'
-                }}
             >
                 <button
                     onClick={() => {
@@ -683,13 +843,21 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
                     justifyContent: 'center',
                     backgroundColor: '#000000',
                     overflow: 'hidden',
-                    transformStyle: 'preserve-3d',
-                    WebkitTransformStyle: 'preserve-3d',
-                    isolation: 'isolate'
-                }}>
+                    // CSS custom properties for guide box dimensions
+                    // @ts-ignore
+                    '--guide-width': 'min(80vw, 300px)',
+                    '--guide-height': 'min(calc(80vw * 1.414), 424px)'
+                } as React.CSSProperties}>
                     {/* Live Video Preview */}
                     <video
-                        ref={videoRef}
+                        ref={(el) => {
+                            // @ts-ignore
+                            videoRef.current = el;
+                            if (el) {
+                                console.log("[TRACE] video element mounted");
+                            }
+                        }}
+                        autoPlay
                         playsInline
                         muted
                         style={{
@@ -699,9 +867,7 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
                             width: '100%',
                             height: '100%',
                             objectFit: 'cover',
-                            zIndex: 1,
-                            transform: 'translate3d(0, 0, 0)',
-                            WebkitTransform: 'translate3d(0, 0, 0)'
+                            zIndex: 1
                         }}
                     />
 
@@ -712,38 +878,72 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
                         left: 0,
                         width: '100%',
                         height: '100%',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '24px',
                         pointerEvents: 'none',
-                        zIndex: 10,
-                        transform: 'translate3d(0, 0, 10px)',
-                        WebkitTransform: 'translate3d(0, 0, 10px)'
+                        zIndex: 100
                     }}>
-                        {/* Clear central sheet helper bounding box with giant dark mask shadow */}
+                        {/* 4 Overlay Masks */}
                         <div style={{
-                            position: 'relative',
-                            width: '80vw',
-                            maxWidth: '300px',
-                            height: 'calc(80vw * 1.414)',
-                            maxHeight: '424px',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: 'calc(50% - (var(--guide-height) / 2))',
+                            backgroundColor: 'rgba(0, 0, 0, 0.55)',
+                            zIndex: 90,
+                            pointerEvents: 'none'
+                        }} />
+                        <div style={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: 0,
+                            width: '100%',
+                            height: 'calc(50% - (var(--guide-height) / 2))',
+                            backgroundColor: 'rgba(0, 0, 0, 0.55)',
+                            zIndex: 90,
+                            pointerEvents: 'none'
+                        }} />
+                        <div style={{
+                            position: 'absolute',
+                            top: 'calc(50% - (var(--guide-height) / 2))',
+                            bottom: 'calc(50% - (var(--guide-height) / 2))',
+                            left: 0,
+                            width: 'calc(50% - (var(--guide-width) / 2))',
+                            backgroundColor: 'rgba(0, 0, 0, 0.55)',
+                            zIndex: 90,
+                            pointerEvents: 'none'
+                        }} />
+                        <div style={{
+                            position: 'absolute',
+                            top: 'calc(50% - (var(--guide-height) / 2))',
+                            bottom: 'calc(50% - (var(--guide-height) / 2))',
+                            right: 0,
+                            width: 'calc(50% - (var(--guide-width) / 2))',
+                            backgroundColor: 'rgba(0, 0, 0, 0.55)',
+                            zIndex: 90,
+                            pointerEvents: 'none'
+                        }} />
+
+                        {/* Clear central sheet helper bounding box */}
+                        <div style={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            width: 'var(--guide-width)',
+                            height: 'var(--guide-height)',
                             borderRadius: '16px',
                             border: `4px dashed ${getBorderColor()}`,
                             outline: '1.5px solid rgba(255, 255, 255, 0.85)',
                             outlineOffset: '-3px',
                             backgroundColor: 'transparent',
-                            boxShadow: `0 0 0 9999px rgba(0, 0, 0, 0.55), 0 0 25px ${getShadowColor()}`,
+                            boxShadow: `0 0 25px ${getShadowColor()}`,
                             transition: 'all 0.3s ease',
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'space-between',
                             padding: '16px',
                             pointerEvents: 'none',
-                            zIndex: 15,
-                            transform: 'translate3d(0, 0, 15px)',
-                            WebkitTransform: 'translate3d(0, 0, 15px)'
+                            zIndex: 100
                         }}>
                             {/* Inner visual markings */}
                             <div style={{ width: '100%', textAlign: 'center', padding: '8px 0', borderBottom: '1px dashed rgba(255, 255, 255, 0.25)' }}>
@@ -767,20 +967,17 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
                         <div style={{
                             position: 'absolute',
                             bottom: '24px',
-                            left: '16px',
-                            right: '16px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
                             backgroundColor: 'rgba(0, 0, 0, 0.8)',
                             border: '1px solid rgba(255, 255, 255, 0.15)',
                             borderRadius: '12px',
                             padding: '12px 16px',
                             textAlign: 'center',
+                            width: 'calc(100% - 32px)',
                             maxWidth: '320px',
-                            marginLeft: 'auto',
-                            marginRight: 'auto',
                             pointerEvents: 'none',
-                            zIndex: 25,
-                            transform: 'translate3d(0, 0, 25px)',
-                            WebkitTransform: 'translate3d(0, 0, 25px)'
+                            zIndex: 110
                         }}>
                             <span style={{ fontSize: '12px', fontWeight: 'bold', color: getBorderColor(), transition: 'color 0.3s ease' }}>
                                 {guideMessage}
@@ -876,6 +1073,7 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
                     </div>
                 )}
             </div>
+            {debugPanel}
         </div>
     );
 };
@@ -2635,11 +2833,14 @@ export default function UploadWorkspace() {
                                     <div className="flex flex-col gap-3">
                                         <button
                                             onClick={() => {
+                                                console.log("[TRACE] take photo clicked");
                                                 console.log('[CAMERA BTN] pendingLabel:', getPendingUploadLabel());
                                                 closeModal();
                                                 if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+                                                    console.log("[TRACE] camera modal opened");
                                                     setShowCustomCamera(true);
                                                 } else {
+                                                    console.log("[TRACE] fallback to native camera");
                                                     toast.info('Beralih ke kamera bawaan sistem.');
                                                     setTimeout(() => {
                                                         cameraInputRef.current?.click();
@@ -2696,14 +2897,17 @@ export default function UploadWorkspace() {
                     }}
                     onClose={() => {
                         setShowCustomCamera(false);
-                        if (!initialCameraFile) {
-                            toast.info('Beralih ke kamera bawaan sistem.');
-                            setTimeout(() => {
-                                cameraInputRef.current?.click();
-                            }, 100);
-                        }
                         setInitialCameraFile(null);
                         setActiveUploadChoiceLabel(null);
+                    }}
+                    onFallbackToNative={() => {
+                        setShowCustomCamera(false);
+                        setInitialCameraFile(null);
+                        setActiveUploadChoiceLabel(null);
+                        toast.info('Beralih ke kamera bawaan sistem.');
+                        setTimeout(() => {
+                            cameraInputRef.current?.click();
+                        }, 100);
                     }}
                 />
             )}
