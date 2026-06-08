@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { UploadCloud, CheckCircle, Loader2, AlertTriangle, Eye, Lock, X, RefreshCw, Trophy, Camera, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { UploadCloud, CheckCircle, Loader2, AlertTriangle, Eye, Lock, X, RefreshCw, Trophy, Camera, Image as ImageIcon, Trash2, Zap, ZapOff } from 'lucide-react';
 import Navbar from '../../components/Navbar';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/app/hooks/useToast';
@@ -71,14 +71,92 @@ const getSignedPreviewUrl = async (path: string): Promise<string | null> => {
     }
 };
 
-const compressImage = (file: File): Promise<File> => {
+const getExifOrientation = (file: File): Promise<number> => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsArrayBuffer(file.slice(0, 64 * 1024));
+        reader.onload = (e) => {
+            const buffer = e.target?.result as ArrayBuffer;
+            if (!buffer) {
+                resolve(-1);
+                return;
+            }
+            const view = new DataView(buffer);
+            if (view.byteLength < 2 || view.getUint16(0, false) !== 0xFFD8) {
+                resolve(-1);
+                return;
+            }
+            const length = view.byteLength;
+            let offset = 2;
+            while (offset < length - 2) {
+                const marker = view.getUint16(offset, false);
+                offset += 2;
+                if (marker === 0xFFE1) {
+                    if (offset + 8 <= length && view.getUint32(offset + 2, false) === 0x45786966) {
+                        const tiffOffset = offset + 8;
+                        if (tiffOffset + 8 <= length) {
+                            const littleEndian = view.getUint16(tiffOffset, false) === 0x4949;
+                            const ifdOffset = view.getUint32(tiffOffset + 4, littleEndian);
+                            const tagStart = tiffOffset + ifdOffset;
+                            if (tagStart + 2 <= length) {
+                                const tagsCount = view.getUint16(tagStart, littleEndian);
+                                for (let i = 0; i < tagsCount; i++) {
+                                    const tagOffset = tagStart + 2 + i * 12;
+                                    if (tagOffset + 12 <= length && view.getUint16(tagOffset, littleEndian) === 0x0112) {
+                                        const value = view.getUint16(tagOffset + 8, littleEndian);
+                                        resolve(value);
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    resolve(-1);
+                    return;
+                } else if ((marker & 0xFF00) !== 0xFF00) {
+                    break;
+                } else {
+                    if (offset + 2 <= length) {
+                        offset += view.getUint16(offset, false);
+                    } else {
+                        break;
+                    }
+                }
+            }
+            resolve(-1);
+        };
+        reader.onerror = () => resolve(-1);
+    });
+};
+
+const checkAutoRotation = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+        if (typeof window === 'undefined') {
+            resolve(false);
+            return;
+        }
+        const testImage = new Image();
+        testImage.src = 'data:image/jpeg;base64,/9j/4QAiRXhpZgAATU0AKgAAAAgAAQEqAAIAAAAKAAAADgAAAAAA/9sAQwAGBAUGBQQGBgUGBwcGCAoQCgoJCQoUDg8MEBcUGBgXFBYWGh0lHxobIxwWFiAsICMiJyckFBYgJCwsMCwsMCwo/9sAQwEHBwcKCAoRCwoRJhwWIiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYm/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwA=';
+        testImage.onload = () => {
+            const rotated = testImage.width === 1;
+            resolve(rotated);
+        };
+        testImage.onerror = () => {
+            resolve(false);
+        };
+    });
+};
+
+const compressImage = async (file: File): Promise<File> => {
+    const orientation = await getExifOrientation(file);
+    const autoRotateSupported = await checkAutoRotation();
+
     return new Promise((resolve) => {
         const originalSizeMB = file.size / (1024 * 1024);
 
-        // Task 2: Adaptive Compression
-        if (originalSizeMB <= 1) {
+        if (originalSizeMB <= 1 && orientation <= 1) {
             if (process.env.NODE_ENV !== 'production') {
-                console.log("[UPLOAD] Skip Compression (File size <= 1MB):", file.size);
+                console.log("[UPLOAD] Skip Compression & Rotation (File size <= 1MB, no rotation):", file.size);
             }
             resolve(file);
             return;
@@ -107,8 +185,12 @@ const compressImage = (file: File): Promise<File> => {
                 const canvas = document.createElement('canvas');
                 const originalWidth = img.width;
                 const originalHeight = img.height;
-                let width = img.width;
-                let height = img.height;
+
+                const needsRotation = orientation === 6 || orientation === 8 || orientation === 3;
+                const needsSwap = needsRotation && !autoRotateSupported && (orientation === 6 || orientation === 8);
+                
+                let width = needsSwap ? img.height : img.width;
+                let height = needsSwap ? img.width : img.height;
 
                 if (width > height) {
                     if (width > maxDimension) {
@@ -125,14 +207,33 @@ const compressImage = (file: File): Promise<File> => {
                 canvas.width = width;
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
-                ctx?.drawImage(img, 0, 0, width, height);
+                if (ctx) {
+                    if (needsRotation && !autoRotateSupported) {
+                        if (orientation === 6) {
+                            ctx.translate(width, 0);
+                            ctx.rotate(90 * Math.PI / 180);
+                            ctx.drawImage(img, 0, 0, height, width);
+                        } else if (orientation === 8) {
+                            ctx.translate(0, height);
+                            ctx.rotate(-90 * Math.PI / 180);
+                            ctx.drawImage(img, 0, 0, height, width);
+                        } else if (orientation === 3) {
+                            ctx.translate(width, height);
+                            ctx.rotate(180 * Math.PI / 180);
+                            ctx.drawImage(img, 0, 0, width, height);
+                        } else {
+                            ctx.drawImage(img, 0, 0, width, height);
+                        }
+                    } else {
+                        ctx.drawImage(img, 0, 0, width, height);
+                    }
+                }
 
                 const finalWidth = width;
                 const finalHeight = height;
 
                 canvas.toBlob(
                     (blob) => {
-                        // Task 4: Memory Safety
                         canvas.width = 0;
                         canvas.height = 0;
                         img.onload = null;
@@ -144,12 +245,13 @@ const compressImage = (file: File): Promise<File> => {
                                 lastModified: Date.now(),
                             });
 
-                            // Task 1: Compression Diagnostics (development-only)
                             if (process.env.NODE_ENV !== 'production') {
                                 const ratio = ((file.size - compressedFile.size) / file.size * 100).toFixed(2) + "%";
                                 console.log("[UPLOAD] Original Size:", file.size);
                                 console.log("[UPLOAD] Compressed Size:", compressedFile.size);
                                 console.log("[UPLOAD] Compression Ratio:", ratio);
+                                console.log("[UPLOAD] EXIF Orientation:", orientation);
+                                console.log("[UPLOAD] Auto-Rotate Supported by Browser:", autoRotateSupported);
                                 console.log("[UPLOAD] Original Resolution:", originalWidth, originalHeight);
                                 console.log("[UPLOAD] Final Resolution:", finalWidth, finalHeight);
                             }
@@ -199,6 +301,9 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
     const [capturedFile, setCapturedFile] = useState<File | null>(null);
     const [coverageRatio, setCoverageRatio] = useState(0);
 
+    const [torchActive, setTorchActive] = useState(false);
+    const [isTorchSupported, setIsTorchSupported] = useState(false);
+
     const stopCamera = () => {
         if (analysisIntervalRef.current) {
             clearInterval(analysisIntervalRef.current);
@@ -209,6 +314,24 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
             streamRef.current = null;
         }
         setIsCameraActive(false);
+        setTorchActive(false);
+        setIsTorchSupported(false);
+    };
+
+    const toggleTorch = async () => {
+        if (!streamRef.current) return;
+        try {
+            const videoTrack = streamRef.current.getVideoTracks()[0];
+            if (videoTrack) {
+                const nextState = !torchActive;
+                await (videoTrack as any).applyConstraints({
+                    advanced: [{ torch: nextState }]
+                });
+                setTorchActive(nextState);
+            }
+        } catch (e) {
+            console.error("Failed to toggle torch:", e);
+        }
     };
 
     const startCamera = async () => {
@@ -232,6 +355,20 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
             }
             setIsCameraActive(true);
             setCameraError(false);
+
+            try {
+                const videoTrack = stream.getVideoTracks()[0];
+                if (videoTrack && typeof videoTrack.getCapabilities === 'function') {
+                    const capabilities = videoTrack.getCapabilities();
+                    // @ts-ignore
+                    setIsTorchSupported(!!(capabilities && 'torch' in capabilities));
+                } else {
+                    setIsTorchSupported(false);
+                }
+            } catch (e) {
+                console.warn("Torch check failed:", e);
+                setIsTorchSupported(false);
+            }
 
             // Start live analysis
             startLiveAnalysis();
@@ -415,18 +552,23 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
 
                 setCoverageRatio(whiteRatio);
 
-                if (avgBrightness < 35) {
+                const isPortraitOrientation = typeof window !== 'undefined' && window.innerHeight > window.innerWidth;
+
+                if (isPortraitOrientation) {
+                    setGuideStatus('red');
+                    setGuideMessage('Putar HP ke Lanskap (Gunakan Orientasi Lanskap)');
+                } else if (avgBrightness < 35) {
                     setGuideStatus('red');
                     setGuideMessage('Pencahayaan terlalu gelap. Cari tempat yang lebih terang.');
                 } else if (avgBrightness > 280) {
                     setGuideStatus('red');
                     setGuideMessage('Pencahayaan terlalu terang/silau.');
-                } else if (whiteRatio < 0.2) {
-                    setGuideStatus('red');
-                    setGuideMessage('Posisikan seluruh lembar ke dalam area panduan');
                 } else if (whiteRatio < 0.3) {
                     setGuideStatus('yellow');
-                    setGuideMessage('Hampir sesuai. Dekatkan kamera ke lembar jawaban.');
+                    setGuideMessage('Dekatkan kamera ke lembar jawaban');
+                } else if (whiteRatio > 0.85) {
+                    setGuideStatus('yellow');
+                    setGuideMessage('Jauhkan kamera sedikit');
                 } else {
                     setGuideStatus('green');
                     setGuideMessage('Siap difoto. Jaga kamera tetap stabil.');
@@ -845,8 +987,10 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
                     overflow: 'hidden',
                     // CSS custom properties for guide box dimensions
                     // @ts-ignore
-                    '--guide-width': 'min(80vw, 300px)',
-                    '--guide-height': 'min(calc(80vw * 1.414), 424px)'
+                    '--guide-width': 'min(85vw, 450px)',
+                    '--guide-height': label.toLowerCase().endsWith('f')
+                        ? 'calc(min(85vw, 450px) / 1.4)'
+                        : 'calc(min(85vw, 450px) / 1.8)'
                 } as React.CSSProperties}>
                     {/* Live Video Preview */}
                     <video
@@ -946,17 +1090,33 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
                             zIndex: 100
                         }}>
                             {/* Inner visual markings */}
-                            <div style={{ width: '100%', textAlign: 'center', padding: '8px 0', borderBottom: '1px dashed rgba(255, 255, 255, 0.25)' }}>
-                                <span style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1px', color: '#ffffff', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                            <div style={{ width: '100%', textAlign: 'center', padding: '6px 0', borderBottom: '1px dashed rgba(255, 255, 255, 0.25)' }}>
+                                <span style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1px', color: '#06b6d4', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
                                     Bagian Atas (Nomor Soal)
                                 </span>
                             </div>
-                            <div style={{ width: '100%', flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <span style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '2px', color: '#ffffff', opacity: 0.5, textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
-                                    Lembar Jawaban
-                                </span>
+                            <div style={{ width: '100%', flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px' }}>
+                                <div style={{
+                                    border: '1px dashed rgba(255, 255, 255, 0.2)',
+                                    borderRadius: '6px',
+                                    width: '90%',
+                                    height: '80%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexDirection: 'column',
+                                    gap: '2px',
+                                    backgroundColor: 'rgba(0, 0, 0, 0.15)'
+                                }}>
+                                    <span style={{ fontSize: '9px', fontWeight: '800', letterSpacing: '1px', color: '#ffffff', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                                        AREA JAWABAN LANSKAP
+                                    </span>
+                                    <span style={{ fontSize: '8px', color: 'rgba(255, 255, 255, 0.45)', textAlign: 'center', padding: '0 4px' }}>
+                                        Posisikan lembar fisik pas di batas panduan
+                                    </span>
+                                </div>
                             </div>
-                            <div style={{ width: '100%', textAlign: 'center', padding: '8px 0', borderTop: '1px dashed rgba(255, 255, 255, 0.25)' }}>
+                            <div style={{ width: '100%', textAlign: 'center', padding: '6px 0', borderTop: '1px dashed rgba(255, 255, 255, 0.25)' }}>
                                 <span style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1px', color: '#ffffff', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
                                     Kotak Area Jawaban
                                 </span>
@@ -1046,6 +1206,18 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
                 {!previewUrl ? (
                     // Live camera action: large shutter button
                     <div className="flex items-center justify-center w-full relative">
+                        {isTorchSupported && (
+                            <button
+                                onClick={toggleTorch}
+                                className="absolute right-6 p-3 rounded-full bg-neutral-900/80 border border-white/10 hover:bg-neutral-800 text-white cursor-pointer transition-all flex items-center justify-center"
+                                style={{ width: '46px', height: '46px' }}
+                                title="Senter"
+                            >
+                                <span style={{ fontSize: '18px', color: torchActive ? '#fbbf24' : '#94a3b8' }}>
+                                    {torchActive ? '💡' : '⚡'}
+                                </span>
+                            </button>
+                        )}
                         <button
                             onClick={handleCapture}
                             disabled={!isCameraActive || isAnalyzing}
@@ -1078,6 +1250,499 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
     );
 };
 
+interface ImageAdjustmentModalProps {
+    label: string;
+    file: File;
+    onConfirm: (adjustedFile: File) => void;
+    onClose: () => void;
+}
+
+const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file, onConfirm, onClose }) => {
+    const [scale, setScale] = useState(1);
+    const [offset, setOffset] = useState({ x: 0, y: 0 });
+    const [rotation, setRotation] = useState(0); // 0, 90, 180, 270
+    const [imgUrl, setImgUrl] = useState<string>('');
+    const [isAligned, setIsAligned] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+
+    const containerRef = useRef<HTMLDivElement>(null);
+    const imgRef = useRef<HTMLImageElement>(null);
+    
+    const dragStart = useRef({ x: 0, y: 0 });
+    const isDragging = useRef(false);
+    const initialPinchDist = useRef<number | null>(null);
+    const initialScale = useRef(1);
+
+    const isQuestionF = label.toLowerCase().endsWith('f');
+    const guideWidthStr = 'min(80vw, 400px)';
+    const guideHeightStr = isQuestionF
+        ? 'calc(min(80vw, 400px) / 1.4)'
+        : 'calc(min(80vw, 400px) / 1.8)';
+
+    useEffect(() => {
+        const url = URL.createObjectURL(file);
+        setImgUrl(url);
+        return () => {
+            URL.revokeObjectURL(url);
+        };
+    }, [file]);
+
+    const checkCoverage = () => {
+        if (!imgRef.current || !containerRef.current) return false;
+        const imgRect = imgRef.current.getBoundingClientRect();
+        const guideEl = containerRef.current.querySelector('.editor-guide-box');
+        if (!guideEl) return false;
+        const guideRect = guideEl.getBoundingClientRect();
+
+        const buffer = 5;
+        const covers =
+            imgRect.left <= guideRect.left + buffer &&
+            imgRect.right >= guideRect.right - buffer &&
+            imgRect.top <= guideRect.top + buffer &&
+            imgRect.bottom >= guideRect.bottom - buffer;
+        return covers;
+    };
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setIsAligned(checkCoverage());
+        }, 50);
+        return () => clearTimeout(timer);
+    }, [scale, offset, rotation]);
+
+    const handleReset = () => {
+        setScale(1);
+        setOffset({ x: 0, y: 0 });
+        setRotation(0);
+    };
+
+    const handleRotateLeft = () => {
+        setRotation(prev => (prev - 90 + 360) % 360);
+    };
+
+    const handleRotateRight = () => {
+        setRotation(prev => (prev + 90) % 360);
+    };
+
+    const handleZoomIn = () => {
+        setScale(prev => Math.min(4, prev + 0.25));
+    };
+
+    const handleZoomOut = () => {
+        setScale(prev => Math.max(1, prev - 0.25));
+    };
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault();
+        isDragging.current = true;
+        dragStart.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
+    };
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (!isDragging.current) return;
+        setOffset({
+            x: e.clientX - dragStart.current.x,
+            y: e.clientY - dragStart.current.y
+        });
+    };
+
+    const handleMouseUpOrLeave = () => {
+        isDragging.current = false;
+    };
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (e.touches.length === 1) {
+            isDragging.current = true;
+            dragStart.current = {
+                x: e.touches[0].clientX - offset.x,
+                y: e.touches[0].clientY - offset.y
+            };
+        } else if (e.touches.length === 2) {
+            isDragging.current = false;
+            const dist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            initialPinchDist.current = dist;
+            initialScale.current = scale;
+        }
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (e.touches.length === 1 && isDragging.current) {
+            setOffset({
+                x: e.touches[0].clientX - dragStart.current.x,
+                y: e.touches[0].clientY - dragStart.current.y
+            });
+        } else if (e.touches.length === 2 && initialPinchDist.current !== null) {
+            const dist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            const factor = dist / initialPinchDist.current;
+            setScale(Math.min(4, Math.max(1, initialScale.current * factor)));
+        }
+    };
+
+    const handleTouchEnd = () => {
+        isDragging.current = false;
+        initialPinchDist.current = null;
+    };
+
+    const handleWheel = (e: React.WheelEvent) => {
+        const step = 0.1;
+        setScale(prev => {
+            const next = e.deltaY < 0 ? prev + step : prev - step;
+            return Math.min(4, Math.max(1, next));
+        });
+    };
+
+    const handleConfirm = async () => {
+        if (isSaving || !imgRef.current) return;
+        setIsSaving(true);
+
+        try {
+            const naturalW = imgRef.current.naturalWidth;
+            const naturalH = imgRef.current.naturalHeight;
+
+            const targetWidth = Math.min(2048, Math.max(1200, naturalW));
+            const targetHeight = isQuestionF ? Math.round(targetWidth / 1.4) : Math.round(targetWidth / 1.8);
+
+            const canvas = document.createElement('canvas');
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
+
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, targetWidth, targetHeight);
+
+                const guideEl = containerRef.current?.querySelector('.editor-guide-box');
+                if (guideEl) {
+                    const guideRect = guideEl.getBoundingClientRect();
+                    const containerRect = containerRef.current!.getBoundingClientRect();
+
+                    const canvasToVisualRatio = targetWidth / guideRect.width;
+
+                    const guideCenterContainer = {
+                        x: (guideRect.left + guideRect.right) / 2 - containerRect.left,
+                        y: (guideRect.top + guideRect.bottom) / 2 - containerRect.top
+                    };
+
+                    const containerCenter = {
+                        x: containerRect.width / 2,
+                        y: containerRect.height / 2
+                    };
+
+                    const imgCenterContainer = {
+                        x: containerCenter.x + offset.x,
+                        y: containerCenter.y + offset.y
+                    };
+
+                    const relX_v = imgCenterContainer.x - guideCenterContainer.x;
+                    const relY_v = imgCenterContainer.y - guideCenterContainer.y;
+
+                    const relX_c = relX_v * canvasToVisualRatio;
+                    const relY_c = relY_v * canvasToVisualRatio;
+
+                    const imgCenterCanvas = {
+                        x: targetWidth / 2 + relX_c,
+                        y: targetHeight / 2 + relY_c
+                    };
+
+                    ctx.save();
+                    ctx.translate(imgCenterCanvas.x, imgCenterCanvas.y);
+                    ctx.rotate(rotation * Math.PI / 180);
+
+                    const imgBaseWidth_v = imgRef.current.clientWidth;
+                    const imgBaseHeight_v = imgRef.current.clientHeight;
+
+                    const drawW = imgBaseWidth_v * scale * canvasToVisualRatio;
+                    const drawH = imgBaseHeight_v * scale * canvasToVisualRatio;
+
+                    ctx.drawImage(imgRef.current, -drawW / 2, -drawH / 2, drawW, drawH);
+                    ctx.restore();
+                }
+            }
+
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    const adjustedFile = new File([blob], file.name, {
+                        type: 'image/jpeg',
+                        lastModified: Date.now()
+                    });
+                    onConfirm(adjustedFile);
+                } else {
+                    onConfirm(file);
+                }
+                setIsSaving(false);
+            }, 'image/jpeg', 0.9);
+        } catch (err) {
+            console.error('Failed to crop/adjust image:', err);
+            onConfirm(file);
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-[#09090b]/98 backdrop-blur-md z-[9999] flex flex-col justify-between text-white select-none">
+            <div className="w-full h-14 bg-black/60 border-b border-white/10 flex items-center justify-between px-4 z-20">
+                <button
+                    onClick={onClose}
+                    className="p-2 text-white/85 hover:text-white cursor-pointer transition-colors text-sm font-semibold"
+                >
+                    ✕ Batal
+                </button>
+                <span className="font-extrabold text-sm tracking-widest text-cyan-400">
+                    SESUAIKAN LEMBAR - SOAL {label.toUpperCase()}
+                </span>
+                <div className="w-8" />
+            </div>
+
+            <div
+                ref={containerRef}
+                onWheel={handleWheel}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUpOrLeave}
+                onMouseLeave={handleMouseUpOrLeave}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                className="relative flex-grow w-full overflow-hidden bg-black flex items-center justify-center cursor-move"
+                style={{
+                    // @ts-ignore
+                    '--guide-width': guideWidthStr,
+                    '--guide-height': guideHeightStr
+                } as React.CSSProperties}
+            >
+                {imgUrl && (
+                    <img
+                        ref={imgRef}
+                        src={imgUrl}
+                        alt="Preview"
+                        onLoad={() => {
+                            setTimeout(() => setIsAligned(checkCoverage()), 100);
+                        }}
+                        style={{
+                            transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale}) rotate(${rotation}deg)`,
+                            transformOrigin: 'center center',
+                            maxHeight: '75%',
+                            maxWidth: '75%',
+                            objectFit: 'contain',
+                            pointerEvents: 'none',
+                            userSelect: 'none',
+                            transition: isDragging.current ? 'none' : 'transform 0.1s ease-out'
+                        }}
+                    />
+                )}
+
+                <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: 'calc(50% - (var(--guide-height) / 2))',
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                    zIndex: 90,
+                    pointerEvents: 'none'
+                }} />
+                <div style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    width: '100%',
+                    height: 'calc(50% - (var(--guide-height) / 2))',
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                    zIndex: 90,
+                    pointerEvents: 'none'
+                }} />
+                <div style={{
+                    position: 'absolute',
+                    top: 'calc(50% - (var(--guide-height) / 2))',
+                    bottom: 'calc(50% - (var(--guide-height) / 2))',
+                    left: 0,
+                    width: 'calc(50% - (var(--guide-width) / 2))',
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                    zIndex: 90,
+                    pointerEvents: 'none'
+                }} />
+                <div style={{
+                    position: 'absolute',
+                    top: 'calc(50% - (var(--guide-height) / 2))',
+                    bottom: 'calc(50% - (var(--guide-height) / 2))',
+                    right: 0,
+                    width: 'calc(50% - (var(--guide-width) / 2))',
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                    zIndex: 90,
+                    pointerEvents: 'none'
+                }} />
+
+                <div
+                    className="editor-guide-box"
+                    style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: 'var(--guide-width)',
+                        height: 'var(--guide-height)',
+                        borderRadius: '12px',
+                        border: `3px dashed ${isAligned ? '#10b981' : '#f59e0b'}`,
+                        outline: '1.5px solid rgba(255, 255, 255, 0.8)',
+                        outlineOffset: '-3px',
+                        backgroundColor: 'transparent',
+                        boxShadow: `0 0 25px ${isAligned ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+                        transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        pointerEvents: 'none',
+                        zIndex: 100
+                    }}
+                >
+                    <div style={{
+                        width: '100%',
+                        textAlign: 'center',
+                        padding: '8px 0',
+                        borderBottom: '1.5px dashed rgba(255, 255, 255, 0.3)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                        borderTopLeftRadius: '10px',
+                        borderTopRightRadius: '10px'
+                    }}>
+                        <span style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1.5px', color: '#06b6d4', textShadow: '0 1px 2px rgba(0,0,0,0.9)' }}>
+                            Nomor Soal {label.toUpperCase()}
+                        </span>
+                    </div>
+
+                    <div style={{
+                        width: '100%',
+                        flexGrow: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'rgba(0, 0, 0, 0.15)',
+                        borderBottomLeftRadius: '10px',
+                        borderBottomRightRadius: '10px',
+                        padding: '10px'
+                    }}>
+                        <div style={{
+                            border: '1px dashed rgba(255, 255, 255, 0.2)',
+                            borderRadius: '6px',
+                            width: '85%',
+                            height: '75%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexDirection: 'column',
+                            gap: '4px'
+                        }}>
+                            <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', color: '#ffffff', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                                AREA JAWABAN LANSKAP
+                            </span>
+                            <span style={{ fontSize: '8px', color: 'rgba(255, 255, 255, 0.5)', textAlign: 'center', padding: '0 4px' }}>
+                                Geser dan perbesar lembar agar pas di dalam garis putus-putus
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{
+                    position: 'absolute',
+                    top: '16px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '20px',
+                    padding: '6px 16px',
+                    textAlign: 'center',
+                    pointerEvents: 'none',
+                    zIndex: 110,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                }}>
+                    <span style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: isAligned ? '#10b981' : '#f59e0b',
+                        boxShadow: `0 0 8px ${isAligned ? '#10b981' : '#f59e0b'}`
+                    }} />
+                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: isAligned ? '#10b981' : '#f59e0b' }}>
+                        {isAligned ? 'Area Jawaban Sesuai' : 'Geser gambar agar sesuai area panduan'}
+                    </span>
+                </div>
+            </div>
+
+            <div className="w-full bg-black/95 border-t border-white/10 py-5 px-6 flex flex-col items-center gap-5 z-20 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+                <div className="flex items-center justify-center gap-6 w-full max-w-sm">
+                    <button
+                        onClick={handleRotateLeft}
+                        className="p-3 bg-neutral-900 border border-white/10 hover:bg-neutral-800 rounded-xl transition-all cursor-pointer"
+                        title="Putar Kiri -90°"
+                    >
+                        <span className="text-xs font-bold block text-cyan-400">⟲ -90°</span>
+                    </button>
+
+                    <div className="flex items-center gap-3 bg-neutral-900 border border-white/10 rounded-xl p-1.5">
+                        <button
+                            onClick={handleZoomOut}
+                            disabled={scale <= 1}
+                            className="w-10 h-10 flex items-center justify-center hover:bg-white/5 rounded-lg text-slate-300 disabled:opacity-40 cursor-pointer"
+                        >
+                            －
+                        </button>
+                        <span className="w-12 text-center text-xs font-bold tracking-wide text-cyan-300">
+                            {scale.toFixed(1)}x
+                        </span>
+                        <button
+                            onClick={handleZoomIn}
+                            disabled={scale >= 4}
+                            className="w-10 h-10 flex items-center justify-center hover:bg-white/5 rounded-lg text-slate-300 disabled:opacity-40 cursor-pointer"
+                        >
+                            ＋
+                        </button>
+                    </div>
+
+                    <button
+                        onClick={handleRotateRight}
+                        className="p-3 bg-neutral-900 border border-white/10 hover:bg-neutral-800 rounded-xl transition-all cursor-pointer"
+                        title="Putar Kanan +90°"
+                    >
+                        <span className="text-xs font-bold block text-cyan-400">⟳ +90°</span>
+                    </button>
+                </div>
+
+                <div className="flex w-full max-w-md gap-3">
+                    <button
+                        onClick={handleReset}
+                        className="flex-1 h-12 border border-slate-700 bg-neutral-900 hover:bg-neutral-800 text-slate-300 font-bold rounded-xl transition-colors cursor-pointer text-sm"
+                    >
+                        Atur Ulang
+                    </button>
+                    <button
+                        onClick={handleConfirm}
+                        disabled={isSaving}
+                        className="flex-1 h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-50 text-white font-bold rounded-xl transition-all cursor-pointer text-sm shadow-lg shadow-cyan-500/10 flex items-center justify-center gap-2"
+                    >
+                        {isSaving ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Memproses...</span>
+                            </>
+                        ) : (
+                            <span>Konfirmasi & Unggah</span>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export default function UploadWorkspace() {
     const router = useRouter();
     const params = useParams();
@@ -1086,6 +1751,8 @@ export default function UploadWorkspace() {
     const [slots, setSlots] = useState<SlotState[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showCustomCamera, setShowCustomCamera] = useState(false);
+    const [adjustmentFile, setAdjustmentFile] = useState<File | null>(null);
+    const [adjustmentLabel, setAdjustmentLabel] = useState<string | null>(null);
     const [userId, setUserId] = useState<string | null>(null);
     const [namaMatkul, setNamaMatkul] = useState('');
     const [kodeMatkul, setKodeMatkul] = useState('');
@@ -2090,7 +2757,8 @@ export default function UploadWorkspace() {
                                                     e.preventDefault();
                                                     setDragOverLabel(null);
                                                     if (!locked && slot.status !== 'uploading' && e.dataTransfer.files?.[0]) {
-                                                        handleFileChange(slot.label, e.dataTransfer.files[0]);
+                                                        setAdjustmentFile(e.dataTransfer.files[0]);
+                                                        setAdjustmentLabel(slot.label);
                                                     }
                                                 }}
                                                 onClick={() => {
@@ -2892,8 +3560,8 @@ export default function UploadWorkspace() {
                     onCapture={(file) => {
                         setShowCustomCamera(false);
                         setInitialCameraFile(null);
-                        handleFileChange(activeUploadChoiceLabel, file);
-                        setActiveUploadChoiceLabel(null);
+                        setAdjustmentFile(file);
+                        setAdjustmentLabel(activeUploadChoiceLabel);
                     }}
                     onClose={() => {
                         setShowCustomCamera(false);
@@ -2908,6 +3576,22 @@ export default function UploadWorkspace() {
                         setTimeout(() => {
                             cameraInputRef.current?.click();
                         }, 100);
+                    }}
+                />
+            )}
+
+            {adjustmentFile && adjustmentLabel && (
+                <ImageAdjustmentModal
+                    label={adjustmentLabel}
+                    file={adjustmentFile}
+                    onConfirm={(adjustedFile) => {
+                        handleFileChange(adjustmentLabel, adjustedFile);
+                        setAdjustmentFile(null);
+                        setAdjustmentLabel(null);
+                    }}
+                    onClose={() => {
+                        setAdjustmentFile(null);
+                        setAdjustmentLabel(null);
                     }}
                 />
             )}

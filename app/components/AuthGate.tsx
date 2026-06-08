@@ -113,18 +113,20 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                 // 6. Role-based route guard
                 const isAdminRoute = currentPath.startsWith('/admin');
                 const isDosenRoute = currentPath.startsWith('/dosen');
+                const isSharedRoute = currentPath === '/profile' || currentPath.startsWith('/profile/') ||
+                                      currentPath === '/settings' || currentPath.startsWith('/settings/');
 
                 if (userRole === 'admin') {
-                    if (!isAdminRoute) {
-                        router.replace('/admin');
-                    } else {
+                    if (isAdminRoute || isSharedRoute) {
                         setLoading(false);
+                    } else {
+                        router.replace('/admin');
                     }
                 } else if (userRole === 'dosen') {
-                    if (!isDosenRoute) {
-                        router.replace('/dosen');
-                    } else {
+                    if (isDosenRoute || isSharedRoute) {
                         setLoading(false);
+                    } else {
+                        router.replace('/dosen');
                     }
                 } else {
                     // Mahasiswa

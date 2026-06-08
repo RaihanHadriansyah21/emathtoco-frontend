@@ -149,7 +149,11 @@ export default function ProfilePage() {
             </div>
 
             {/* HEADER NAVBAR */}
-            <Navbar showBack backUrl="/" title="Profil Mahasiswa" />
+            <Navbar 
+                showBack 
+                backUrl={role === 'admin' ? '/admin' : role === 'dosen' ? '/dosen' : '/'} 
+                title={role === 'admin' ? 'Profil Admin' : role === 'dosen' ? 'Profil Dosen' : 'Profil Mahasiswa'} 
+            />
 
             <main className="max-w-xl mx-auto px-4 py-12 relative z-10">
                 <div className="bg-white border border-slate-200 dark:bg-[#0A0A0F]/80 dark:border-neutral-800/80 backdrop-blur-md rounded-2xl p-8 shadow-sm dark:shadow-[0_0_50px_rgba(0,0,0,0.8)] relative overflow-hidden">
@@ -207,7 +211,9 @@ export default function ProfilePage() {
                         </div>
 
                         <div>
-                            <label className="block text-xs font-bold uppercase tracking-widest text-slate-600 dark:text-neutral-400 mb-2">Nomor Induk Mahasiswa (NIM)</label>
+                            <label className="block text-xs font-bold uppercase tracking-widest text-slate-600 dark:text-neutral-400 mb-2">
+                                {role === 'mahasiswa' ? 'Nomor Induk Mahasiswa (NIM)' : 'Nomor Induk Pegawai (NIP)'}
+                            </label>
                             <div className="relative">
                                 <input
                                     type="text"
@@ -225,7 +231,9 @@ export default function ProfilePage() {
                         </div>
 
                         <div>
-                            <label className="block text-xs font-bold uppercase tracking-widest text-slate-600 dark:text-neutral-400 mb-2">Kelas</label>
+                            <label className="block text-xs font-bold uppercase tracking-widest text-slate-600 dark:text-neutral-400 mb-2">
+                                {role === 'mahasiswa' ? 'Kelas' : role === 'dosen' ? 'Inisial / Kode Dosen' : 'Departemen / Bagian'}
+                            </label>
                             <div className="relative">
                                 <input
                                     type="text"

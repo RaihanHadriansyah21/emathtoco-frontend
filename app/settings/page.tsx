@@ -10,6 +10,7 @@ import { useTheme } from 'next-themes';
 export default function SettingsPage() {
     const router = useRouter();
     const [userEmail, setUserEmail] = useState('');
+    const [role, setRole] = useState('mahasiswa');
     const [isChecking, setIsChecking] = useState(true);
 
     const { theme, setTheme } = useTheme();
@@ -42,6 +43,16 @@ export default function SettingsPage() {
                     return;
                 }
                 setUserEmail(user.email || '');
+
+                const { data: profile } = await supabase
+                    .from('profil_pengguna')
+                    .select('role')
+                    .eq('id', user.id)
+                    .maybeSingle();
+                
+                if (profile?.role) {
+                    setRole(profile.role);
+                }
             } catch (err) {
                 console.error(err);
             } finally {
@@ -135,7 +146,11 @@ export default function SettingsPage() {
             </div>
 
             {/* HEADER NAVBAR */}
-            <Navbar showBack backUrl="/" title="Pengaturan" />
+            <Navbar 
+                showBack 
+                backUrl={role === 'admin' ? '/admin' : role === 'dosen' ? '/dosen' : '/'} 
+                title="Pengaturan" 
+            />
 
             <main className="max-w-xl mx-auto px-4 py-12 relative z-10 space-y-8">
                 {/* 1. SECTION: UBAH PASSWORD */}
