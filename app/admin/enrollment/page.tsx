@@ -48,6 +48,8 @@ export default function EnrollmentPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('');
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -166,6 +168,31 @@ export default function EnrollmentPage() {
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
   const paginated = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
+  // Ambil daftar ID mahasiswa yang sudah terdaftar pada mata kuliah yang dipilih
+  const enrolledStudentIds = enrollments
+    .filter(e => e.mata_kuliah_id === selectedCourse)
+    .map(e => e.mahasiswa_id);
+
+  // Saring mahasiswa yang belum terdaftar di mata kuliah tersebut
+  const availableStudents = students.filter(s => !enrolledStudentIds.includes(s.id));
+
+  // Saring mahasiswa berdasarkan query pencarian di modal
+  const filteredAvailableStudents = availableStudents.filter(s =>
+    s.nama_lengkap.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
+    s.nim_nip.toLowerCase().includes(studentSearchQuery.toLowerCase())
+  );
+
+  const getStudentDisplayValue = () => {
+    if (studentSearchQuery !== '') {
+      return studentSearchQuery;
+    }
+    if (selectedStudent) {
+      const s = students.find(x => x.id === selectedStudent);
+      return s ? `${s.nama_lengkap} (${s.nim_nip})` : '';
+    }
+    return '';
+  };
+
   if (isChecking) {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 text-cyan-500 dark:text-cyan-400 animate-spin" /></div>;
   }
@@ -180,7 +207,7 @@ export default function EnrollmentPage() {
           </h1>
           <p className="text-slate-500 dark:text-neutral-400 text-sm mt-1">Kelola pendaftaran mahasiswa ke mata kuliah.</p>
         </div>
-        <button onClick={() => { setShowAddModal(true); setFormError(''); }} className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold tracking-wider transition-all cursor-pointer shadow-lg shadow-emerald-500/10">
+        <button onClick={() => { setShowAddModal(true); setFormError(''); setSelectedCourse(''); setSelectedStudent(''); setStudentSearchQuery(''); }} className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold tracking-wider transition-all cursor-pointer shadow-lg shadow-emerald-500/10">
           <Plus className="w-4 h-4" /> Daftarkan Mahasiswa
         </button>
       </div>
@@ -261,18 +288,75 @@ export default function EnrollmentPage() {
             {formError && <p className="text-red-400 text-xs mb-4 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg">{formError}</p>}
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 mb-1.5">Mahasiswa</label>
-                <select value={selectedStudent} onChange={(e) => setSelectedStudent(e.target.value)} className="w-full bg-slate-50 dark:bg-black border border-slate-200 dark:border-neutral-800 rounded-xl py-2.5 px-4 text-sm text-slate-800 dark:text-white focus:outline-none focus:border-cyan-500/60 cursor-pointer">
-                  <option value="">Pilih mahasiswa...</option>
-                  {students.map(s => <option key={s.id} value={s.id}>{s.nama_lengkap} ({s.nim_nip})</option>)}
-                </select>
-              </div>
-              <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 mb-1.5">Mata Kuliah</label>
-                <select value={selectedCourse} onChange={(e) => setSelectedCourse(e.target.value)} className="w-full bg-slate-50 dark:bg-black border border-slate-200 dark:border-neutral-800 rounded-xl py-2.5 px-4 text-sm text-slate-800 dark:text-white focus:outline-none focus:border-cyan-500/60 cursor-pointer">
+                <select 
+                  value={selectedCourse} 
+                  onChange={(e) => { 
+                    setSelectedCourse(e.target.value); 
+                    setSelectedStudent(''); 
+                    setStudentSearchQuery(''); 
+                  }} 
+                  className="w-full bg-slate-50 dark:bg-black border border-slate-200 dark:border-neutral-800 rounded-xl py-2.5 px-4 text-sm text-slate-800 dark:text-white focus:outline-none focus:border-cyan-500/60 cursor-pointer"
+                >
                   <option value="">Pilih mata kuliah...</option>
                   {courses.map(c => <option key={c.id} value={c.id}>{c.nama_matkul} ({c.kode_matkul})</option>)}
                 </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 mb-1.5">Mahasiswa</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder={
+                      !selectedCourse
+                        ? "Pilih mata kuliah terlebih dahulu..."
+                        : "Ketik nama atau NIM mahasiswa..."
+                    }
+                    value={getStudentDisplayValue()}
+                    disabled={!selectedCourse}
+                    onChange={(e) => {
+                      setStudentSearchQuery(e.target.value);
+                      setIsStudentDropdownOpen(true);
+                      setSelectedStudent(''); // Reset selection when user types new query
+                    }}
+                    onFocus={() => {
+                      if (selectedCourse) {
+                        setIsStudentDropdownOpen(true);
+                      }
+                    }}
+                    onBlur={() => {
+                      // Jeda agar event click opsi dropdown terpicu sebelum list menutup
+                      setTimeout(() => {
+                        setIsStudentDropdownOpen(false);
+                        setStudentSearchQuery('');
+                      }, 200);
+                    }}
+                    className="w-full bg-slate-50 dark:bg-black border border-slate-200 dark:border-neutral-800 rounded-xl py-2.5 px-4 text-sm text-slate-800 dark:text-white focus:outline-none focus:border-cyan-500/60 disabled:opacity-50"
+                  />
+                  {isStudentDropdownOpen && selectedCourse && (
+                    <div className="absolute z-[110] left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white dark:bg-[#0D0D14] border border-slate-200 dark:border-neutral-800 rounded-xl shadow-2xl divide-y divide-slate-100 dark:divide-neutral-900/50">
+                      {filteredAvailableStudents.length === 0 ? (
+                        <div className="py-2.5 px-4 text-xs text-slate-400 dark:text-neutral-500">Tidak ada mahasiswa yang cocok/belum terdaftar.</div>
+                      ) : (
+                        filteredAvailableStudents.map(s => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedStudent(s.id);
+                              setStudentSearchQuery('');
+                              setIsStudentDropdownOpen(false);
+                            }}
+                            className="w-full text-left py-2.5 px-4 text-sm text-slate-700 dark:text-neutral-350 hover:bg-slate-100 dark:hover:bg-neutral-900 transition-colors flex flex-col cursor-pointer"
+                          >
+                            <span className="font-semibold text-slate-900 dark:text-white">{s.nama_lengkap}</span>
+                            <span className="text-xs text-slate-500 dark:text-neutral-500">NIM: {s.nim_nip} | Kelas: {s.kelas}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex items-center justify-end gap-3 mt-6">

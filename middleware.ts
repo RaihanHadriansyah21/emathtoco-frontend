@@ -58,6 +58,7 @@ export const config = {
     matcher: [
         '/',                   // Jaga Beranda
         '/login',              // Jaga halaman login
+        '/login/:path*',       // Jaga sub-halaman login
         '/complete-profile',   // Jaga onboarding
         '/profile',            // Jaga halaman profil
         '/settings',           // Jaga halaman pengaturan

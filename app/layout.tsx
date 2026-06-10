@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "E-MATHTOCO",
-  description: "Automated Assessment System",
+  description: "Essay Mathematics Auto Correction",
 };
 
 export default function RootLayout({

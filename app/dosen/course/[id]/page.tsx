@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Search, Loader2, ArrowLeft, ArrowRight, BookOpen, Clock, Calendar, CheckSquare, Cpu, Download, FileSpreadsheet, Lock, Zap, ChevronDown, CheckCircle, X } from 'lucide-react';
+import { Search, Loader2, ArrowLeft, ArrowRight, BookOpen, Clock, Calendar, CheckSquare, Cpu, Download, FileSpreadsheet, Lock, Zap, ChevronDown, CheckCircle, X, Users } from 'lucide-react';
 import Navbar from '../../../components/Navbar';
 import BatchAIModal from '../../../components/BatchAIModal';
 import ExportCSVModal from '../../../components/ExportCSVModal';
@@ -569,20 +569,29 @@ export default function LecturerCoursePortal() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10 w-full flex-grow">
         {/* Back navigation and Welcome message */}
-        <div className="mb-8 flex items-start gap-4">
-          <button
-            onClick={() => router.push('/dosen')}
-            className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 dark:bg-[#0A0A0F]/80 dark:border-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-950 dark:hover:text-white transition-all cursor-pointer shadow-sm flex items-center justify-center flex-shrink-0"
-            title="Kembali ke Dashboard"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Portal Penilaian AI</h1>
-            <p className="text-slate-500 dark:text-neutral-400 mt-1">
-              Mata Kuliah: <span className="text-cyan-600 dark:text-cyan-400 font-semibold">{courseName || 'Memuat...'}</span> {courseCode ? `(${courseCode})` : ''} • Halo Dosen <span className="text-cyan-600 dark:text-cyan-400 font-semibold">{lecturerName}</span>
-            </p>
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <button
+              onClick={() => router.push('/dosen')}
+              className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 dark:bg-[#0A0A0F]/80 dark:border-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-950 dark:hover:text-white transition-all cursor-pointer shadow-sm flex items-center justify-center flex-shrink-0"
+              title="Kembali ke Dashboard"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Portal Penilaian AI</h1>
+              <p className="text-slate-500 dark:text-neutral-400 mt-1">
+                Mata Kuliah: <span className="text-cyan-600 dark:text-cyan-400 font-semibold">{courseName || 'Memuat...'}</span> {courseCode ? `(${courseCode})` : ''} • Halo Dosen <span className="text-cyan-600 dark:text-cyan-400 font-semibold">{lecturerName}</span>
+              </p>
+            </div>
           </div>
+          <button
+            onClick={() => router.push(`/dosen/course/${courseId}/students`)}
+            className="flex items-center justify-center gap-2.5 bg-slate-50 border border-slate-200 dark:bg-neutral-950 dark:border-neutral-900 hover:border-cyan-500/40 hover:bg-slate-100 dark:hover:bg-neutral-900/60 text-slate-700 dark:text-neutral-350 px-4 py-3 rounded-xl text-xs font-bold tracking-wider transition-all duration-200 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99] w-full sm:w-auto self-start sm:self-center"
+          >
+            <Users className="w-4 h-4 text-cyan-500" />
+            <span>MAHASISWA TERDAFTAR</span>
+          </button>
         </div>
 
         {/* SUMMARY CARDS */}

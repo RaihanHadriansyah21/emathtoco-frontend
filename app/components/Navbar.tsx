@@ -15,6 +15,9 @@ interface NavbarProps {
   title?: string;
   subtitle?: string;
   onMenuClick?: () => void;
+  isAdminLayout?: boolean;
+  sidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 const getDisplayName = (fullName: string) => {
@@ -37,11 +40,22 @@ const getInitials = (displayName: string) => {
   return displayName.charAt(0).toUpperCase();
 };
 
-export default function Navbar({ showBack = false, backUrl = '/', title, subtitle, onMenuClick }: NavbarProps) {
+export default function Navbar({ 
+  showBack = false, 
+  backUrl = '/', 
+  title, 
+  subtitle, 
+  onMenuClick,
+  isAdminLayout = false,
+  sidebarCollapsed = false,
+  onToggleSidebar,
+}: NavbarProps) {
   const router = useRouter();
   const [userEmail, setUserEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState('mahasiswa');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   
@@ -49,6 +63,20 @@ export default function Navbar({ showBack = false, backUrl = '/', title, subtitl
   
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const handleAvatarUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail !== undefined) {
+        setAvatarUrl(customEvent.detail);
+        setImageError(false);
+      }
+    };
+    window.addEventListener('avatar-update', handleAvatarUpdate);
+    return () => {
+      window.removeEventListener('avatar-update', handleAvatarUpdate);
+    };
+  }, []);
 
   useEffect(() => {
     const getNavbarData = async () => {
@@ -59,7 +87,7 @@ export default function Navbar({ showBack = false, backUrl = '/', title, subtitl
 
           const { data: profile } = await supabase
             .from('profil_pengguna')
-            .select('nama_lengkap, role')
+            .select('nama_lengkap, role, foto_profil_url')
             .eq('id', user.id)
             .maybeSingle();
 
@@ -68,6 +96,10 @@ export default function Navbar({ showBack = false, backUrl = '/', title, subtitl
           }
           if (profile?.role) {
             setRole(profile.role);
+          }
+          if (profile?.foto_profil_url) {
+            setAvatarUrl(profile.foto_profil_url);
+            setImageError(false);
           }
         }
       } catch (err) {
@@ -106,50 +138,108 @@ export default function Navbar({ showBack = false, backUrl = '/', title, subtitl
   };
 
   return (
-    <header className="border-b border-slate-200 dark:border-neutral-900 bg-white/75 dark:bg-[#0A0A0F]/65 backdrop-blur-md sticky top-0 z-50 w-full px-4 sm:px-6 lg:px-10 flex-shrink-0 pt-[env(safe-area-inset-top)]">
+    <header className={`border-b border-slate-200 dark:border-neutral-900 bg-white/75 dark:bg-[#0A0A0F]/65 backdrop-blur-md sticky top-0 z-50 w-full flex-shrink-0 pt-[env(safe-area-inset-top)] ${
+      isAdminLayout 
+        ? 'pr-4 sm:pr-6 lg:pr-10' 
+        : 'px-4 sm:px-6 lg:px-10'
+    }`}>
       <div className="h-16 flex items-center justify-between">
-        {/* Left section: Back button + Logo + Page context */}
-        <div className="flex items-center gap-3 md:gap-4 overflow-hidden mr-4">
-          {onMenuClick && (
-            <button
-              onClick={onMenuClick}
-              className="p-2 hover:bg-slate-100 dark:hover:bg-neutral-950 border border-transparent hover:border-slate-200 dark:hover:border-neutral-900 rounded-xl text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white transition-all cursor-pointer flex-shrink-0 md:hidden"
-              title="Open menu"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-          )}
-
-          {showBack && (
-            <button
-              onClick={() => router.push(backUrl)}
-              className="p-2 hover:bg-slate-100 dark:hover:bg-neutral-950 border border-transparent hover:border-slate-200 dark:hover:border-neutral-900 rounded-xl text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white transition-all cursor-pointer flex-shrink-0"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-          )}
-
-          {/* Logo */}
-          <div
-            onClick={() => router.push('/')}
-            className="flex items-center gap-2.5 cursor-pointer select-none flex-shrink-0"
-          >
-            <div className="bg-white border border-slate-200 rounded-lg p-1.5 shadow-sm flex items-center justify-center flex-shrink-0">
-              <Image
-                src={Logo}
-                alt="Logo E-MATHTOCO"
-                className="h-6 w-auto object-contain"
-                priority
-              />
+        {/* Left section: Sidebar Area + Page context */}
+        <div className="flex items-center overflow-hidden mr-4">
+          {isAdminLayout ? (
+            /* Admin Header Sidebar Container - width matches sidebar exactly, includes border-r */
+            <div className={`flex items-center transition-all duration-300 border-r border-slate-200 dark:border-neutral-900 h-16 mr-4 ${
+              sidebarCollapsed ? 'w-[80px] justify-center px-0' : 'w-[270px] justify-between px-5'
+            }`}>
+              {sidebarCollapsed ? (
+                /* Collapsed: Centered Logo with Morphing Toggle Button on Hover */
+                <div className="relative w-10 h-10 flex items-center justify-center group cursor-pointer" onClick={onToggleSidebar}>
+                  <div className="bg-white border border-slate-200 dark:border-neutral-750/60 rounded-xl p-1.5 shadow-sm dark:shadow-[0_0_12px_rgba(6,182,212,0.08)] flex items-center justify-center transition-all duration-200 scale-100 opacity-100 group-hover:scale-0 group-hover:opacity-0 hover:scale-105">
+                    <Image
+                      src={Logo}
+                      alt="Logo E-MATHTOCO"
+                      className="h-6 w-auto object-contain"
+                      priority
+                    />
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white transition-all duration-200 scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100">
+                    <Menu className="w-5 h-5" />
+                  </div>
+                </div>
+              ) : (
+                /* Expanded: Logo + Brand Title + Collapse Button aligned inside the container */
+                <div className="flex items-center justify-between w-full">
+                  <div
+                    onClick={() => router.push('/')}
+                    className="flex items-center gap-2.5 cursor-pointer select-none"
+                  >
+                    <div className="bg-white border border-slate-200 dark:border-neutral-750/60 rounded-xl p-1.5 shadow-sm dark:shadow-[0_0_12px_rgba(6,182,212,0.08)] flex items-center justify-center flex-shrink-0 transition-transform duration-300 hover:scale-105">
+                      <Image
+                        src={Logo}
+                        alt="Logo E-MATHTOCO"
+                        className="h-6 w-auto object-contain"
+                        priority
+                      />
+                    </div>
+                    <span className="text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-slate-950 dark:from-white dark:to-neutral-300 drop-shadow-[0_0_8px_rgba(0,0,0,0.05)] dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.1)] whitespace-nowrap">
+                      E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-black drop-shadow-[0_0_12px_rgba(6,182,212,0.3)]">TOCO</span>
+                    </span>
+                  </div>
+                  <button
+                    onClick={onToggleSidebar}
+                    className="p-2 hover:bg-slate-100 dark:hover:bg-neutral-950 border border-transparent hover:border-slate-200 dark:hover:border-neutral-900 rounded-xl text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white transition-all cursor-pointer"
+                    title="Collapse sidebar"
+                  >
+                    <Menu className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
             </div>
-            <span className={`text-xl font-bold tracking-wider text-slate-900 dark:text-white ${title ? 'hidden md:inline-block' : ''}`}>
-              E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-extrabold">TOCO</span>
-            </span>
-          </div>
+          ) : (
+            /* Original Left Section (Mahasiswa/Dosen/Unauthenticated Layouts) */
+            <div className="flex items-center gap-3 md:gap-4 overflow-hidden mr-4">
+              {onMenuClick && (
+                <button
+                  onClick={onMenuClick}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-neutral-950 border border-transparent hover:border-slate-200 dark:hover:border-neutral-900 rounded-xl text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white transition-all cursor-pointer flex-shrink-0 md:hidden"
+                  title="Open menu"
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
+              )}
+
+              {showBack && (
+                <button
+                  onClick={() => router.push(backUrl)}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-neutral-950 border border-transparent hover:border-slate-200 dark:hover:border-neutral-900 rounded-xl text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white transition-all cursor-pointer flex-shrink-0"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+              )}
+
+              {/* Logo */}
+              <div
+                onClick={() => router.push('/')}
+                className="flex items-center gap-2.5 cursor-pointer select-none flex-shrink-0"
+              >
+                <div className="bg-white border border-slate-200 rounded-lg p-1.5 shadow-sm flex items-center justify-center flex-shrink-0">
+                  <Image
+                    src={Logo}
+                    alt="Logo E-MATHTOCO"
+                    className="h-6 w-auto object-contain"
+                    priority
+                  />
+                </div>
+                <span className={`text-xl font-bold tracking-wider text-slate-900 dark:text-white ${title ? 'hidden md:inline-block' : ''}`}>
+                  E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-extrabold">TOCO</span>
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Page Title Context */}
           {title && (
-            <>
+            <div className="flex items-center gap-3">
               <div className="h-5 w-[1px] bg-slate-200 dark:bg-neutral-800 flex-shrink-0" />
               <div className="min-w-0">
                 <h1 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider truncate">
@@ -161,7 +251,7 @@ export default function Navbar({ showBack = false, backUrl = '/', title, subtitl
                   </p>
                 )}
               </div>
-            </>
+            </div>
           )}
         </div>
 
@@ -186,9 +276,18 @@ export default function Navbar({ showBack = false, backUrl = '/', title, subtitl
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 hover:border-slate-300 dark:bg-black/40 dark:border-neutral-800 dark:hover:border-cyan-500/40 transition-all duration-300 cursor-pointer select-none"
             >
               {/* Avatar circular */}
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 flex items-center justify-center text-white text-sm font-bold shadow-inner uppercase">
-                {getInitials(getDisplayName(fullName))}
-              </div>
+              {avatarUrl && !imageError ? (
+                <img
+                  src={avatarUrl}
+                  alt={fullName}
+                  onError={() => setImageError(true)}
+                  className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-neutral-800"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 flex items-center justify-center text-white text-sm font-bold shadow-inner uppercase">
+                  {getInitials(getDisplayName(fullName))}
+                </div>
+              )}
               <span className="text-sm font-medium text-slate-700 dark:text-neutral-200 hidden sm:inline-block max-w-[120px] truncate">
                 {getDisplayName(fullName)}
               </span>

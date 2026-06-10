@@ -33,7 +33,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                 }
 
                 const isPublicRoute = 
-                    currentPath === '/login' || 
+                    currentPath.startsWith('/login') || 
                     currentPath === '/register' || 
                     currentPath === '/forgot-password' || 
                     currentPath === '/reset-password';

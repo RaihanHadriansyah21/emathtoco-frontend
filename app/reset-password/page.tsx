@@ -146,8 +146,9 @@ export default function ResetPasswordPage() {
             return;
         }
 
-        if (newPassword.length < 8) {
-            setErrorMessage('Password baru minimal harus 8 karakter!');
+        const alnumRegex = /^(?=.*[a-zA-Z])(?=.*\d).{6,}$/;
+        if (!alnumRegex.test(newPassword)) {
+            setErrorMessage('Password baru harus minimal 6 karakter dan mengandung kombinasi huruf dan angka (alfanumerik)!');
             return;
         }
 
@@ -246,7 +247,7 @@ export default function ResetPasswordPage() {
                         {hasSession && !successMessage && (
                             <form onSubmit={handleResetSubmit} className="space-y-5">
                                 <div>
-                                    <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Password Baru (min. 8 karakter)</label>
+                                    <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Password Baru (min. 6 karakter alfanumerik)</label>
                                     <div className="relative">
                                         <input
                                             type={showPassword ? "text" : "password"}

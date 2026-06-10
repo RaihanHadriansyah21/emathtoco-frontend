@@ -26,8 +26,9 @@ export default function RegisterPage() {
             return;
         }
 
-        if (password.length < 6) {
-            setErrorMessage('Password minimal harus 6 karakter.');
+        const alnumRegex = /^(?=.*[a-zA-Z])(?=.*\d).{6,}$/;
+        if (!alnumRegex.test(password)) {
+            setErrorMessage('Password harus minimal 6 karakter dan mengandung kombinasi huruf dan angka (alfanumerik).');
             return;
         }
 
@@ -112,7 +113,7 @@ export default function RegisterPage() {
                         <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Password Baru</label>
                         <input
                             type="password"
-                            placeholder="Minimal 6 Karakter"
+                            placeholder="Min. 6 Karakter Alfanumerik"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             className="w-full bg-black border border-neutral-800 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/20 transition-all text-sm placeholder:text-neutral-600"

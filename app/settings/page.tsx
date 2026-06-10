@@ -9,6 +9,7 @@ import { useTheme } from 'next-themes';
 
 export default function SettingsPage() {
     const router = useRouter();
+    const [userId, setUserId] = useState<string | null>(null);
     const [userEmail, setUserEmail] = useState('');
     const [role, setRole] = useState('mahasiswa');
     const [isChecking, setIsChecking] = useState(true);
@@ -42,6 +43,7 @@ export default function SettingsPage() {
                     window.location.href = '/login';
                     return;
                 }
+                setUserId(user.id);
                 setUserEmail(user.email || '');
 
                 const { data: profile } = await supabase
@@ -73,8 +75,9 @@ export default function SettingsPage() {
             return;
         }
 
-        if (newPassword.length < 6) {
-            setErrorMessage('Kata sandi baru minimal harus 6 karakter.');
+        const alnumRegex = /^(?=.*[a-zA-Z])(?=.*\d).{6,}$/;
+        if (!alnumRegex.test(newPassword)) {
+            setErrorMessage('Kata sandi baru harus minimal 6 karakter dan mengandung kombinasi huruf dan angka (alfanumerik).');
             return;
         }
 
@@ -153,6 +156,7 @@ export default function SettingsPage() {
             />
 
             <main className="max-w-xl mx-auto px-4 py-12 relative z-10 space-y-8">
+
                 {/* 1. SECTION: UBAH PASSWORD */}
                 <div className="bg-white border border-slate-200 dark:bg-[#0A0A0F]/80 dark:border-neutral-800/80 backdrop-blur-md rounded-2xl p-8 shadow-sm dark:shadow-[0_0_50px_rgba(0,0,0,0.8)]">
                     <div className="flex items-center gap-3 border-b border-slate-100 dark:border-neutral-900 pb-4 mb-6">
@@ -303,7 +307,7 @@ export default function SettingsPage() {
                             <span className="font-mono text-slate-900 dark:text-white text-xs">v1.0.0</span>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-neutral-500 leading-relaxed border-t border-slate-100 dark:border-neutral-900 pt-4">
-                            E-MATHTOCO adalah platform penilaian terotomatisasi (*Automated Assessment System*) yang dikembangkan untuk mendukung pengumpulan & evaluasi digital lembar jawaban tugas kuliah mahasiswa secara dinamis, cepat, dan aman.
+                            E-MATHTOCO (Essay Mathematics Auto Correction) adalah platform penilaian terotomatisasi yang dikembangkan untuk mendukung pengumpulan & evaluasi digital lembar jawaban tugas kuliah mahasiswa secara dinamis, cepat, dan aman.
                         </p>
                     </div>
                 </div>
