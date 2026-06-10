@@ -147,6 +147,14 @@ export default function UserManagementPage() {
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setIsDeleting(true);
+
+    console.log("Delete User Payload", {
+      userId: deleteTarget.id,
+      userName: deleteTarget.name,
+      profileId: deleteTarget.id,
+      authUserId: deleteTarget.id
+    });
+
     try {
       console.log(`[Delete User Request] Target User ID: ${deleteTarget.id}`);
 
@@ -172,10 +180,17 @@ export default function UserManagementPage() {
         },
       });
 
+      console.log("Delete User API Response", {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+
       const result = await response.json();
 
       if (!response.ok) {
         console.error('[Delete User API Error]', result);
+        console.log("Delete User Supabase Error", result);
         throw new Error(result.detail || 'Gagal menghapus pengguna dari server.');
       }
 
@@ -185,6 +200,7 @@ export default function UserManagementPage() {
       setDeleteTarget(null);
     } catch (err: any) {
       console.error('[Delete User Error] Exception occurred:', err);
+      console.log("Delete User Supabase Error", err);
       toast.error('Gagal Menghapus', err.message || 'Terjadi kesalahan saat menghapus pengguna.');
     } finally {
       setIsDeleting(false);

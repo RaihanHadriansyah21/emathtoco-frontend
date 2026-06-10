@@ -25,7 +25,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         const checkAuth = async () => {
             try {
                 const currentPath = pathnameRef.current;
-                const isPublicRoute = currentPath === '/login' || currentPath === '/register';
+                const isPublicRoute = 
+                    currentPath === '/login' || 
+                    currentPath === '/register' || 
+                    currentPath === '/forgot-password' || 
+                    currentPath === '/reset-password';
 
                 // 1. Get current session
                 const { data: { session } } = await supabase.auth.getSession();

@@ -239,7 +239,12 @@ export default function LoginPage() {
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Password</label>
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400">Password</label>
+                            <Link href="/forgot-password" className="text-xs font-bold text-cyan-400 hover:text-cyan-300 hover:underline transition-all">
+                                Lupa Password?
+                            </Link>
+                        </div>
                         <div className="relative">
                             <input
                                 type={showPassword ? "text" : "password"}

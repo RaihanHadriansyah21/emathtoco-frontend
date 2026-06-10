@@ -21,7 +21,9 @@ function isTokenExpired(token: string): boolean {
 export function middleware(request: NextRequest) {
     // Ambil data cookie tanda login aktif dari browser
     let token = request.cookies.get('sb-access-token')?.value;
-    const isLoginPage = request.nextUrl.pathname.startsWith('/login');
+    const pathname = request.nextUrl.pathname;
+    const isLoginPage = pathname.startsWith('/login');
+    const isPublicPage = isLoginPage || pathname.startsWith('/forgot-password') || pathname.startsWith('/reset-password');
 
     // Jika token terdeteksi kedaluwarsa secara mandiri di server, kosongkan status token
     if (token && isTokenExpired(token)) {
@@ -29,7 +31,7 @@ export function middleware(request: NextRequest) {
     }
 
     // KONDISI 1: Pengguna mencoba masuk Beranda tapi BELUM LOGIN -> Tendang ke halaman login
-    if (!token && !isLoginPage) {
+    if (!token && !isPublicPage) {
         const response = NextResponse.redirect(new URL('/login', request.url));
         if (request.cookies.has('sb-access-token')) {
             response.cookies.delete('sb-access-token');
@@ -41,8 +43,8 @@ export function middleware(request: NextRequest) {
     // Meskipun token ada, kita tidak bisa menjamin token valid di backend (misal: user dihapus).
     // Client-side supabase.auth.getUser() di /login yang akan melakukan redirect ke '/' jika benar-benar valid.
 
-    // Jika token kedaluwarsa dan berada di halaman login, pastikan cookie dibersihkan dari browser
-    if (!token && isLoginPage && request.cookies.has('sb-access-token')) {
+    // Jika token kedaluwarsa dan berada di halaman publik, pastikan cookie dibersihkan dari browser
+    if (!token && isPublicPage && request.cookies.has('sb-access-token')) {
         const response = NextResponse.next();
         response.cookies.delete('sb-access-token');
         return response;
