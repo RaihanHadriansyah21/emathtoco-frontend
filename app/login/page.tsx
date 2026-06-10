@@ -209,13 +209,13 @@ export default function LoginPage() {
                     <div className="mx-auto w-fit bg-white border border-slate-200 rounded-xl p-4 shadow-sm mb-4 flex items-center justify-center">
                         <Image
                             src={Logo}
-                            alt="Logo Emathtoco"
+                            alt="Logo E-MATHTOCO"
                             className="h-10 w-auto object-contain"
                             priority
                         />
                     </div>
                     <h1 className="text-3xl font-extrabold tracking-wider text-white">
-                        E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-500 bg-clip-text text-transparent font-extrabold">TOCO</span>
+                        E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-extrabold">TOCO</span>
                     </h1>
                     <p className="text-neutral-400 text-xs uppercase tracking-widest mt-2">Automated Assessment System</p>
                 </div>

@@ -460,7 +460,7 @@ export default function AuditLogPage() {
             Enterprise Audit Log
           </h1>
           <p className="text-slate-500 dark:text-neutral-400 text-sm mt-1">
-            Observability, audit trail, dan bukti rekam jejak aktivitas sistem EMATHTOCO.
+            Observability, audit trail, dan bukti rekam jejak aktivitas sistem E-MATHTOCO.
           </p>
         </div>
         <button

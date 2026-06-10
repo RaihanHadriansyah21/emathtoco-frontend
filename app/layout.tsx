@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Emathtoco",
+  title: "E-MATHTOCO",
   description: "Automated Assessment System",
 };
 

@@ -79,9 +79,9 @@ export default function RegisterPage() {
 
                 <div className="text-center mb-8">
                     <h1 className="text-3xl font-extrabold tracking-wider text-white">
-                        Pendaftaran <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-500 bg-clip-text text-transparent font-extrabold">Akun</span>
+                        Pendaftaran <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-extrabold">Akun</span>
                     </h1>
-                    <p className="text-neutral-400 text-xs uppercase tracking-widest mt-2">Buat akun baru untuk mengakses EMATHTOCO</p>
+                    <p className="text-neutral-400 text-xs uppercase tracking-widest mt-2">Buat akun baru untuk mengakses E-MATHTOCO</p>
                 </div>
 
                 {/* Peringatan Error & Sukses */}

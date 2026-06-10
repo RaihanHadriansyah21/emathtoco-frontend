@@ -163,7 +163,7 @@ export default function AdminDashboard() {
           <div>
             <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Admin Dashboard</h1>
             <p className="text-slate-500 dark:text-neutral-400 text-sm">
-              Selamat datang, <span className="text-cyan-600 dark:text-cyan-400 font-semibold">{adminName}</span>. Kelola sistem EMATHTOCO dari sini.
+              Selamat datang, <span className="text-cyan-600 dark:text-cyan-400 font-semibold">{adminName}</span>. Kelola sistem E-MATHTOCO dari sini.
             </p>
           </div>
         </div>

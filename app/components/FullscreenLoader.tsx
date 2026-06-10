@@ -30,7 +30,7 @@ export default function FullscreenLoader() {
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-500/10 dark:via-cyan-500/20 to-transparent -translate-x-full animate-[shimmer_2.5s_infinite] pointer-events-none rounded-2xl" />
                     <Image
                         src={Logo}
-                        alt="Logo Emathtoco"
+                        alt="Logo E-MATHTOCO"
                         className="h-16 w-auto object-contain"
                         priority
                     />
@@ -39,7 +39,7 @@ export default function FullscreenLoader() {
                 {/* Text Logo */}
                 <div className="space-y-2 mt-2">
                     <h1 className="text-3xl font-extrabold tracking-widest text-slate-800 dark:text-white">
-                        E-MATH<span className="bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 dark:from-cyan-400 dark:via-blue-400 dark:to-indigo-500 bg-clip-text text-transparent font-extrabold">TOCO</span>
+                        E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-extrabold">TOCO</span>
                     </h1>
                     <p className="text-slate-500 dark:text-neutral-400 text-xs font-bold uppercase tracking-[0.3em] animate-pulse">
                         Memuat Sistem...

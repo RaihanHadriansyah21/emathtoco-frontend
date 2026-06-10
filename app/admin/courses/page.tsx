@@ -149,7 +149,7 @@ export default function CourseManagementPage() {
             <BookOpen className="w-6 h-6 text-indigo-500 dark:text-indigo-400" />
             Manajemen Mata Kuliah
           </h1>
-          <p className="text-slate-500 dark:text-neutral-400 text-sm mt-1">Tambah, edit, dan hapus mata kuliah EMATHTOCO.</p>
+          <p className="text-slate-500 dark:text-neutral-400 text-sm mt-1">Tambah, edit, dan hapus mata kuliah E-MATHTOCO.</p>
         </div>
         <button
           onClick={openAddForm}

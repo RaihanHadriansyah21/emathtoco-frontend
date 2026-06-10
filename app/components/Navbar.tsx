@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { GraduationCap, ArrowLeft, ChevronDown, User, Settings, LogOut, Sun, Moon, Menu } from 'lucide-react';
+import { ArrowLeft, ChevronDown, User, Settings, LogOut, Sun, Moon, Menu } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import { useTheme } from 'next-themes';
+import Image from 'next/image';
+import Logo from '../Emathtoco.png';
 
 interface NavbarProps {
   showBack?: boolean;
@@ -130,11 +132,18 @@ export default function Navbar({ showBack = false, backUrl = '/', title, subtitl
           {/* Logo */}
           <div
             onClick={() => router.push('/')}
-            className="flex items-center gap-2 cursor-pointer select-none flex-shrink-0"
+            className="flex items-center gap-2.5 cursor-pointer select-none flex-shrink-0"
           >
-            <GraduationCap className="w-6 h-6 text-cyan-500 dark:text-cyan-400" />
+            <div className="bg-white border border-slate-200 rounded-lg p-1.5 shadow-sm flex items-center justify-center flex-shrink-0">
+              <Image
+                src={Logo}
+                alt="Logo E-MATHTOCO"
+                className="h-6 w-auto object-contain"
+                priority
+              />
+            </div>
             <span className={`text-xl font-bold tracking-wider text-slate-900 dark:text-white ${title ? 'hidden md:inline-block' : ''}`}>
-              EMATHTO<span className="bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 dark:from-cyan-400 dark:via-blue-400 dark:to-indigo-500 bg-clip-text text-transparent font-extrabold">CO</span>
+              E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-extrabold">TOCO</span>
             </span>
           </div>
 

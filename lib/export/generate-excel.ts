@@ -211,7 +211,7 @@ export async function generateExportExcel(filters: ExportFilters): Promise<{
   // 3. Populate Header / Title Section (Rows 1-2)
   sheet.mergeCells('A1:AE1');
   const titleRow1 = sheet.getCell('A1');
-  titleRow1.value = 'EMATHTOCO';
+  titleRow1.value = 'E-MATHTOCO';
   titleRow1.font = { name: 'Segoe UI', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
   titleRow1.alignment = { horizontal: 'center', vertical: 'middle' };
   titleRow1.fill = {
@@ -463,7 +463,7 @@ export async function generateExportExcel(filters: ExportFilters): Promise<{
     .replace(/\s+/g, '_')
     .replace(/[^a-zA-Z0-9_]/g, '');
 
-  const filename = `emathtoco_rekap_${sanitizedMatkul}_kelas${sanitizedKelas}_${exportDateFilename}.xlsx`;
+  const filename = `e-mathtoco_rekap_${sanitizedMatkul}_kelas${sanitizedKelas}_${exportDateFilename}.xlsx`;
 
   // 10. Write workbook buffer
   const buffer = await workbook.xlsx.writeBuffer();

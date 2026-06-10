@@ -111,7 +111,7 @@ export default function SystemSettingsPage() {
   const currentTheme = mounted ? (theme === 'system' ? resolvedTheme : theme) : 'dark';
 
   const infoItems = [
-    { label: 'Nama Aplikasi', value: 'EMATHTOCO', icon: Globe, iconColor: 'text-cyan-500 dark:text-cyan-400' },
+    { label: 'Nama Aplikasi', value: 'E-MATHTOCO', icon: Globe, iconColor: 'text-cyan-500 dark:text-cyan-400' },
     { label: 'Versi', value: '0.1.0', icon: Server, iconColor: 'text-indigo-500 dark:text-indigo-400' },
     { label: 'Framework', value: 'Next.js 16.2.6 + React 19', icon: Server, iconColor: 'text-purple-500 dark:text-purple-400' },
     { label: 'Database', value: 'Supabase (PostgreSQL)', icon: Database, iconColor: 'text-emerald-500 dark:text-emerald-400' },
@@ -125,7 +125,7 @@ export default function SystemSettingsPage() {
           <Settings className="w-6 h-6 text-slate-500 dark:text-neutral-400" />
           System Settings
         </h1>
-        <p className="text-slate-500 dark:text-neutral-400 text-sm mt-1">Informasi sistem dan konfigurasi aplikasi EMATHTOCO.</p>
+        <p className="text-slate-500 dark:text-neutral-400 text-sm mt-1">Informasi sistem dan konfigurasi aplikasi E-MATHTOCO.</p>
       </div>
 
       {/* Connection Status */}

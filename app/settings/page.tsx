@@ -296,14 +296,14 @@ export default function SettingsPage() {
                     <div className="space-y-4 text-sm text-slate-600 dark:text-neutral-400">
                         <div className="flex justify-between">
                             <span className="font-medium text-slate-600 dark:text-neutral-300">Nama Aplikasi</span>
-                            <span className="font-semibold text-slate-900 dark:text-white">EMATHTOCO</span>
+                            <span className="font-semibold text-slate-900 dark:text-white">E-MATHTOCO</span>
                         </div>
                         <div className="flex justify-between">
                             <span className="font-medium text-slate-600 dark:text-neutral-300">Versi Sistem</span>
                             <span className="font-mono text-slate-900 dark:text-white text-xs">v1.0.0</span>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-neutral-500 leading-relaxed border-t border-slate-100 dark:border-neutral-900 pt-4">
-                            EMATHTOCO adalah platform penilaian terotomatisasi (*Automated Assessment System*) yang dikembangkan untuk mendukung pengumpulan & evaluasi digital lembar jawaban tugas kuliah mahasiswa secara dinamis, cepat, dan aman.
+                            E-MATHTOCO adalah platform penilaian terotomatisasi (*Automated Assessment System*) yang dikembangkan untuk mendukung pengumpulan & evaluasi digital lembar jawaban tugas kuliah mahasiswa secara dinamis, cepat, dan aman.
                         </p>
                     </div>
                 </div>

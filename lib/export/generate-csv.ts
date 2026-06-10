@@ -192,7 +192,7 @@ export async function generateExportCSV(filters: ExportFilters): Promise<{
   const lines: string[] = [];
 
   // Header metadata block
-  lines.push('EMATHTOCO');
+  lines.push('E-MATHTOCO');
   lines.push(`REKAP NILAI KELAS ${mataKuliahName} (${mataKuliahCode})`);
   lines.push('');
   lines.push(`Tanggal Export,${escapeCSV(exportDate)}`);
@@ -258,7 +258,7 @@ export async function generateExportCSV(filters: ExportFilters): Promise<{
   const sanitizedKelas = (filters.kelas || 'semua')
     .replace(/\s+/g, '_')
     .replace(/[^a-zA-Z0-9_]/g, '');
-  const filename = `emathtoco_rekap_${sanitizedMatkul}_${sanitizedKelas}_${exportDateFilename}.csv`;
+  const filename = `e-mathtoco_rekap_${sanitizedMatkul}_${sanitizedKelas}_${exportDateFilename}.csv`;
 
   return {
     csv,

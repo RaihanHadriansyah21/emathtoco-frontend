@@ -224,7 +224,7 @@ export default function UserManagementPage() {
           <Users className="w-6 h-6 text-cyan-500 dark:text-cyan-400" />
           Manajemen Pengguna
         </h1>
-        <p className="text-slate-500 dark:text-neutral-400 text-sm mt-1">Kelola semua pengguna EMATHTOCO — Mahasiswa, Dosen, dan Admin.</p>
+        <p className="text-slate-500 dark:text-neutral-400 text-sm mt-1">Kelola semua pengguna E-MATHTOCO — Mahasiswa, Dosen, dan Admin.</p>
       </div>
 
       {/* Filters */}

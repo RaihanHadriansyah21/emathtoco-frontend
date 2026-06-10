@@ -130,7 +130,7 @@ export default function MonitoringPage() {
           <Activity className="w-6 h-6 text-cyan-500 dark:text-cyan-400" />
           Monitoring Sistem
         </h1>
-        <p className="text-slate-500 dark:text-neutral-400 text-sm mt-1">Statistik pipeline, storage, dan aktivitas sistem EMATHTOCO.</p>
+        <p className="text-slate-500 dark:text-neutral-400 text-sm mt-1">Statistik pipeline, storage, dan aktivitas sistem E-MATHTOCO.</p>
       </div>
 
       {isLoading ? (
