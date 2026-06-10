@@ -25,6 +25,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         const checkAuth = async () => {
             try {
                 const currentPath = pathnameRef.current;
+                
+                // Bypass auth gate controls entirely for reset-password page to prevent race conditions and redirects
+                if (currentPath === '/reset-password') {
+                    setLoading(false);
+                    return;
+                }
+
                 const isPublicRoute = 
                     currentPath === '/login' || 
                     currentPath === '/register' || 
@@ -151,8 +158,23 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
         // Listen for authentication changes (e.g. login, logout, password recovery)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log(`[AUTH GATE] Event: ${event}`);
+            console.log("AUTH EVENT:", event);
+            console.log("SESSION:", session);
+            if (typeof window !== 'undefined') {
+                console.log("CURRENT PATH:", window.location.pathname);
+                console.log("RECOVERY URL:", window.location.href);
+            }
             
+            if (event === 'PASSWORD_RECOVERY') {
+                console.log("[AUTH GATE] PASSWORD_RECOVERY event triggered. Redirecting to /reset-password...");
+                if (session) {
+                    document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${session.expires_in}; SameSite=Lax`;
+                }
+                setLoading(false);
+                router.replace('/reset-password');
+                return;
+            }
+
             if (event === 'SIGNED_OUT') {
                 document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
                 setLoading(true);

@@ -8,6 +8,27 @@ import { supabase } from '@/lib/supabase';
 import Logo from '../Emathtoco.png';
 import { Lock, Eye, EyeOff, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 
+const getErrorFromURL = () => {
+    if (typeof window === 'undefined') return null;
+    const hash = window.location.hash;
+    const search = window.location.search;
+    
+    const hashParams = new URLSearchParams(hash.substring(1));
+    const searchParams = new URLSearchParams(search);
+    
+    const errorDesc = hashParams.get('error_description') || searchParams.get('error_description');
+    if (errorDesc) {
+        return decodeURIComponent(errorDesc.replace(/\+/g, ' '));
+    }
+    
+    const errorMsg = hashParams.get('error') || searchParams.get('error');
+    if (errorMsg) {
+        return `Kesalahan Pemulihan: ${decodeURIComponent(errorMsg.replace(/\+/g, ' '))}`;
+    }
+    
+    return null;
+};
+
 export default function ResetPasswordPage() {
     const router = useRouter();
     const [newPassword, setNewPassword] = useState('');
@@ -22,25 +43,97 @@ export default function ResetPasswordPage() {
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     useEffect(() => {
+        let isSubscribed = true;
+
         const verifyRecoverySession = async () => {
             try {
-                // Wait a brief moment for Supabase client to parse the URL parameters and establish the session
-                await new Promise((resolve) => setTimeout(resolve, 800));
+                // Debug log
+                console.log("RECOVERY URL:", window.location.href);
+                console.log("CURRENT PATH:", window.location.pathname);
 
+                // Check for errors in the URL redirect first (e.g. invalid/expired recovery links)
+                const urlError = getErrorFromURL();
+                if (urlError) {
+                    console.log("Detected error in recovery URL params:", urlError);
+                    if (isSubscribed) {
+                        setErrorMessage(urlError);
+                        setIsChecking(false);
+                    }
+                    return;
+                }
+
+                // 1. Initial check (if session is already established on mount)
                 const { data: { session } } = await supabase.auth.getSession();
+                console.log("INITIAL SESSION CHECK:", session);
+                
                 if (session) {
-                    setHasSession(true);
-                } else {
+                    if (isSubscribed) {
+                        setHasSession(true);
+                        setIsChecking(false);
+                    }
+                    return;
+                }
+
+                // 2. Poll for session if we are in recovery flow based on URL structure
+                const hash = window.location.hash;
+                const search = window.location.search;
+                const isRecoveryFlow = hash.includes('type=recovery') || hash.includes('access_token=') || search.includes('type=recovery');
+
+                if (isRecoveryFlow) {
+                    console.log("Recovery URL parameters detected. Polling for session initialization...");
+                    
+                    // Poll getSession up to 3 seconds (30 attempts * 100ms)
+                    for (let i = 0; i < 30; i++) {
+                        await new Promise((resolve) => setTimeout(resolve, 100));
+                        if (!isSubscribed) return;
+
+                        const { data: { session: polledSession } } = await supabase.auth.getSession();
+                        if (polledSession) {
+                            console.log("Session resolved via polling:", polledSession);
+                            if (isSubscribed) {
+                                setHasSession(true);
+                                setIsChecking(false);
+                            }
+                            return;
+                        }
+                    }
+                }
+
+                // If still no session after check/polling
+                if (isSubscribed) {
                     setErrorMessage('Tautan reset password kedaluwarsa atau sesi pemulihan tidak ditemukan. Silakan ajukan lupa password kembali.');
+                    setIsChecking(false);
                 }
             } catch (err) {
-                setErrorMessage('Terjadi gangguan saat memvalidasi sesi pemulihan.');
-            } finally {
-                setIsChecking(false);
+                console.error("Error in verifyRecoverySession:", err);
+                if (isSubscribed) {
+                    setErrorMessage('Terjadi gangguan saat memvalidasi sesi pemulihan.');
+                    setIsChecking(false);
+                }
             }
         };
 
         verifyRecoverySession();
+
+        // Listen for auth event changes to update page state dynamically
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            console.log("AUTH EVENT:", event);
+            console.log("SESSION:", session);
+            console.log("CURRENT PATH:", window.location.pathname);
+            console.log("RECOVERY URL:", window.location.href);
+
+            if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
+                if (isSubscribed) {
+                    setHasSession(true);
+                    setIsChecking(false);
+                }
+            }
+        });
+
+        return () => {
+            isSubscribed = false;
+            subscription.unsubscribe();
+        };
     }, []);
 
     const handleResetSubmit = async (e: React.FormEvent) => {
@@ -79,10 +172,13 @@ export default function ResetPasswordPage() {
             setSuccessMessage('Password Anda berhasil diperbarui! Mengalihkan ke halaman login...');
             
             // Clean up session cookies and sign out to force fresh login
-            await supabase.auth.signOut();
-            document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
-
-            setTimeout(() => {
+            setTimeout(async () => {
+                try {
+                    await supabase.auth.signOut();
+                } catch (err) {
+                    console.error("Error signing out:", err);
+                }
+                document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
                 router.push('/login');
             }, 3000);
         } catch (err) {
