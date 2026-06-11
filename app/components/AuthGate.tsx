@@ -177,14 +177,24 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
             if (event === 'SIGNED_OUT') {
                 document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
-                setLoading(true);
-                router.replace('/login');
+                // If user is on a login page, don't interfere — the login page
+                // handles its own sign-out flow (e.g. role validation rejection)
+                const currentPath = pathnameRef.current;
+                if (!currentPath.startsWith('/login')) {
+                    setLoading(true);
+                    router.replace('/login');
+                }
             } else if (event === 'SIGNED_IN') {
                 if (session) {
                     document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${session.expires_in}; SameSite=Lax`;
                 }
-                setLoading(true);
-                checkAuth();
+                // If user is on a login page, don't interfere — the login page
+                // handles its own sign-in flow (profile fetch, role gate, redirect)
+                const currentPath = pathnameRef.current;
+                if (!currentPath.startsWith('/login')) {
+                    setLoading(true);
+                    checkAuth();
+                }
             }
         });
 

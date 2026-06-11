@@ -816,7 +816,7 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
             position: 'absolute',
             bottom: '16px',
             left: '16px',
-            right: '16px',
+            width: '280px',
             maxHeight: '200px',
             overflowY: 'auto',
             fontSize: '11px',

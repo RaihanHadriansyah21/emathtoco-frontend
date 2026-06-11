@@ -162,23 +162,30 @@ export default function MahasiswaLoginPage() {
                     const role = normalizeRole(profile?.role);
                     const userName = profile?.nama_lengkap || data.session.user.email || 'Anonymous';
 
+                    // ═══════════════════════════════════════════════════════
+                    // ROLE VALIDATION LAYER - Portal Mahasiswa
+                    // Only 'mahasiswa' role is allowed through this portal
+                    // ═══════════════════════════════════════════════════════
+                    if (role !== 'mahasiswa') {
+                        await supabase.auth.signOut();
+                        document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
+                        const sessionKey = `logged_${data.session.user.id}`;
+                        if (typeof window !== 'undefined') {
+                            sessionStorage.removeItem(sessionKey);
+                        }
+                        setErrorMessage('Akun ini tidak memiliki akses ke Portal Mahasiswa.');
+                        setIsLoading(false);
+                        return;
+                    }
+
                     // Session storage guard to prevent duplicate login logging
                     const sessionLoggedKey = `logged_${data.session.user.id}`;
                     if (typeof window !== 'undefined' && !sessionStorage.getItem(sessionLoggedKey)) {
                         console.log("[AUDIT DEBUG] About to write audit log");
                         sessionStorage.setItem(sessionLoggedKey, 'true');
 
-                        let auditAction = '';
-                        let auditTarget = 'auth';
-
-                        if (role === 'admin') {
-                            auditAction = 'ADMIN_LOGIN';
-                        } else if (role === 'dosen') {
-                            auditAction = 'LECTURER_LOGIN';
-                        } else if (role === 'mahasiswa') {
-                            auditAction = 'STUDENT_LOGIN';
-                            auditTarget = 'profil_pengguna';
-                        }
+                        const auditAction = 'STUDENT_LOGIN';
+                        const auditTarget = 'profil_pengguna';
 
                         if (auditAction) {
                             sendLoginAuditLog({

@@ -161,23 +161,33 @@ export default function DosenLoginPage() {
                     const role = normalizeRole(profile?.role);
                     const userName = profile?.nama_lengkap || data.session.user.email || 'Anonymous';
 
+                    // ═══════════════════════════════════════════════════════
+                    // ROLE VALIDATION LAYER - Portal Dosen
+                    // Only 'dosen' and 'admin' roles are allowed
+                    // ═══════════════════════════════════════════════════════
+                    if (role !== 'dosen' && role !== 'admin') {
+                        await supabase.auth.signOut();
+                        document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
+                        const sessionKey = `logged_${data.session.user.id}`;
+                        if (typeof window !== 'undefined') {
+                            sessionStorage.removeItem(sessionKey);
+                        }
+                        setErrorMessage('Akun ini tidak memiliki akses ke Portal Dosen.');
+                        setIsLoading(false);
+                        return;
+                    }
+
+                    // Role-based redirect destination
+                    targetHref = role === 'admin' ? '/admin' : '/dosen';
+
                     // Session storage guard to prevent duplicate login logging
                     const sessionLoggedKey = `logged_${data.session.user.id}`;
                     if (typeof window !== 'undefined' && !sessionStorage.getItem(sessionLoggedKey)) {
                         console.log("[AUDIT DEBUG] About to write audit log");
                         sessionStorage.setItem(sessionLoggedKey, 'true');
 
-                        let auditAction = '';
-                        let auditTarget = 'auth';
-
-                        if (role === 'admin') {
-                            auditAction = 'ADMIN_LOGIN';
-                        } else if (role === 'dosen') {
-                            auditAction = 'LECTURER_LOGIN';
-                        } else if (role === 'mahasiswa') {
-                            auditAction = 'STUDENT_LOGIN';
-                            auditTarget = 'profil_pengguna';
-                        }
+                        const auditAction = role === 'admin' ? 'ADMIN_LOGIN' : 'LECTURER_LOGIN';
+                        const auditTarget = 'auth';
 
                         if (auditAction) {
                             sendLoginAuditLog({
