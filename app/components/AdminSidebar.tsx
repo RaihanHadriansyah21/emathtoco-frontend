@@ -77,16 +77,23 @@ export default function AdminSidebar({
       }`}
     >
       {/* Nav items */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-4">
+      <nav className={`flex-1 py-4 px-3 space-y-4 ${
+        collapsed && !hideToggle ? 'overflow-visible' : 'overflow-y-auto'
+      }`}>
         {sections.map((section, secIdx) => (
           <div key={secIdx} className="space-y-1">
-            {/* Section Title */}
-            {(!collapsed || hideToggle) ? (
-              <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-600 transition-opacity duration-300">
-                {section.title}
-              </div>
-            ) : (
-              secIdx > 0 && <div className="h-px bg-slate-200 dark:bg-neutral-900/60 my-2 mx-1 transition-all duration-300" />
+            {/* Section Title (smooth fade and height collapse) */}
+            <div className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-600 transition-all duration-300 origin-left overflow-hidden ${
+              collapsed && !hideToggle ? 'opacity-0 max-h-0 py-0 scale-95' : 'opacity-100 max-h-[30px] scale-100'
+            }`}>
+              {section.title}
+            </div>
+
+            {/* Section Divider Line (smooth fade and height collapse) */}
+            {secIdx > 0 && (
+              <div className={`bg-slate-200 dark:bg-neutral-900/60 mx-1 transition-all duration-300 ${
+                collapsed && !hideToggle ? 'h-px my-2 opacity-100' : 'h-0 my-0 opacity-0 overflow-hidden'
+              }`} />
             )}
 
             {section.items.map((item) => {
@@ -99,8 +106,8 @@ export default function AdminSidebar({
                     router.push(item.href);
                     if (onItemClick) onItemClick();
                   }}
-                  className={`w-full flex items-center gap-3 rounded-xl transition-all duration-250 cursor-pointer group relative ${
-                    collapsed && !hideToggle ? 'justify-center px-2 py-3' : 'px-3 py-2.5'
+                  className={`w-full flex items-center rounded-xl transition-all duration-300 cursor-pointer group relative ${
+                    collapsed && !hideToggle ? 'justify-center px-2 py-3 gap-0' : 'px-3 py-2.5 gap-3'
                   } ${
                     active
                       ? 'bg-gradient-to-r from-cyan-500/10 via-blue-500/5 to-transparent border border-cyan-500/20 text-cyan-600 dark:text-cyan-400 shadow-[inset_1px_0_0_rgba(6,182,212,0.15),0_0_15px_rgba(6,182,212,0.04)]'
@@ -116,17 +123,18 @@ export default function AdminSidebar({
                     active ? 'text-cyan-500 dark:text-cyan-400' : 'text-slate-400 dark:text-neutral-600 group-hover:text-slate-600 dark:group-hover:text-neutral-300'
                   }`} />
                   
-                  {(!collapsed || hideToggle) && (
-                    <span className={`text-sm font-semibold truncate transition-opacity duration-350 ${
-                      active ? 'text-cyan-700 dark:text-cyan-300' : ''
-                    }`}>
-                      {item.label}
-                    </span>
-                  )}
+                  {/* Item Label (smooth width & opacity fade) */}
+                  <span className={`text-sm font-semibold truncate transition-all duration-300 origin-left ${
+                    active ? 'text-cyan-700 dark:text-cyan-300' : ''
+                  } ${
+                    collapsed && !hideToggle ? 'opacity-0 max-w-0 translate-x-[-10px] overflow-hidden' : 'opacity-100 max-w-[150px] translate-x-0'
+                  }`}>
+                    {item.label}
+                  </span>
 
                   {/* Tooltip on Hover in Collapsed State */}
                   {collapsed && !hideToggle && (
-                    <span className="absolute left-full ml-3 px-2.5 py-1.5 rounded-lg bg-slate-900/90 dark:bg-[#070710]/95 border border-slate-200/10 dark:border-neutral-800/80 text-white text-xs font-semibold whitespace-nowrap shadow-xl opacity-0 scale-95 translate-x-[-10px] group-hover:opacity-100 group-hover:scale-100 group-hover:translate-x-0 pointer-events-none transition-all duration-200 z-50 flex items-center gap-1.5">
+                    <span className="absolute left-full ml-3 px-2.5 py-1.5 rounded-lg bg-slate-900/90 dark:bg-[#070710]/95 border border-slate-200/10 dark:border-neutral-800/80 text-white text-xs font-semibold whitespace-nowrap shadow-xl invisible group-hover:visible opacity-0 scale-95 translate-x-[-10px] group-hover:opacity-100 group-hover:scale-100 group-hover:translate-x-0 pointer-events-none transition-all duration-200 z-50 flex items-center gap-1.5">
                       <span>{item.emoji}</span>
                       <span>{item.label}</span>
                     </span>
@@ -143,16 +151,16 @@ export default function AdminSidebar({
         <div className="border-t border-slate-200 dark:border-neutral-900 p-2">
           <button
             onClick={onToggle}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-slate-400 dark:text-neutral-600 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-all cursor-pointer"
+            className={`w-full flex items-center justify-center py-2 rounded-xl text-slate-400 dark:text-neutral-600 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-all duration-300 cursor-pointer ${
+              collapsed ? 'gap-0' : 'gap-2'
+            }`}
           >
-            {collapsed ? (
-              <ChevronRight className="w-4 h-4" />
-            ) : (
-              <>
-                <ChevronLeft className="w-4 h-4" />
-                <span className="text-xs font-semibold">Tutup</span>
-              </>
-            )}
+            <ChevronLeft className={`w-4 h-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
+            <span className={`text-xs font-semibold transition-all duration-300 origin-left overflow-hidden ${
+              collapsed ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[50px]'
+            }`}>
+              Tutup
+            </span>
           </button>
         </div>
       )}

@@ -567,9 +567,9 @@ export default function LecturerCoursePortal() {
 
       <Navbar />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10 w-full flex-grow">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10 w-full flex-grow">
         {/* Back navigation and Welcome message */}
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-4">
             <button
               onClick={() => router.push('/dosen')}
@@ -580,14 +580,14 @@ export default function LecturerCoursePortal() {
             </button>
             <div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Portal Penilaian AI</h1>
-              <p className="text-slate-500 dark:text-neutral-400 mt-1">
+              <p className="text-slate-500 dark:text-neutral-400 mt-1 text-sm">
                 Mata Kuliah: <span className="text-cyan-600 dark:text-cyan-400 font-semibold">{courseName || 'Memuat...'}</span> {courseCode ? `(${courseCode})` : ''} • Halo Dosen <span className="text-cyan-600 dark:text-cyan-400 font-semibold">{lecturerName}</span>
               </p>
             </div>
           </div>
           <button
             onClick={() => router.push(`/dosen/course/${courseId}/students`)}
-            className="flex items-center justify-center gap-2.5 bg-slate-50 border border-slate-200 dark:bg-neutral-950 dark:border-neutral-900 hover:border-cyan-500/40 hover:bg-slate-100 dark:hover:bg-neutral-900/60 text-slate-700 dark:text-neutral-350 px-4 py-3 rounded-xl text-xs font-bold tracking-wider transition-all duration-200 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99] w-full sm:w-auto self-start sm:self-center"
+            className="flex items-center justify-center gap-2.5 bg-cyan-500/10 border border-cyan-500/35 hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 px-4 py-2.5 rounded-xl text-xs font-bold tracking-wider transition-all duration-200 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99] w-full sm:w-auto self-start sm:self-center"
           >
             <Users className="w-4 h-4 text-cyan-500" />
             <span>MAHASISWA TERDAFTAR</span>
@@ -595,19 +595,19 @@ export default function LecturerCoursePortal() {
         </div>
 
         {/* SUMMARY CARDS */}
-        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 mb-8">
+        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 mb-6">
           {[
-            { label: 'Total Pengumpulan', val: counts.total, icon: '📊', color: 'bg-white dark:bg-[#0A0A0F] dark:bg-gradient-to-b dark:from-cyan-500/10 dark:to-blue-500/5', border: 'border-slate-200 dark:border-cyan-500/10 dark:hover:border-cyan-500/20' },
-            { label: 'Mahasiswa Terdaftar', val: totalStudents !== null ? totalStudents : '-', icon: '👥', color: 'bg-white dark:bg-[#0A0A0F] dark:bg-gradient-to-b dark:from-teal-500/10 dark:to-emerald-500/5', border: 'border-slate-200 dark:border-teal-500/10 dark:hover:border-teal-500/20' },
-            { label: 'Menunggu AI', val: counts.pending, icon: '⏳', color: 'bg-white dark:bg-[#0A0A0F] dark:bg-gradient-to-b dark:from-amber-500/10 dark:to-orange-500/5', border: 'border-slate-200 dark:border-amber-500/10 dark:hover:border-amber-500/20' },
-            { label: 'Diproses AI', val: counts.processing, icon: '🤖', color: 'bg-white dark:bg-[#0A0A0F] dark:bg-gradient-to-b dark:from-purple-500/10 dark:to-indigo-500/5', border: 'border-slate-200 dark:border-purple-500/10 dark:hover:border-purple-500/20' },
-            { label: 'Siap Direview', val: counts.completed, icon: '👨‍🏫', color: 'bg-white dark:bg-[#0A0A0F] dark:bg-gradient-to-b dark:from-blue-500/10 dark:to-indigo-500/5', border: 'border-slate-200 dark:border-blue-500/10 dark:hover:border-blue-500/20' },
-            { label: 'Direview Dosen', val: counts.reviewed, icon: '👨‍🏫', color: 'bg-white dark:bg-[#0A0A0F] dark:bg-gradient-to-b dark:from-indigo-500/10 dark:to-blue-500/5', border: 'border-slate-200 dark:border-indigo-500/10 dark:hover:border-indigo-500/20' },
-            { label: 'Finalized', val: counts.finalized, icon: '🏁', color: 'bg-white dark:bg-[#0A0A0F] dark:bg-gradient-to-b dark:from-emerald-500/10 dark:to-teal-500/5', border: 'border-slate-200 dark:border-emerald-500/10 dark:hover:border-emerald-500/20' }
+            { label: 'Total Pengumpulan', val: counts.total, icon: '📊', color: 'bg-white dark:bg-[#0A0A0F] dark:bg-gradient-to-b dark:from-cyan-500/10 dark:to-blue-500/5', border: 'border-slate-200 dark:border-cyan-500/10 dark:hover:border-cyan-500/25' },
+            { label: 'Mahasiswa Terdaftar', val: totalStudents !== null ? totalStudents : '-', icon: '👥', color: 'bg-white dark:bg-[#0A0A0F] dark:bg-gradient-to-b dark:from-teal-500/10 dark:to-emerald-500/5', border: 'border-slate-200 dark:border-teal-500/10 dark:hover:border-teal-500/25' },
+            { label: 'Menunggu AI', val: counts.pending, icon: '⏳', color: 'bg-white dark:bg-[#0A0A0F] dark:bg-gradient-to-b dark:from-amber-500/10 dark:to-orange-500/5', border: 'border-slate-200 dark:border-amber-500/10 dark:hover:border-amber-500/25' },
+            { label: 'Diproses AI', val: counts.processing, icon: '🤖', color: 'bg-white dark:bg-[#0A0A0F] dark:bg-gradient-to-b dark:from-purple-500/10 dark:to-indigo-500/5', border: 'border-slate-200 dark:border-purple-500/10 dark:hover:border-purple-500/25' },
+            { label: 'Siap Review', val: counts.completed, icon: '👨‍🏫', color: 'bg-white dark:bg-[#0A0A0F] dark:bg-gradient-to-b dark:from-blue-500/10 dark:to-indigo-500/5', border: 'border-slate-200 dark:border-blue-500/10 dark:hover:border-blue-500/25' },
+            { label: 'Direview Dosen', val: counts.reviewed, icon: '👨‍🏫', color: 'bg-white dark:bg-[#0A0A0F] dark:bg-gradient-to-b dark:from-indigo-500/10 dark:to-blue-500/5', border: 'border-slate-200 dark:border-indigo-500/10 dark:hover:border-indigo-500/25' },
+            { label: 'Finalized', val: counts.finalized, icon: '🏁', color: 'bg-white dark:bg-[#0A0A0F] dark:bg-gradient-to-b dark:from-emerald-500/10 dark:to-teal-500/5', border: 'border-slate-200 dark:border-emerald-500/10 dark:hover:border-emerald-500/25' }
           ].map((card, idx) => (
             <div
               key={idx}
-              className={`${card.color} border ${card.border} backdrop-blur-md rounded-2xl p-4 shadow-lg flex flex-col justify-between transition-all duration-300 ${idx === 6 ? 'col-span-1 min-[360px]:col-span-2 lg:col-span-1' : ''}`}
+              className={`${card.color} border ${card.border} backdrop-blur-md rounded-2xl pt-3.5 pb-3 px-3.5 shadow-lg flex flex-col justify-between transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(6,182,212,0.08)] ${idx === 6 ? 'col-span-1 min-[360px]:col-span-2 lg:col-span-1' : ''}`}
             >
               <div className="flex flex-col gap-1.5 items-start">
                 <span className="text-xl">{card.icon}</span>
@@ -619,7 +619,7 @@ export default function LecturerCoursePortal() {
         </div>
 
         {/* SEARCH AND FILTERS */}
-        <div className="relative z-20 bg-white/90 dark:bg-[#0A0A0F]/70 border border-slate-200 dark:border-neutral-900 rounded-2xl p-4 sm:p-5 mb-8 backdrop-blur-md flex flex-col gap-4 shadow-lg">
+        <div className="relative z-20 bg-white/90 dark:bg-[#0A0A0F]/70 border border-slate-200 dark:border-neutral-900 rounded-2xl p-4 sm:p-5 mb-6 backdrop-blur-md flex flex-col gap-4 shadow-lg">
           {/* Segmented Status Tabs */}
           <div 
             className="flex items-center gap-1.5 overflow-x-auto w-full pb-1.5 flex-nowrap border-b border-slate-100 dark:border-neutral-900/60 scroll-smooth"
@@ -692,11 +692,11 @@ export default function LecturerCoursePortal() {
               <div className="relative w-full sm:w-auto" ref={dropdownRef}>
                 <button
                   onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
-                  className="w-full flex items-center justify-center gap-2.5 bg-slate-50 border border-slate-200 dark:bg-neutral-950 dark:border-neutral-900 hover:border-cyan-500/40 hover:bg-slate-100 dark:hover:bg-neutral-900/60 text-slate-700 dark:text-neutral-350 px-4 py-3 rounded-xl text-xs font-bold tracking-wider transition-all duration-200 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99]"
+                  className="w-full flex items-center justify-center gap-2.5 bg-cyan-500/10 border border-cyan-500/35 hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 px-4 py-3 rounded-xl text-xs font-bold tracking-wider transition-all duration-200 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99]"
                 >
                   <Download className="w-4 h-4 text-cyan-500" />
                   <span>Export</span>
-                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 dark:text-neutral-550 transition-transform duration-200 ${isExportDropdownOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-3.5 h-3.5 text-cyan-600/70 dark:text-cyan-400/70 transition-transform duration-200 ${isExportDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {isExportDropdownOpen && (
@@ -747,18 +747,17 @@ export default function LecturerCoursePortal() {
           <>
             {/* Desktop Table View */}
             <div className="hidden md:block bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl overflow-hidden shadow-xl dark:shadow-2xl backdrop-blur-md">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[950px]">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black/40">
-                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mahasiswa</th>
-                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Kelas</th>
-                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mata Kuliah</th>
-                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Jumlah Jawaban</th>
-                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Nilai AI</th>
-                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Status</th>
-                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Waktu Submit</th>
-                      <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right whitespace-nowrap">Aksi</th>
+              <div className="overflow-x-auto overflow-y-auto max-h-[520px] pr-0.5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-neutral-800/60 dark:scrollbar-thumb-neutral-800/40">
+                <table className="w-full text-left border-collapse min-w-[800px]">
+                  <thead className="sticky top-0 z-20 bg-slate-50/95 dark:bg-[#07070a]/95 backdrop-blur-md border-b border-slate-200 dark:border-neutral-900">
+                    <tr className="bg-slate-50/20 dark:bg-black/20">
+                      <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mahasiswa</th>
+                      <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Kelas</th>
+                      <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Jumlah Jawaban</th>
+                      <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Nilai AI</th>
+                      <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Status</th>
+                      <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Waktu Submit</th>
+                      <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right whitespace-nowrap">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
@@ -769,38 +768,33 @@ export default function LecturerCoursePortal() {
                       const statusBadge = getStatusBadge(sub.ai_status);
                       const uploadedCount = sub.lembar_jawaban ? sub.lembar_jawaban.length : 0;
                       const mhs = Array.isArray(sub.mahasiswa) ? sub.mahasiswa[0] : sub.mahasiswa;
-                      const mk = Array.isArray(sub.mata_kuliah) ? sub.mata_kuliah[0] : sub.mata_kuliah;
                       return (
                         <tr key={sub.id} className="hover:bg-slate-50/50 dark:hover:bg-white/1 transition-colors duration-200 group">
-                          <td className="py-4 px-6 whitespace-nowrap">
+                          <td className="py-3.5 px-5 whitespace-nowrap">
                             <div className="text-sm font-semibold text-slate-800 dark:text-white group-hover:text-cyan-600 dark:group-hover:text-cyan-300 transition-colors duration-200">{mhs?.nama_lengkap || 'Unknown'}</div>
                             <div className="text-xs text-slate-500 dark:text-neutral-400 font-mono mt-0.5">{mhs?.nim_nip || '-'}</div>
                           </td>
-                          <td className="py-4 px-6 text-sm font-semibold text-slate-700 dark:text-neutral-300 whitespace-nowrap">{mhs?.kelas || '-'}</td>
-                          <td className="py-4 px-6 whitespace-nowrap">
-                            <div className="text-sm font-semibold text-slate-700 dark:text-neutral-300">{mk?.nama_matkul || 'Unknown'}</div>
-                            <div className="text-[10px] text-slate-500 dark:text-neutral-400 font-mono tracking-wider mt-0.5 uppercase">{mk?.kode_matkul || '-'}</div>
-                          </td>
-                          <td className="py-4 px-6 text-center whitespace-nowrap">
+                          <td className="py-3.5 px-5 text-sm font-semibold text-slate-700 dark:text-neutral-300 whitespace-nowrap">{mhs?.kelas || '-'}</td>
+                          <td className="py-3.5 px-5 text-center whitespace-nowrap">
                             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 text-sm font-mono font-bold">
                               <span className={uploadedCount === 24 ? 'text-cyan-600 dark:text-cyan-400' : 'text-slate-500 dark:text-neutral-400'}>{uploadedCount}</span>
                               <span className="text-slate-300 dark:text-neutral-600">/</span>
                               <span className="text-slate-400 dark:text-neutral-500">24</span>
                             </div>
                           </td>
-                          <td className="py-4 px-6 text-center whitespace-nowrap">
+                          <td className="py-3.5 px-5 text-center whitespace-nowrap">
                             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 text-sm font-mono font-bold text-purple-600 dark:text-purple-400">
                               {sub.nilai_akhir !== null ? sub.nilai_akhir : '-'}
                             </div>
                           </td>
-                          <td className="py-4 px-6 whitespace-nowrap">
+                          <td className="py-3.5 px-5 whitespace-nowrap">
                             <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-bold uppercase tracking-wider ${statusBadge.bg} ${statusBadge.border} ${statusBadge.color}`}>
                               <span>{statusBadge.icon}</span>
                               <span>{statusBadge.text}</span>
                             </span>
                           </td>
-                          <td className="py-4 px-6 text-xs text-slate-500 dark:text-neutral-400 font-medium whitespace-nowrap">{formatDate(sub.waktu_submit)}</td>
-                          <td className="py-4 px-6 text-right whitespace-nowrap">
+                          <td className="py-3.5 px-5 text-xs text-slate-500 dark:text-neutral-400 font-medium whitespace-nowrap">{formatDate(sub.waktu_submit)}</td>
+                          <td className="py-3.5 px-5 text-right whitespace-nowrap">
                             <button
                               onClick={() => router.push(`/dosen/review/${sub.id}`)}
                               className="inline-flex items-center gap-2 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500 hover:to-blue-600 border border-cyan-500/30 hover:border-transparent text-cyan-600 dark:text-cyan-400 hover:text-white px-4 py-2 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-300 shadow-md cursor-pointer"
@@ -826,7 +820,6 @@ export default function LecturerCoursePortal() {
                 const statusBadge = getStatusBadge(sub.ai_status);
                 const uploadedCount = sub.lembar_jawaban ? sub.lembar_jawaban.length : 0;
                 const mhs = Array.isArray(sub.mahasiswa) ? sub.mahasiswa[0] : sub.mahasiswa;
-                const mk = Array.isArray(sub.mata_kuliah) ? sub.mata_kuliah[0] : sub.mata_kuliah;
                 return (
                   <div
                     key={sub.id}
@@ -844,28 +837,24 @@ export default function LecturerCoursePortal() {
 
                     <div className="grid grid-cols-2 gap-3 text-xs border-y border-slate-100 dark:border-neutral-900 py-3">
                       <div className="space-y-1">
-                        <span className="text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-widest text-[9px]">Mata Kuliah</span>
-                        <div className="font-semibold text-slate-700 dark:text-neutral-300 break-words">{mk?.nama_matkul || 'Unknown'}</div>
-                      </div>
-                      <div className="space-y-1">
                         <span className="text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-widest text-[9px]">Kelas</span>
                         <div className="font-semibold text-slate-700 dark:text-neutral-300">{mhs?.kelas || '-'}</div>
                       </div>
-                      <div className="space-y-1 mt-2">
+                      <div className="space-y-1">
                         <span className="text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-widest text-[9px]">Jawaban</span>
                         <div className="font-mono font-bold text-slate-700 dark:text-neutral-300">
                           <span className={uploadedCount === 24 ? 'text-cyan-600 dark:text-cyan-400' : 'text-slate-500 dark:text-neutral-400'}>{uploadedCount}</span> / 24
                         </div>
                       </div>
-                      <div className="space-y-1 mt-2">
+                      <div className="space-y-1 mt-1">
                         <span className="text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-widest text-[9px]">Nilai AI</span>
                         <div className="font-mono font-bold text-purple-600 dark:text-purple-400">
                           {sub.nilai_akhir !== null ? sub.nilai_akhir : '-'}
                         </div>
                       </div>
-                      <div className="space-y-1 mt-2 col-span-2">
+                      <div className="space-y-1 mt-1">
                         <span className="text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-widest text-[9px]">Waktu Submit</span>
-                        <div className="text-slate-500 dark:text-neutral-400 font-medium">{formatDate(sub.waktu_submit)}</div>
+                        <div className="text-slate-700 dark:text-neutral-300 font-medium">{formatDate(sub.waktu_submit)}</div>
                       </div>
                     </div>
 

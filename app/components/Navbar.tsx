@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ChevronDown, User, Settings, LogOut, Sun, Moon, Menu } from 'lucide-react';
+import { ArrowLeft, ChevronDown, User, Settings, LogOut, Sun, Moon, Menu, ChevronLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import { useTheme } from 'next-themes';
@@ -148,13 +148,18 @@ export default function Navbar({
         <div className="flex items-center overflow-hidden mr-4">
           {isAdminLayout ? (
             /* Admin Header Sidebar Container - width matches sidebar exactly, includes border-r */
-            <div className={`flex items-center transition-all duration-300 border-r border-slate-200 dark:border-neutral-900 h-16 mr-4 ${
+            <div className={`flex items-center transition-all duration-300 border-r border-slate-200 dark:border-neutral-900 h-16 mr-4 relative overflow-hidden ${
               sidebarCollapsed ? 'w-[80px] justify-center px-0' : 'w-[270px] justify-between px-5'
             }`}>
-              {sidebarCollapsed ? (
-                /* Collapsed: Centered Logo with Morphing Toggle Button on Hover */
-                <div className="relative w-10 h-10 flex items-center justify-center group cursor-pointer" onClick={onToggleSidebar}>
-                  <div className="bg-white border border-slate-200 dark:border-neutral-750/60 rounded-xl p-1.5 shadow-sm dark:shadow-[0_0_12px_rgba(6,182,212,0.08)] flex items-center justify-center transition-all duration-200 scale-100 opacity-100 group-hover:scale-0 group-hover:opacity-0 hover:scale-105">
+              <div className={`flex items-center gap-2.5 w-full ${sidebarCollapsed ? 'justify-center' : 'justify-start'}`}>
+                {/* Logo Area */}
+                <div 
+                  className="relative w-10 h-10 flex items-center justify-center group cursor-pointer flex-shrink-0" 
+                  onClick={sidebarCollapsed ? onToggleSidebar : () => router.push('/')}
+                >
+                  <div className={`bg-white border border-slate-200 dark:border-neutral-750/60 rounded-xl p-1.5 shadow-sm dark:shadow-[0_0_12px_rgba(6,182,212,0.08)] flex items-center justify-center transition-all duration-200 scale-100 opacity-100 ${
+                    sidebarCollapsed ? 'group-hover:scale-0 group-hover:opacity-0' : 'hover:scale-105'
+                  }`}>
                     <Image
                       src={Logo}
                       alt="Logo E-MATHTOCO"
@@ -162,38 +167,31 @@ export default function Navbar({
                       priority
                     />
                   </div>
-                  <div className="absolute inset-0 flex items-center justify-center text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white transition-all duration-200 scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100">
-                    <Menu className="w-5 h-5" />
-                  </div>
-                </div>
-              ) : (
-                /* Expanded: Logo + Brand Title + Collapse Button aligned inside the container */
-                <div className="flex items-center justify-between w-full">
-                  <div
-                    onClick={() => router.push('/')}
-                    className="flex items-center gap-2.5 cursor-pointer select-none"
-                  >
-                    <div className="bg-white border border-slate-200 dark:border-neutral-750/60 rounded-xl p-1.5 shadow-sm dark:shadow-[0_0_12px_rgba(6,182,212,0.08)] flex items-center justify-center flex-shrink-0 transition-transform duration-300 hover:scale-105">
-                      <Image
-                        src={Logo}
-                        alt="Logo E-MATHTOCO"
-                        className="h-6 w-auto object-contain"
-                        priority
-                      />
+                  {sidebarCollapsed && (
+                    <div className="absolute inset-0 flex items-center justify-center text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white transition-all duration-200 scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100">
+                      <Menu className="w-5 h-5" />
                     </div>
-                    <span className="text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-slate-950 dark:from-white dark:to-neutral-300 drop-shadow-[0_0_8px_rgba(0,0,0,0.05)] dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.1)] whitespace-nowrap">
-                      E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-black drop-shadow-[0_0_12px_rgba(6,182,212,0.3)]">TOCO</span>
-                    </span>
-                  </div>
-                  <button
-                    onClick={onToggleSidebar}
-                    className="p-2 hover:bg-slate-100 dark:hover:bg-neutral-950 border border-transparent hover:border-slate-200 dark:hover:border-neutral-900 rounded-xl text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white transition-all cursor-pointer"
-                    title="Collapse sidebar"
-                  >
-                    <Menu className="w-5 h-5" />
-                  </button>
+                  )}
                 </div>
-              )}
+
+                {/* Brand Text */}
+                <span className={`text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-slate-950 dark:from-white dark:to-neutral-300 drop-shadow-[0_0_8px_rgba(0,0,0,0.05)] dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.1)] whitespace-nowrap transition-all duration-300 origin-left overflow-hidden ${
+                  sidebarCollapsed ? 'opacity-0 max-w-0 translate-x-[-10px]' : 'opacity-100 max-w-[180px] translate-x-0'
+                }`}>
+                  E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-black drop-shadow-[0_0_12px_rgba(6,182,212,0.3)]">TOCO</span>
+                </span>
+              </div>
+
+              {/* Collapse Button (Fades out and hides off-screen when collapsed) */}
+              <button
+                onClick={onToggleSidebar}
+                className={`p-2 hover:bg-slate-100 dark:hover:bg-neutral-950 border border-transparent hover:border-slate-200 dark:hover:border-neutral-900 rounded-xl text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white transition-all duration-300 cursor-pointer flex-shrink-0 ${
+                  sidebarCollapsed ? 'opacity-0 pointer-events-none absolute right-[-50px]' : 'opacity-100 pointer-events-auto'
+                }`}
+                title="Collapse sidebar"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
             </div>
           ) : (
             /* Original Left Section (Mahasiswa/Dosen/Unauthenticated Layouts) */
