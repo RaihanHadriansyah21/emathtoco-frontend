@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import { User, IdCard, GraduationCap, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function CompleteProfilePage() {
     const router = useRouter();
@@ -162,10 +163,20 @@ export default function CompleteProfilePage() {
                 <div className="absolute bottom-[15%] right-[15%] w-[500px] h-[500px] bg-indigo-500/12 rounded-full blur-[130px] animate-float-purple"></div>
             </div>
 
-            <div className="w-full max-w-md bg-[#0A0A0F]/80 border border-neutral-800/80 backdrop-blur-md rounded-2xl p-8 shadow-[0_0_50px_rgba(0,0,0,0.8)] relative z-10 overflow-hidden">
+            <motion.div
+                initial={{ opacity: 0, y: 30, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                className="w-full max-w-md bg-[#0A0A0F]/80 border border-neutral-800/80 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-[0_0_50px_rgba(0,0,0,0.8)] relative z-10 overflow-hidden"
+            >
                 <div className="absolute -top-10 -right-10 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none"></div>
 
-                <div className="text-center mb-8">
+                <motion.div
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.15 }}
+                    className="text-center mb-8"
+                >
                     <div className="mx-auto w-16 h-16 bg-black border border-neutral-800 rounded-2xl flex items-center justify-center shadow-inner mb-4">
                         <GraduationCap className="w-8 h-8 text-cyan-400" />
                     </div>
@@ -173,20 +184,36 @@ export default function CompleteProfilePage() {
                         Lengkapi <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-500 bg-clip-text text-transparent font-extrabold">Profil</span>
                     </h1>
                     <p className="text-neutral-400 text-xs uppercase tracking-widest mt-2">Satu langkah lagi sebelum masuk ke sistem</p>
-                </div>
+                </motion.div>
 
                 {errorMessage && (
-                    <div className="mb-6 flex items-start gap-3 bg-red-950/20 border border-red-900/50 text-red-400 p-4 rounded-xl text-sm">
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="mb-6 flex items-start gap-3 bg-red-950/20 border border-red-900/50 text-red-400 p-4 rounded-xl text-sm"
+                    >
                         <p className="font-medium leading-relaxed">{errorMessage}</p>
-                    </div>
+                    </motion.div>
                 )}
                 {successMessage && (
-                    <div className="mb-6 flex items-start gap-3 bg-emerald-950/20 border border-emerald-900/50 text-emerald-400 p-4 rounded-xl text-sm">
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="mb-6 flex items-start gap-3 bg-emerald-950/20 border border-emerald-900/50 text-emerald-400 p-4 rounded-xl text-sm"
+                    >
                         <p className="font-medium leading-relaxed">{successMessage}</p>
-                    </div>
+                    </motion.div>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <motion.form
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.25 }}
+                    onSubmit={handleSubmit}
+                    className="space-y-5"
+                >
                     <div>
                         <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Nama Lengkap</label>
                         <div className="relative">
@@ -266,7 +293,7 @@ export default function CompleteProfilePage() {
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className="w-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-600 hover:via-blue-600 hover:to-indigo-700 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/10 disabled:opacity-50 text-sm tracking-widest mt-4 cursor-pointer"
+                        className="w-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-600 hover:via-blue-600 hover:to-indigo-700 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/10 disabled:opacity-50 text-sm tracking-widest mt-4 cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
                     >
                         {isLoading ? (
                             <>
@@ -277,8 +304,8 @@ export default function CompleteProfilePage() {
                             <span>SELESAIKAN PROFIL</span>
                         )}
                     </button>
-                </form>
-            </div>
+                </motion.form>
+            </motion.div>
         </div>
     );
 }

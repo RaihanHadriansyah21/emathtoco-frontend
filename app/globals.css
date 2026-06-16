@@ -40,6 +40,22 @@ body, header, main, table, tr, th, td, div, button, input, textarea, select, spa
   animation: float-purple 20s ease-in-out infinite;
 }
 
+/* Spotlight animation for Aceternity Spotlight component */
+@keyframes spotlight {
+  0% {
+    opacity: 0;
+    transform: translate(-72%, -62%) scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -40%) scale(1);
+  }
+}
+
+.animate-spotlight {
+  animation: spotlight 2s ease 0.75s 1 forwards;
+}
+
 @keyframes pop-success {
   0% {
     transform: scale(1);

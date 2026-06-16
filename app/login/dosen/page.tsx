@@ -8,6 +8,7 @@ import { API_URL } from '@/lib/config';
 import Image from 'next/image';
 import Logo from '../../Emathtoco.png';
 import { Eye, EyeOff, ArrowLeft, BookOpen } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function DosenLoginPage() {
     const router = useRouter();
@@ -222,19 +223,46 @@ export default function DosenLoginPage() {
                 <div className="absolute bottom-[15%] right-[15%] w-[500px] h-[500px] bg-purple-500/12 rounded-full blur-[130px] animate-float-purple"></div>
             </div>
 
-            <div className="w-full max-w-md bg-[#0A0A0F]/80 border border-neutral-800/80 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-[0_0_50px_rgba(0,0,0,0.8)] relative z-10 overflow-hidden">
+            {/* Top Navigation Bar with brand text only */}
+            <motion.nav
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-6 sm:px-10 lg:px-14 py-5"
+            >
+                <div className="flex items-center">
+                    <span className="text-white text-sm font-bold tracking-wider">
+                        E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-bold">TOCO</span>
+                    </span>
+                </div>
+            </motion.nav>
+
+            <motion.div
+                initial={{ opacity: 0, y: 30, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                className="w-full max-w-md bg-[#0A0A0F]/80 border border-neutral-800/80 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-[0_0_50px_rgba(0,0,0,0.8)] relative z-10 overflow-hidden"
+            >
                 <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none"></div>
 
-                {/* Back to role selection */}
-                <button
-                    onClick={() => router.push('/login')}
+                {/* Back to role selection — navigates to /login?select=true */}
+                <motion.button
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.3, delay: 0.2 }}
+                    onClick={() => router.push('/login?select=true')}
                     className="flex items-center gap-1.5 text-neutral-500 hover:text-indigo-400 text-xs font-bold uppercase tracking-widest mb-6 transition-colors cursor-pointer"
                 >
                     <ArrowLeft className="w-3.5 h-3.5" />
                     <span>Kembali</span>
-                </button>
+                </motion.button>
 
-                <div className="text-center mb-8">
+                <motion.div
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.15 }}
+                    className="text-center mb-8"
+                >
                     <div className="mx-auto w-fit bg-white border border-slate-200 rounded-xl p-4 shadow-sm mb-4 flex items-center justify-center">
                         <Image
                             src={Logo}
@@ -251,15 +279,26 @@ export default function DosenLoginPage() {
                         </h1>
                     </div>
                     <p className="text-neutral-500 text-xs uppercase tracking-widest mt-1">Kelola kelas dan lakukan review hasil penilaian AI</p>
-                </div>
+                </motion.div>
 
                 {errorMessage && (
-                    <div className="mb-6 flex items-start gap-3 bg-red-950/20 border border-red-900/50 text-red-400 p-4 rounded-xl text-sm">
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="mb-6 flex items-start gap-3 bg-red-950/20 border border-red-900/50 text-red-400 p-4 rounded-xl text-sm"
+                    >
                         <p className="font-medium leading-relaxed">{errorMessage}</p>
-                    </div>
+                    </motion.div>
                 )}
 
-                <form onSubmit={handleLoginSubmit} className="space-y-5">
+                <motion.form
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.25 }}
+                    onSubmit={handleLoginSubmit}
+                    className="space-y-5"
+                >
                     <div>
                         <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Email</label>
                         <input
@@ -301,13 +340,12 @@ export default function DosenLoginPage() {
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className="w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-650 hover:from-indigo-600 hover:via-purple-600 hover:to-pink-750 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/10 disabled:opacity-50 text-sm tracking-widest cursor-pointer"
+                        className="w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-650 hover:from-indigo-600 hover:via-purple-600 hover:to-pink-750 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/10 disabled:opacity-50 text-sm tracking-widest cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
                     >
                         {isLoading ? <span>Memverifikasi Akun...</span> : <span>MASUK KE SISTEM</span>}
                     </button>
-                </form>
-
-            </div>
+                </motion.form>
+            </motion.div>
         </div>
     );
 }
