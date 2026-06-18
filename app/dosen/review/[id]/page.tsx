@@ -71,15 +71,24 @@ interface SlotState {
   reuploadCount?: number;
 }
 
+// EGRESS FIX: Signed URL cache — prevents regenerating URLs on every polling cycle.
+// Shared at module level so it persists across re-renders.
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+
 const getSignedPreviewUrl = async (path: string): Promise<string | null> => {
+  const now = Date.now();
+  const cached = signedUrlCache.get(path);
+  // Return cached URL if still valid (expires in > 60s)
+  if (cached && cached.expiresAt - now > 60_000) {
+    return cached.url;
+  }
   try {
-    console.log("SIGNED URL PATH", path);
     const { data, error } = await supabase.storage
       .from('lembar-jawaban')
       .createSignedUrl(path, 3600);
-    console.log("SIGNED URL RESULT", data);
-    console.log("SIGNED URL ERROR", error);
     if (error) throw error;
+    // Cache for 50 minutes (3000 seconds)
+    signedUrlCache.set(path, { url: data.signedUrl, expiresAt: now + 3_000_000 });
     return data.signedUrl;
   } catch (err) {
     console.error('Error generating signed URL:', err);

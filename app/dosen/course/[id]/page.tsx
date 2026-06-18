@@ -200,11 +200,12 @@ export default function LecturerCoursePortal() {
     // Only create a new interval if one doesn't already exist
     if (pollingRef.current) return;
 
+    // EGRESS FIX: Poll every 15 seconds (was 3s — 5× reduction in Supabase API calls).
     pollingRef.current = setInterval(() => {
       // Prevent overlapping fetches
       if (isFetchingRef.current) return;
       fetchSubmissions();
-    }, 3000);
+    }, 15000);
 
     return () => {
       if (pollingRef.current) {
@@ -762,9 +763,6 @@ export default function LecturerCoursePortal() {
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
                     {filteredSubmissions.map((sub) => {
-                      console.log("submission", sub.id, sub.ai_status);
-                      console.log("MAHASISWA DATA", sub.mahasiswa);
-                      console.log("LEMBAR DATA", sub.lembar_jawaban);
                       const statusBadge = getStatusBadge(sub.ai_status);
                       const uploadedCount = sub.lembar_jawaban ? sub.lembar_jawaban.length : 0;
                       const mhs = Array.isArray(sub.mahasiswa) ? sub.mahasiswa[0] : sub.mahasiswa;

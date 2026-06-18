@@ -59,12 +59,25 @@ const createSubmission = async (mahasiswaId: string, mataKuliahId: string) => {
     return data;
 };
 
+// EGRESS FIX: Signed URL cache — avoids regenerating URLs on every 3s poll.
+// Signed URLs expire after 3600s; we cache for 50 minutes (3000s) to ensure
+// the URL is valid with a 10-minute safety buffer.
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+
 const getSignedPreviewUrl = async (path: string): Promise<string | null> => {
+    const now = Date.now();
+    const cached = signedUrlCache.get(path);
+    // Return cached URL if still valid (expires in > 60s)
+    if (cached && cached.expiresAt - now > 60_000) {
+        return cached.url;
+    }
     try {
         const { data, error } = await supabase.storage
             .from('lembar-jawaban')
             .createSignedUrl(path, 3600);
         if (error) throw error;
+        // Cache for 50 minutes (3000 seconds)
+        signedUrlCache.set(path, { url: data.signedUrl, expiresAt: now + 3_000_000 });
         return data.signedUrl;
     } catch (err) {
         console.error('Error generating signed URL:', err);
@@ -2139,9 +2152,21 @@ export default function UploadWorkspace() {
                         return slot;
                     });
 
-                    // Ambil signed preview URL untuk render gambar secara paralel
+                    // Ambil signed preview URL — EGRESS FIX: skip if already cached
+                    // (URL is cached in signedUrlCache for 50 minutes; no need to regenerate on every poll)
                     const urlPromises = updatedSlots.map(async (slot) => {
                         if (slot.status === 'success' && slot.imagePath) {
+                            // Check 1: module-level signedUrlCache (survives re-renders)
+                            const now = Date.now();
+                            const cached = signedUrlCache.get(slot.imagePath);
+                            if (cached && cached.expiresAt - now > 60_000) {
+                                return { ...slot, fileUrl: cached.url };
+                            }
+                            // Check 2: current slot state has valid URL for same path
+                            const existingSlot = slots.find(s => s.label === slot.label);
+                            if (existingSlot?.fileUrl && existingSlot.imagePath === slot.imagePath) {
+                                return { ...slot, fileUrl: existingSlot.fileUrl };
+                            }
                             const signedUrl = await getSignedPreviewUrl(slot.imagePath);
                             if (!signedUrl) {
                                 console.warn(`Failed to generate signed URL for path: ${slot.imagePath}. It might be a temporary network issue.`);
@@ -2248,10 +2273,12 @@ export default function UploadWorkspace() {
     useEffect(() => {
         if (!userId) return;
 
-        // Poll every 3 seconds to keep student UI perfectly in sync
+        // EGRESS FIX: Poll every 15 seconds (was 3s — 5× reduction in Supabase calls).
+        // Status changes are driven by the dosen/AI pipeline, not the student;
+        // 15 second sync lag is imperceptible and saves ~80% of polling egress.
         const interval = setInterval(() => {
             loadSubmissionDetails(userId);
-        }, 3000);
+        }, 15000);
 
         return () => clearInterval(interval);
     }, [userId]);
