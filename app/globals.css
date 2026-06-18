@@ -137,3 +137,132 @@ html.dark::-webkit-scrollbar-thumb:hover,
 .dark::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, #06b6d4, #3b82f6);
 }
+
+/* Premium Refactor Design Tokens */
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.015) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.28), 0 1px 0 0 rgba(255, 255, 255, 0.04) inset !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.025) !important;
+  border-color: rgba(255, 255, 255, 0.13) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.38), 0 1px 0 0 rgba(255, 255, 255, 0.05) inset !important;
+  transform: translateY(-1px) scale(1.005) !important;
+}
+
+/* Dark Mode Variant for glass-card */
+.dark .dark\:glass-card {
+  background: rgba(255, 255, 255, 0.015) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.28), 0 1px 0 0 rgba(255, 255, 255, 0.04) inset !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.dark .dark\:glass-card:hover {
+  background: rgba(255, 255, 255, 0.025) !important;
+  border-color: rgba(255, 255, 255, 0.13) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.38), 0 1px 0 0 rgba(255, 255, 255, 0.05) inset !important;
+  transform: translateY(-1px) scale(1.005) !important;
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.015) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.25) !important;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #06b6d4, #3b82f6, #6366f1) !important;
+  background-size: 200% auto !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 4px 14px 0 rgba(6, 182, 212, 0.2) !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.btn-primary:hover {
+  background-position: right center !important;
+  box-shadow: 0 6px 20px 0 rgba(6, 182, 212, 0.3) !important;
+  transform: translateY(-1px) scale(1.01) !important;
+}
+
+.btn-primary:active {
+  transform: translateY(1px) scale(0.99) !important;
+}
+
+.btn-glass {
+  background: rgba(255, 255, 255, 0.03) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  border-radius: 0.75rem !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.btn-glass:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  transform: translateY(-1px) scale(1.01) !important;
+}
+
+.btn-glass:active {
+  transform: translateY(1px) scale(0.99) !important;
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #ef4444, #f43f5e) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.2) !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.btn-danger:hover {
+  box-shadow: 0 6px 20px 0 rgba(239, 68, 68, 0.3) !important;
+  transform: translateY(-1px) scale(1.01) !important;
+}
+
+.btn-danger:active {
+  transform: translateY(1px) scale(0.99) !important;
+}
+
+.btn-ghost {
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  font-weight: 600 !important;
+  border-radius: 0.75rem !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  border: 1px solid transparent !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}

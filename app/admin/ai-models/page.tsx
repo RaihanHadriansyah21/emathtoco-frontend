@@ -9,6 +9,9 @@ import { createAuditLog, standardizeModelName } from '@/lib/services/audit-servi
 import { fetchAvailableModels } from '@/lib/services/model-service';
 import { fetchModelsInfo, type ModelInfo } from '@/lib/services/model-info-service';
 import { apiGet, apiPost } from '@/lib/api-client';
+import { GlassTable, GlassTableHeader, GlassTableRow, ResponsiveTableWrapper } from '@/components/ui/table';
+import PageTransition from '@/components/ui/PageTransition';
+import { PageLoader } from '@/components/ui/loaders';
 
 interface ModelStat {
   model_name: string;
@@ -219,11 +222,12 @@ export default function AIModelInventoryPage() {
   const maxCount = Math.max(...models.map(m => m.count), 1);
 
   if (isChecking) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 text-cyan-500 dark:text-cyan-400 animate-spin" /></div>;
+    return <PageLoader message="Memverifikasi admin..." />;
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+    <PageTransition>
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
       <div>
         <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
           <Cpu className="w-6 h-6 text-purple-500 dark:text-purple-400" />
@@ -509,32 +513,31 @@ export default function AIModelInventoryPage() {
           </div>
 
           {/* Table Detail */}
-          <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[650px]">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black/40">
-                    <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Model AI</th>
-                    <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Penggunaan</th>
-                    <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Rata-rata Nilai</th>
-                    <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Finalized</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
-                  {models.map((m, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
-                      <td className="py-3 px-5 text-sm font-semibold text-slate-800 dark:text-white whitespace-nowrap">{m.model_name}</td>
-                      <td className="py-3 px-5 text-center text-sm font-mono text-slate-600 dark:text-neutral-300 whitespace-nowrap">{m.count}</td>
-                      <td className="py-3 px-5 text-center text-sm font-mono text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{m.avg_score !== null ? m.avg_score : '-'}</td>
-                      <td className="py-3 px-5 text-center text-sm font-mono text-slate-600 dark:text-neutral-300 whitespace-nowrap">{m.finalized_count}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <ResponsiveTableWrapper className="bg-white dark:bg-[#0A0A0F]/80 shadow-xl">
+            <GlassTable className="min-w-[650px]">
+              <GlassTableHeader>
+                <tr>
+                  <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 whitespace-nowrap">Model AI</th>
+                  <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 text-center whitespace-nowrap">Penggunaan</th>
+                  <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 text-center whitespace-nowrap">Rata-rata Nilai</th>
+                  <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 text-center whitespace-nowrap">Finalized</th>
+                </tr>
+              </GlassTableHeader>
+              <tbody>
+                {models.map((m, idx) => (
+                  <GlassTableRow key={idx} hoverable={true}>
+                    <td className="py-3.5 px-5 text-sm font-semibold text-slate-850 dark:text-neutral-200 whitespace-nowrap">{m.model_name}</td>
+                    <td className="py-3.5 px-5 text-center text-sm font-mono text-slate-600 dark:text-neutral-450 whitespace-nowrap">{m.count}</td>
+                    <td className="py-3.5 px-5 text-center text-sm font-mono text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{m.avg_score !== null ? m.avg_score : '-'}</td>
+                    <td className="py-3.5 px-5 text-center text-sm font-mono text-slate-650 dark:text-neutral-400 whitespace-nowrap">{m.finalized_count}</td>
+                  </GlassTableRow>
+                ))}
+              </tbody>
+            </GlassTable>
+          </ResponsiveTableWrapper>
         </>
       )}
     </div>
+    </PageTransition>
   );
 }

@@ -6,6 +6,9 @@ import { GraduationCap, Loader2, Plus, X, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import ConfirmModal from '@/app/components/ConfirmModal';
+import { GlassTable, GlassTableHeader, GlassTableRow, EmptyState, ResponsiveTableWrapper } from '@/components/ui/table';
+import PageTransition from '@/components/ui/PageTransition';
+import { PageLoader } from '@/components/ui/loaders';
 
 interface Lecturer {
   id: string;
@@ -157,11 +160,12 @@ export default function LecturerAssignmentPage() {
   }));
 
   if (isChecking) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 text-cyan-500 dark:text-cyan-400 animate-spin" /></div>;
+    return <PageLoader message="Memverifikasi admin..." />;
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+    <PageTransition>
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
@@ -178,39 +182,55 @@ export default function LecturerAssignmentPage() {
       {isLoading ? (
         <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 text-cyan-500 dark:text-cyan-400 animate-spin" /></div>
       ) : groupedByLecturer.length === 0 ? (
-        <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl py-12 text-center text-slate-400 dark:text-neutral-500 text-sm">
-          Belum ada dosen terdaftar.
-        </div>
+        <ResponsiveTableWrapper>
+          <EmptyState 
+            title="Belum ada dosen terdaftar" 
+            description="Silakan tambahkan data dosen terlebih dahulu." 
+          />
+        </ResponsiveTableWrapper>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {groupedByLecturer.map(lec => (
-            <div key={lec.id} className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl p-5 backdrop-blur-md shadow-lg hover:border-cyan-500/20 transition-all">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 flex items-center justify-center text-white text-sm font-bold uppercase">
-                  {lec.nama_lengkap?.charAt(0) || 'D'}
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-800 dark:text-white">{lec.nama_lengkap}</h3>
-                  <p className="text-[10px] text-slate-400 dark:text-neutral-500 font-mono">{lec.nim_nip || '-'}</p>
-                </div>
-              </div>
-              {lec.courses.length === 0 ? (
-                <p className="text-xs text-slate-400 dark:text-neutral-600 italic">Belum ada mata kuliah ditugaskan.</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {lec.courses.map(a => (
-                    <div key={a.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-xs font-semibold text-indigo-600 dark:text-indigo-400 group">
-                      <span>{a.course_name}</span>
-                      <button onClick={() => setDeleteTarget(a)} className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer p-0.5 hover:text-red-400">
-                        <X className="w-3 h-3" />
-                      </button>
+        <ResponsiveTableWrapper>
+          <GlassTable className="min-w-[800px]">
+            <GlassTableHeader>
+              <tr>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Dosen Pengajar</th>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">NIM/NIP</th>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mata Kuliah Ditugaskan</th>
+              </tr>
+            </GlassTableHeader>
+            <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
+              {groupedByLecturer.map(lec => (
+                <GlassTableRow key={lec.id}>
+                  <td className="py-3 px-5 whitespace-nowrap">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold uppercase">
+                        {lec.nama_lengkap?.charAt(0) || 'D'}
+                      </div>
+                      <span className="text-sm font-semibold text-slate-800 dark:text-white">{lec.nama_lengkap}</span>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+                  </td>
+                  <td className="py-3 px-5 text-sm font-mono text-slate-500 dark:text-neutral-400 whitespace-nowrap">{lec.nim_nip || '-'}</td>
+                  <td className="py-3 px-5">
+                    {lec.courses.length === 0 ? (
+                      <span className="text-xs text-slate-400 dark:text-neutral-600 italic">Belum ada mata kuliah ditugaskan.</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {lec.courses.map(a => (
+                          <div key={a.id} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 group">
+                            <span>{a.course_name}</span>
+                            <button onClick={() => setDeleteTarget(a)} className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer p-0.5 hover:text-red-400">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                </GlassTableRow>
+              ))}
+            </tbody>
+          </GlassTable>
+        </ResponsiveTableWrapper>
       )}
 
       {/* Add Assignment Modal */}
@@ -257,5 +277,6 @@ export default function LecturerAssignmentPage() {
         isLoading={isDeleting}
       />
     </div>
+    </PageTransition>
   );
 }

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import AdminSidebar from '../components/AdminSidebar';
 import { X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
@@ -41,42 +42,53 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           onToggle={toggleSidebar}
         />
 
-        {/* Mobile Sidebar Overlay */}
-        {mobileSidebarOpen && (
-          <div 
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-all duration-300"
-            onClick={() => setMobileSidebarOpen(false)}
-          />
-        )}
-
-        {/* Mobile Sidebar Drawer */}
-        <div 
-          className={`fixed inset-y-0 left-0 w-[260px] bg-white dark:bg-[#070710] border-r border-slate-200 dark:border-neutral-900 z-50 transform transition-transform duration-300 md:hidden flex flex-col h-full ${
-            mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
-        >
-          {/* Mobile Sidebar Header */}
-          <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black/20 flex-shrink-0">
-            <span className="font-extrabold text-xs uppercase tracking-widest text-slate-800 dark:text-neutral-200">
-              Menu Admin
-            </span>
-            <button 
+        <AnimatePresence>
+          {/* Mobile Sidebar Overlay */}
+          {mobileSidebarOpen && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
               onClick={() => setMobileSidebarOpen(false)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:text-neutral-500 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-all cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          {/* Sidebar Navigation */}
-          <div className="flex-1 overflow-y-auto">
-            <AdminSidebar 
-               collapsed={false} 
-               onToggle={() => {}} 
-               onItemClick={() => setMobileSidebarOpen(false)}
-               hideToggle={true}
             />
-          </div>
-        </div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {/* Mobile Sidebar Drawer */}
+          {mobileSidebarOpen && (
+            <motion.div 
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed inset-y-0 left-0 w-[260px] bg-slate-50 dark:bg-[#070710] border-r border-slate-200 dark:border-neutral-900 z-50 flex flex-col h-full shadow-2xl"
+            >
+              {/* Mobile Sidebar Header */}
+              <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200 dark:border-neutral-900 bg-white dark:bg-black/20 flex-shrink-0">
+                <span className="font-extrabold text-xs uppercase tracking-widest text-slate-800 dark:text-neutral-200">
+                  Menu Admin
+                </span>
+                <button 
+                  onClick={() => setMobileSidebarOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:text-neutral-500 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              {/* Sidebar Navigation */}
+              <div className="flex-1 overflow-y-auto bg-white dark:bg-[#070710]">
+                <AdminSidebar 
+                   collapsed={false} 
+                   onToggle={() => {}} 
+                   onItemClick={() => setMobileSidebarOpen(false)}
+                   hideToggle={true}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto h-full">

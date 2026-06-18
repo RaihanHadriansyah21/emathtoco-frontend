@@ -10,6 +10,7 @@ import Image from 'next/image';
 import Logo from '../../Emathtoco.png';
 import { Eye, EyeOff, ArrowLeft, GraduationCap } from 'lucide-react';
 import { motion } from 'framer-motion';
+import PageTransition from '@/components/ui/PageTransition';
 
 export default function MahasiswaLoginPage() {
     const router = useRouter();
@@ -214,155 +215,157 @@ export default function MahasiswaLoginPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#060814] via-[#020205] to-[#000000] flex items-center justify-center px-4 font-sans relative overflow-hidden">
-            {/* Elegant Background Glows */}
-            <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-                <div className="absolute top-[10%] left-[15%] w-[450px] h-[450px] bg-cyan-500/12 rounded-full blur-[120px] animate-float-blue"></div>
-                <div className="absolute bottom-[15%] right-[15%] w-[500px] h-[500px] bg-indigo-500/12 rounded-full blur-[130px] animate-float-purple"></div>
-            </div>
-
-            {/* Top Navigation Bar with brand text only */}
-            <motion.nav
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-                className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-6 sm:px-10 lg:px-14 py-5"
-            >
-                <div className="flex items-center">
-                    <span className="text-white text-sm font-bold tracking-wider">
-                        E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-bold">TOCO</span>
-                    </span>
+        <PageTransition>
+            <div className="min-h-screen bg-gradient-to-br from-[#060814] via-[#020205] to-[#000000] flex items-center justify-center px-4 pt-[calc(4.5rem+env(safe-area-inset-top))] pb-[calc(2rem+env(safe-area-inset-bottom))] font-sans relative overflow-hidden">
+                {/* Elegant Background Glows */}
+                <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+                    <div className="absolute top-[10%] left-[15%] w-[450px] h-[450px] bg-cyan-500/12 rounded-full blur-[120px] animate-float-blue"></div>
+                    <div className="absolute bottom-[15%] right-[15%] w-[500px] h-[500px] bg-indigo-500/12 rounded-full blur-[130px] animate-float-purple"></div>
                 </div>
-            </motion.nav>
 
-            <motion.div
-                initial={{ opacity: 0, y: 30, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                className="w-full max-w-md bg-[#0A0A0F]/80 border border-neutral-800/80 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-[0_0_50px_rgba(0,0,0,0.8)] relative z-10 overflow-hidden"
-            >
-                <div className="absolute -top-10 -right-10 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none"></div>
-
-                {/* Back to role selection — navigates to /login?select=true */}
-                <motion.button
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.3, delay: 0.2 }}
-                    onClick={() => router.push('/login?select=true')}
-                    className="flex items-center gap-1.5 text-neutral-500 hover:text-cyan-400 text-xs font-bold uppercase tracking-widest mb-6 transition-colors cursor-pointer"
+                {/* Top Navigation Bar with brand text only */}
+                <motion.nav
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.2 }}
+                    className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 md:px-10 lg:px-14 pt-[calc(1.25rem+env(safe-area-inset-top))] pb-5"
                 >
-                    <ArrowLeft className="w-3.5 h-3.5" />
-                    <span>Kembali</span>
-                </motion.button>
+                    <div className="flex items-center">
+                        <span className="text-white text-xs sm:text-sm font-bold tracking-wider select-none">
+                            E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-bold">TOCO</span>
+                        </span>
+                    </div>
+                </motion.nav>
 
                 <motion.div
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: 0.15 }}
-                    className="text-center mb-8"
+                    initial={{ opacity: 0, y: 30, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                    className="w-full max-w-md glass-card rounded-2xl p-5 sm:p-8 shadow-[0_0_50px_rgba(0,0,0,0.8)] relative z-10 overflow-hidden"
                 >
-                    <div className="mx-auto w-fit bg-white border border-slate-200 rounded-xl p-4 shadow-sm mb-4 flex items-center justify-center">
-                        <Image
-                            src={Logo}
-                            alt="Logo E-MATHTOCO"
-                            className="h-10 w-auto object-contain"
-                            priority
-                        />
-                    </div>
+                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none"></div>
 
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                        <GraduationCap className="w-5 h-5 text-cyan-400" />
-                        <h1 className="text-2xl font-extrabold tracking-wider text-white">
-                            Masuk sebagai <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">Mahasiswa</span>
-                        </h1>
-                    </div>
-                    <p className="text-neutral-500 text-xs uppercase tracking-widest mt-1">Akses pengumpulan tugas dan hasil penilaian AI</p>
-                </motion.div>
+                    {/* Back to role selection — navigates to /login?select=true */}
+                    <motion.button
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.3, delay: 0.2 }}
+                        onClick={() => router.push('/login?select=true')}
+                        className="flex items-center gap-1.5 text-neutral-500 hover:text-cyan-400 text-xs font-bold uppercase tracking-widest mb-4 sm:mb-6 transition-colors cursor-pointer"
+                    >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                        <span>Kembali</span>
+                    </motion.button>
 
-                {errorMessage && (
                     <motion.div
-                        initial={{ opacity: 0, y: -10 }}
+                        initial={{ opacity: 0, y: 15 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="mb-6 flex items-start gap-3 bg-red-950/20 border border-red-900/50 text-red-400 p-4 rounded-xl text-sm"
+                        transition={{ duration: 0.4, delay: 0.15 }}
+                        className="text-center mb-6 sm:mb-8"
                     >
-                        <p className="font-medium leading-relaxed">{errorMessage}</p>
-                    </motion.div>
-                )}
-
-                <motion.form
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: 0.25 }}
-                    onSubmit={handleLoginSubmit}
-                    className="space-y-5"
-                >
-                    <div>
-                        <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Email</label>
-                        <input
-                            type="email"
-                            placeholder="nama@gmail.com"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full bg-black border border-neutral-800 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/20 transition-all text-sm placeholder:text-neutral-600"
-                        />
-                    </div>
-
-                    <div>
-                        <div className="flex justify-between items-center mb-2">
-                            <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400">Password</label>
-                            <Link href="/forgot-password" className="text-xs font-bold text-cyan-400 hover:text-cyan-300 hover:underline transition-all">
-                                Lupa Password?
-                            </Link>
-                        </div>
-                        <div className="relative">
-                            <input
-                                type={showPassword ? "text" : "password"}
-                                placeholder="••••••••"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full bg-black border border-neutral-800 rounded-xl py-3 pl-4 pr-12 text-white focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/20 transition-all text-sm placeholder:text-neutral-600"
+                        <div className="mx-auto w-fit bg-white border border-slate-200 rounded-xl p-3 sm:p-4 shadow-sm mb-3 sm:mb-4 flex items-center justify-center">
+                            <Image
+                                src={Logo}
+                                alt="Logo E-MATHTOCO"
+                                className="h-8 sm:h-10 w-auto object-contain"
+                                priority
                             />
-                            <button
-                                type="button"
-                                onClick={togglePasswordVisibility}
-                                aria-label={showPassword ? "Hide password" : "Show password"}
-                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-350 active:scale-95 transition-all p-1 rounded-lg hover:bg-neutral-900/50 cursor-pointer flex items-center justify-center"
-                            >
-                                {showPassword ? (
-                                    <EyeOff className="w-4 h-4" />
-                                ) : (
-                                    <Eye className="w-4 h-4" />
-                                )}
-                            </button>
                         </div>
-                    </div>
 
-                    <button
-                        type="submit"
-                        disabled={isLoading}
-                        className="w-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-600 hover:via-blue-600 hover:to-indigo-700 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/10 disabled:opacity-50 text-sm tracking-widest cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                            <GraduationCap className="w-5 h-5 text-cyan-400" />
+                            <h1 className="text-xl sm:text-2xl font-extrabold tracking-wider text-white">
+                                Masuk sebagai <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">Mahasiswa</span>
+                            </h1>
+                        </div>
+                        <p className="text-neutral-550 text-[10px] sm:text-xs uppercase tracking-widest mt-1">Akses pengumpulan tugas dan hasil penilaian AI</p>
+                    </motion.div>
+
+                    {errorMessage && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className="mb-4 sm:mb-6 flex items-start gap-3 bg-red-950/20 border border-red-900/50 text-red-400 p-4 rounded-xl text-sm"
+                        >
+                            <p className="font-medium leading-relaxed text-xs sm:text-sm">{errorMessage}</p>
+                        </motion.div>
+                    )}
+
+                    <motion.form
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4, delay: 0.25 }}
+                        onSubmit={handleLoginSubmit}
+                        className="space-y-4 sm:space-y-5"
                     >
-                        {isLoading ? <span>Memverifikasi Akun...</span> : <span>MASUK KE SISTEM</span>}
-                    </button>
-                </motion.form>
+                        <div>
+                            <label className="block text-[10px] sm:text-xs font-bold uppercase tracking-widest text-neutral-400 mb-1.5 sm:mb-2">Email</label>
+                            <input
+                                type="email"
+                                placeholder="nama@gmail.com"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="w-full bg-black border border-neutral-800 rounded-xl py-2.5 px-3.5 sm:py-3 sm:px-4 text-white focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/20 transition-all text-xs sm:text-sm placeholder:text-neutral-600"
+                            />
+                        </div>
 
-                {/* Link to register */}
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.4, delay: 0.4 }}
-                    className="mt-6 text-center"
-                >
-                    <p className="text-sm text-neutral-400">
-                        Belum punya akun?{' '}
-                        <Link href="/register" className="text-cyan-400 font-bold hover:text-cyan-300 hover:underline transition-all">
-                            Buat Akun Baru
-                        </Link>
-                    </p>
+                        <div>
+                            <div className="flex justify-between items-center mb-1.5 sm:mb-2">
+                                <label className="block text-[10px] sm:text-xs font-bold uppercase tracking-widest text-neutral-400">Password</label>
+                                <Link href="/forgot-password" className="text-[10px] sm:text-xs font-bold text-cyan-400 hover:text-cyan-300 hover:underline transition-all">
+                                    Lupa Password?
+                                </Link>
+                            </div>
+                            <div className="relative">
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="••••••••"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full bg-black border border-neutral-800 rounded-xl py-2.5 pl-3.5 pr-11 sm:py-3 sm:pl-4 sm:pr-12 text-white focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/20 transition-all text-xs sm:text-sm placeholder:text-neutral-600"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={togglePasswordVisibility}
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-350 active:scale-95 transition-all p-1 rounded-lg hover:bg-neutral-900/50 cursor-pointer flex items-center justify-center"
+                                >
+                                    {showPassword ? (
+                                        <EyeOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    ) : (
+                                        <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-600 hover:via-blue-600 hover:to-indigo-700 text-white font-extrabold py-3 sm:py-3.5 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/10 disabled:opacity-50 text-xs sm:text-sm tracking-widest cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
+                        >
+                            {isLoading ? <span>Memverifikasi Akun...</span> : <span>MASUK KE SISTEM</span>}
+                        </button>
+                    </motion.form>
+
+                    {/* Link to register */}
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.4, delay: 0.4 }}
+                        className="mt-5 sm:mt-6 text-center"
+                    >
+                        <p className="text-xs sm:text-sm text-neutral-400">
+                            Belum punya akun?{' '}
+                            <Link href="/register" className="text-cyan-400 font-bold hover:text-cyan-300 hover:underline transition-all">
+                                Buat Akun Baru
+                            </Link>
+                        </p>
+                    </motion.div>
+
                 </motion.div>
-
-            </motion.div>
-        </div>
+            </div>
+        </PageTransition>
     );
 }

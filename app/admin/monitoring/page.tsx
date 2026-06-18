@@ -2,9 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, Loader2, Database, FileImage, Clock, BarChart3 } from 'lucide-react';
+import { Activity, Database, FileImage, Clock, BarChart3 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
+import { GlassTable, GlassTableHeader, GlassTableRow, EmptyState, ResponsiveTableWrapper } from '@/components/ui/table';
+import { GlassCard } from '@/components/ui/card';
+import { PageLoader, TableLoader } from '@/components/ui/loaders';
+import PageTransition from '@/components/ui/PageTransition';
 
 interface PipelineStats {
   submitted: number;
@@ -92,121 +96,147 @@ export default function MonitoringPage() {
     return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'submitted': return 'text-amber-500 dark:text-amber-400';
-      case 'processing_ai': return 'text-purple-500 dark:text-purple-400';
-      case 'reviewed': return 'text-blue-500 dark:text-blue-400';
-      case 'finalized': return 'text-emerald-500 dark:text-emerald-400';
-      default: return 'text-slate-500 dark:text-neutral-400';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'submitted': return 'Menunggu AI';
-      case 'processing_ai': return 'Diproses AI';
-      case 'reviewed': return 'Direview';
-      case 'finalized': return 'Final';
-      default: return 'Draft';
+      case 'submitted':     return { label: 'Menunggu AI', color: 'text-amber-500 dark:text-amber-400',   dot: 'bg-amber-500 dark:bg-amber-400' };
+      case 'processing_ai': return { label: 'Diproses AI', color: 'text-purple-500 dark:text-purple-400', dot: 'bg-purple-500 dark:bg-purple-400' };
+      case 'reviewed':      return { label: 'Direview',    color: 'text-blue-500 dark:text-blue-400',     dot: 'bg-blue-500 dark:bg-blue-400' };
+      case 'finalized':     return { label: 'Final',       color: 'text-emerald-500 dark:text-emerald-400', dot: 'bg-emerald-500 dark:bg-emerald-400' };
+      default:              return { label: 'Draft',       color: 'text-slate-500 dark:text-neutral-400', dot: 'bg-slate-400 dark:bg-neutral-500' };
     }
   };
 
   if (isChecking) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 text-cyan-500 dark:text-cyan-400 animate-spin" /></div>;
+    return <PageLoader message="Memverifikasi admin..." />;
   }
 
   const pipelineStages = [
-    { label: 'Menunggu AI', count: pipeline.submitted, color: 'from-amber-500 to-orange-500', bgColor: 'bg-amber-500' },
-    { label: 'Diproses AI', count: pipeline.processing_ai, color: 'from-purple-500 to-pink-500', bgColor: 'bg-purple-500' },
-    { label: 'Direview', count: pipeline.reviewed, color: 'from-blue-500 to-indigo-500', bgColor: 'bg-blue-500' },
-    { label: 'Finalized', count: pipeline.finalized, color: 'from-emerald-500 to-teal-500', bgColor: 'bg-emerald-500' },
+    { label: 'Menunggu AI',  count: pipeline.submitted,      color: 'from-amber-500 to-orange-500' },
+    { label: 'Diproses AI',  count: pipeline.processing_ai,  color: 'from-purple-500 to-pink-500' },
+    { label: 'Direview',     count: pipeline.reviewed,       color: 'from-blue-500 to-indigo-500' },
+    { label: 'Finalized',    count: pipeline.finalized,      color: 'from-emerald-500 to-teal-500' },
   ];
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
-      <div>
-        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
-          <Activity className="w-6 h-6 text-cyan-500 dark:text-cyan-400" />
-          Monitoring Sistem
-        </h1>
-        <p className="text-slate-500 dark:text-neutral-400 text-sm mt-1">Statistik pipeline, storage, dan aktivitas sistem E-MATHTOCO.</p>
-      </div>
+    <PageTransition>
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
+            <Activity className="w-6 h-6 text-cyan-500 dark:text-cyan-400" />
+            Monitoring Sistem
+          </h1>
+          <p className="text-slate-500 dark:text-neutral-400 text-sm mt-1">Statistik pipeline, storage, dan aktivitas sistem E-MATHTOCO.</p>
+        </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 text-cyan-500 dark:text-cyan-400 animate-spin" /></div>
-      ) : (
-        <>
-          {/* Pipeline Stats */}
-          <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl p-6 shadow-xl backdrop-blur-md">
-            <h2 className="text-sm font-bold text-slate-600 dark:text-neutral-300 uppercase tracking-widest mb-5 flex items-center gap-2">
-              <BarChart3 className="w-4 h-4" /> Pipeline Submission
-            </h2>
-            <div className="space-y-4">
-              {pipelineStages.map((stage, idx) => (
-                <div key={idx} className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-slate-700 dark:text-neutral-300">{stage.label}</span>
-                    <span className="text-sm font-mono font-bold text-slate-800 dark:text-white">{stage.count} <span className="text-slate-400 dark:text-neutral-500 font-normal text-xs">/ {pipeline.total}</span></span>
-                  </div>
-                  <div className="h-3 bg-slate-100 dark:bg-neutral-900 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full bg-gradient-to-r ${stage.color} rounded-full transition-all duration-700`}
-                      style={{ width: pipeline.total > 0 ? `${(stage.count / pipeline.total) * 100}%` : '0%' }}
-                    />
-                  </div>
-                </div>
-              ))}
+        {isLoading ? (
+          <div className="space-y-6">
+            {/* Pipeline skeleton */}
+            <TableLoader rows={4} cols={2} />
+            {/* Stats skeleton */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="h-24 rounded-2xl bg-slate-100 dark:bg-neutral-900/50 animate-pulse" />
+              <div className="h-24 rounded-2xl bg-slate-100 dark:bg-neutral-900/50 animate-pulse" />
             </div>
+            {/* Activity skeleton */}
+            <TableLoader rows={5} cols={4} />
           </div>
-
-          {/* Storage + Quick Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-white dark:bg-[#0A0A0F] dark:bg-gradient-to-b dark:from-cyan-500/10 dark:to-blue-500/5 border border-slate-200 dark:border-cyan-500/15 rounded-2xl p-5 shadow-lg">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-widest">Lembar Jawaban</span>
-                <FileImage className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />
-              </div>
-              <span className="text-3xl font-extrabold text-slate-800 dark:text-white font-mono">{answerSheetCount}</span>
-              <p className="text-xs text-slate-400 dark:text-neutral-500 mt-1">total gambar tersimpan</p>
-            </div>
-            <div className="bg-white dark:bg-[#0A0A0F] dark:bg-gradient-to-b dark:from-indigo-500/10 dark:to-purple-500/5 border border-slate-200 dark:border-indigo-500/15 rounded-2xl p-5 shadow-lg">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-widest">Total Submission</span>
-                <Database className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
-              </div>
-              <span className="text-3xl font-extrabold text-slate-800 dark:text-white font-mono">{pipeline.total}</span>
-              <p className="text-xs text-slate-400 dark:text-neutral-500 mt-1">pengumpulan tugas</p>
-            </div>
-          </div>
-
-          {/* Recent Activity */}
-          <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl p-6 shadow-xl backdrop-blur-md">
-            <h2 className="text-sm font-bold text-slate-600 dark:text-neutral-300 uppercase tracking-widest mb-5 flex items-center gap-2">
-              <Clock className="w-4 h-4" /> Aktivitas Terbaru
-            </h2>
-            <div className="space-y-3">
-              {recentActivity.length === 0 ? (
-                <p className="text-sm text-slate-400 dark:text-neutral-500">Belum ada aktivitas.</p>
-              ) : recentActivity.map(a => (
-                <div key={a.id} className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-neutral-900/50 last:border-0">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${getStatusColor(a.status_submit).replace('text-', 'bg-').replace(' dark:text-', ' dark:bg-').split(' ')[0]}`} />
-                    <div>
-                      <span className="text-sm font-semibold text-slate-800 dark:text-white">{a.student_name}</span>
-                      <span className="text-xs text-slate-400 dark:text-neutral-500 ml-2">{a.course_name}</span>
+        ) : (
+          <>
+            {/* Pipeline Stats */}
+            <GlassCard hoverScale={false} className="p-6">
+              <h2 className="text-sm font-bold text-slate-600 dark:text-neutral-300 uppercase tracking-widest mb-5 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" /> Pipeline Submission
+              </h2>
+              <div className="space-y-4">
+                {pipelineStages.map((stage, idx) => (
+                  <div key={idx} className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-slate-700 dark:text-neutral-300">{stage.label}</span>
+                      <span className="text-sm font-mono font-bold text-slate-800 dark:text-white">
+                        {stage.count} <span className="text-slate-400 dark:text-neutral-500 font-normal text-xs">/ {pipeline.total}</span>
+                      </span>
+                    </div>
+                    <div className="h-2.5 bg-slate-100 dark:bg-neutral-900 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full bg-gradient-to-r ${stage.color} rounded-full transition-all duration-700 ease-out`}
+                        style={{ width: pipeline.total > 0 ? `${(stage.count / pipeline.total) * 100}%` : '0%' }}
+                      />
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className={`text-xs font-bold ${getStatusColor(a.status_submit)}`}>{getStatusLabel(a.status_submit)}</span>
-                    <span className="text-[10px] text-slate-400 dark:text-neutral-600">{formatDate(a.waktu_submit)}</span>
-                  </div>
+                ))}
+              </div>
+            </GlassCard>
+
+            {/* Storage + Quick Stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <GlassCard hoverScale={false} accentColor="from-cyan-400 to-blue-500" className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-widest">Lembar Jawaban</span>
+                  <FileImage className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />
                 </div>
-              ))}
+                <span className="text-3xl font-extrabold text-slate-800 dark:text-white font-mono">{answerSheetCount}</span>
+                <p className="text-xs text-slate-400 dark:text-neutral-500 mt-1">total gambar tersimpan</p>
+              </GlassCard>
+              <GlassCard hoverScale={false} accentColor="from-indigo-400 to-purple-500" className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-widest">Total Submission</span>
+                  <Database className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+                </div>
+                <span className="text-3xl font-extrabold text-slate-800 dark:text-white font-mono">{pipeline.total}</span>
+                <p className="text-xs text-slate-400 dark:text-neutral-500 mt-1">pengumpulan tugas</p>
+              </GlassCard>
             </div>
-          </div>
-        </>
-      )}
-    </div>
+
+            {/* Recent Activity */}
+            <GlassCard hoverScale={false} className="p-6">
+              <h2 className="text-sm font-bold text-slate-600 dark:text-neutral-300 uppercase tracking-widest mb-5 flex items-center gap-2">
+                <Clock className="w-4 h-4" /> Aktivitas Terbaru
+              </h2>
+              {recentActivity.length === 0 ? (
+                <EmptyState title="Tidak ada aktivitas terbaru" description="Belum ada data pengumpulan tugas baru yang terekam." />
+              ) : (
+                <ResponsiveTableWrapper>
+                  <GlassTable>
+                    <GlassTableHeader>
+                      <tr>
+                        <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Mahasiswa</th>
+                        <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Mata Kuliah</th>
+                        <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Status</th>
+                        <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Waktu</th>
+                      </tr>
+                    </GlassTableHeader>
+                    <tbody>
+                      {recentActivity.map(a => {
+                        const badge = getStatusBadge(a.status_submit);
+                        return (
+                          <GlassTableRow key={a.id}>
+                            <td className="px-4 py-3 text-sm font-semibold text-slate-800 dark:text-neutral-200">
+                              {a.student_name}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-slate-600 dark:text-neutral-400">
+                              {a.course_name}
+                            </td>
+                            <td className="px-4 py-3 text-xs">
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-neutral-900/50 ${badge.color}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${badge.dot}`} />
+                                {badge.label}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-xs font-mono text-slate-400 dark:text-neutral-500">
+                              {formatDate(a.waktu_submit)}
+                            </td>
+                          </GlassTableRow>
+                        );
+                      })}
+                    </tbody>
+                  </GlassTable>
+                </ResponsiveTableWrapper>
+              )}
+            </GlassCard>
+          </>
+        )}
+      </div>
+    </PageTransition>
   );
 }

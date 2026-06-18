@@ -6,6 +6,9 @@ import { BookOpen, Search, Loader2, Plus, Pencil, Trash2, X } from 'lucide-react
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import ConfirmModal from '@/app/components/ConfirmModal';
+import { GlassTable, GlassTableHeader, GlassTableRow, EmptyState, ResponsiveTableWrapper } from '@/components/ui/table';
+import PageTransition from '@/components/ui/PageTransition';
+import { PageLoader } from '@/components/ui/loaders';
 
 interface Course {
   id: string;
@@ -137,11 +140,12 @@ export default function CourseManagementPage() {
   };
 
   if (isChecking) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 text-cyan-500 dark:text-cyan-400 animate-spin" /></div>;
+    return <PageLoader message="Memverifikasi admin..." />;
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+    <PageTransition>
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
@@ -177,45 +181,50 @@ export default function CourseManagementPage() {
       {isLoading ? (
         <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 text-cyan-500 dark:text-cyan-400 animate-spin" /></div>
       ) : (
-        <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[800px]">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black/40">
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Icon</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Nama Mata Kuliah</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Kode</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Dosen</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Dibuat</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right whitespace-nowrap">Aksi</th>
+        <ResponsiveTableWrapper>
+          <GlassTable className="min-w-[800px]">
+            <GlassTableHeader>
+              <tr>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Icon</th>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Nama Mata Kuliah</th>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Kode</th>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Dosen</th>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Dibuat</th>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right whitespace-nowrap">Aksi</th>
+              </tr>
+            </GlassTableHeader>
+            <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
+              {filteredCourses.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12">
+                    <EmptyState 
+                      title="Tidak ada mata kuliah" 
+                      description="Tidak ada mata kuliah ditemukan."
+                    />
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
-                {filteredCourses.length === 0 ? (
-                  <tr><td colSpan={6} className="py-12 text-center text-slate-400 dark:text-neutral-500 text-sm">Tidak ada mata kuliah ditemukan.</td></tr>
-                ) : filteredCourses.map((course) => (
-                  <tr key={course.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
-                    <td className="py-3 px-5 text-xl whitespace-nowrap">{iconMap[course.icon_name] || '📚'}</td>
-                    <td className="py-3 px-5 text-sm font-semibold text-slate-800 dark:text-white whitespace-nowrap">{course.nama_matkul}</td>
-                    <td className="py-3 px-5 text-xs font-mono text-slate-500 dark:text-neutral-400 uppercase tracking-wider whitespace-nowrap">{course.kode_matkul}</td>
-                    <td className="py-3 px-5 text-sm text-slate-600 dark:text-neutral-300 whitespace-nowrap">{course.nama_dosen || '-'}</td>
-                    <td className="py-3 px-5 text-xs text-slate-400 dark:text-neutral-500 whitespace-nowrap">{formatDate(course.created_at)}</td>
-                    <td className="py-3 px-5 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => openEditForm(course)} className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 dark:text-cyan-400 hover:bg-cyan-500/20 transition-all cursor-pointer">
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => setDeleteTarget(course)} className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 hover:bg-red-500/20 transition-all cursor-pointer">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              ) : filteredCourses.map((course) => (
+                <GlassTableRow key={course.id}>
+                  <td className="py-3 px-5 text-xl whitespace-nowrap">{iconMap[course.icon_name] || '📚'}</td>
+                  <td className="py-3 px-5 text-sm font-semibold text-slate-800 dark:text-white whitespace-nowrap">{course.nama_matkul}</td>
+                  <td className="py-3 px-5 text-xs font-mono text-slate-500 dark:text-neutral-400 uppercase tracking-wider whitespace-nowrap">{course.kode_matkul}</td>
+                  <td className="py-3 px-5 text-sm text-slate-600 dark:text-neutral-300 whitespace-nowrap">{course.nama_dosen || '-'}</td>
+                  <td className="py-3 px-5 text-xs text-slate-400 dark:text-neutral-500 whitespace-nowrap">{formatDate(course.created_at)}</td>
+                  <td className="py-3 px-5 text-right whitespace-nowrap">
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => openEditForm(course)} className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 dark:text-cyan-400 hover:bg-cyan-500/20 transition-all cursor-pointer">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => setDeleteTarget(course)} className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 hover:bg-red-500/20 transition-all cursor-pointer">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                </GlassTableRow>
+              ))}
+            </tbody>
+          </GlassTable>
+        </ResponsiveTableWrapper>
       )}
 
       {/* Add/Edit Form Modal */}
@@ -285,5 +294,6 @@ export default function CourseManagementPage() {
         isLoading={isDeleting}
       />
     </div>
+    </PageTransition>
   );
 }

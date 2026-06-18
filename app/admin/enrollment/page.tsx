@@ -6,6 +6,9 @@ import { UserCheck, Loader2, Plus, Search, X, Trash2, ChevronLeft, ChevronRight 
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import ConfirmModal from '@/app/components/ConfirmModal';
+import { GlassTable, GlassTableHeader, GlassTableRow, EmptyState, ResponsiveTableWrapper } from '@/components/ui/table';
+import PageTransition from '@/components/ui/PageTransition';
+import { PageLoader } from '@/components/ui/loaders';
 
 interface Student {
   id: string;
@@ -194,11 +197,12 @@ export default function EnrollmentPage() {
   };
 
   if (isChecking) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 text-cyan-500 dark:text-cyan-400 animate-spin" /></div>;
+    return <PageLoader message="Memverifikasi admin..." />;
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+    <PageTransition>
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
@@ -230,39 +234,44 @@ export default function EnrollmentPage() {
       {isLoading ? (
         <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 text-cyan-500 dark:text-cyan-400 animate-spin" /></div>
       ) : (
-        <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[750px]">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black/40">
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mahasiswa</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">NIM</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Kelas</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mata Kuliah</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right whitespace-nowrap">Aksi</th>
+        <ResponsiveTableWrapper>
+          <GlassTable className="min-w-[750px]">
+            <GlassTableHeader>
+              <tr>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mahasiswa</th>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">NIM</th>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Kelas</th>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mata Kuliah</th>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right whitespace-nowrap">Aksi</th>
+              </tr>
+            </GlassTableHeader>
+            <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
+              {paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-12">
+                    <EmptyState 
+                      title="Belum ada enrollment" 
+                      description="Belum ada data pendaftaran mahasiswa."
+                    />
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
-                {paginated.length === 0 ? (
-                  <tr><td colSpan={5} className="py-12 text-center text-slate-400 dark:text-neutral-500 text-sm">Belum ada enrollment.</td></tr>
-                ) : paginated.map(e => (
-                  <tr key={e.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
-                    <td className="py-3 px-5 text-sm font-semibold text-slate-800 dark:text-white whitespace-nowrap">{e.student_name}</td>
-                    <td className="py-3 px-5 text-xs font-mono text-slate-500 dark:text-neutral-400 whitespace-nowrap">{e.student_nim}</td>
-                    <td className="py-3 px-5 text-sm text-slate-600 dark:text-neutral-300 whitespace-nowrap">{e.student_class}</td>
-                    <td className="py-3 px-5 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-xs font-semibold text-indigo-600 dark:text-indigo-400">{e.course_name}</span>
-                    </td>
-                    <td className="py-3 px-5 text-right whitespace-nowrap">
-                      <button onClick={() => setDeleteTarget(e)} className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 hover:bg-red-500/20 transition-all cursor-pointer">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ) : paginated.map(e => (
+                <GlassTableRow key={e.id}>
+                  <td className="py-3 px-5 text-sm font-semibold text-slate-800 dark:text-white whitespace-nowrap">{e.student_name}</td>
+                  <td className="py-3 px-5 text-xs font-mono text-slate-500 dark:text-neutral-400 whitespace-nowrap">{e.student_nim}</td>
+                  <td className="py-3 px-5 text-sm text-slate-600 dark:text-neutral-300 whitespace-nowrap">{e.student_class}</td>
+                  <td className="py-3 px-5 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-xs font-semibold text-indigo-600 dark:text-indigo-400">{e.course_name}</span>
+                  </td>
+                  <td className="py-3 px-5 text-right whitespace-nowrap">
+                    <button onClick={() => setDeleteTarget(e)} className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 hover:bg-red-500/20 transition-all cursor-pointer">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </td>
+                </GlassTableRow>
+              ))}
+            </tbody>
+          </GlassTable>
           {totalPages > 1 && (
             <div className="border-t border-slate-200 dark:border-neutral-900 px-5 py-3 flex items-center justify-between">
               <span className="text-xs text-slate-400 dark:text-neutral-500">
@@ -275,7 +284,7 @@ export default function EnrollmentPage() {
               </div>
             </div>
           )}
-        </div>
+        </ResponsiveTableWrapper>
       )}
 
       {/* Add Modal */}
@@ -369,5 +378,6 @@ export default function EnrollmentPage() {
 
       <ConfirmModal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Hapus Enrollment" message={`Hapus ${deleteTarget?.student_name} dari ${deleteTarget?.course_name}?`} confirmLabel="Hapus" variant="danger" isLoading={isDeleting} />
     </div>
+    </PageTransition>
   );
 }

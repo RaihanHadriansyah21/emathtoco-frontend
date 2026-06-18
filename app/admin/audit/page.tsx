@@ -11,6 +11,11 @@ import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import { standardizeModelName } from '@/lib/services/audit-service';
 import { apiGet } from '@/lib/api-client';
+import { GlassTable, GlassTableHeader, GlassTableRow, EmptyState, ResponsiveTableWrapper } from '@/components/ui/table';
+import { motion, AnimatePresence } from 'framer-motion';
+import { fadeIn, modalTransition } from '@/styles/motion';
+import PageTransition from '@/components/ui/PageTransition';
+import { PageLoader } from '@/components/ui/loaders';
 
 interface AuditEntry {
   id: string;
@@ -315,10 +320,10 @@ export default function AuditLogPage() {
       };
     }
     
-    // FINALISASI / FINAL SCORE — Green
+    // FINALISASI / FINAL SCORE — Emerald (aligned with success color token)
     if (act === 'FINAL_SCORE_SUBMITTED') {
       return {
-        badge: 'text-green-500 bg-green-500/10 border-green-500/20 dark:text-green-400 dark:bg-green-400/10 dark:border-green-400/20',
+        badge: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20 dark:text-emerald-400 dark:bg-emerald-400/10 dark:border-emerald-400/20',
         text: 'success'
       };
     }
@@ -443,15 +448,12 @@ export default function AuditLogPage() {
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   if (isChecking) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-cyan-500 dark:text-cyan-400 animate-spin" />
-      </div>
-    );
+    return <PageLoader message="Memverifikasi admin..." />;
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+    <PageTransition>
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -548,61 +550,65 @@ export default function AuditLogPage() {
               <Loader2 className="w-8 h-8 text-cyan-500 dark:text-cyan-400 animate-spin" />
             </div>
           ) : (
-            <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[850px]">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black/40">
-                      <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 w-[20%] whitespace-nowrap">Waktu</th>
-                      <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 w-[20%] whitespace-nowrap">Pengguna</th>
-                      <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 w-[25%] whitespace-nowrap">Action</th>
-                      <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 w-[25%] whitespace-nowrap">Target</th>
-                      <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center w-[10%] whitespace-nowrap">Detail</th>
+            <ResponsiveTableWrapper className="bg-white dark:bg-[#0A0A0F]/80 shadow-xl">
+              <GlassTable className="min-w-[850px]">
+                <GlassTableHeader>
+                  <tr>
+                    <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 w-[20%] whitespace-nowrap">Waktu</th>
+                    <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 w-[20%] whitespace-nowrap">Pengguna</th>
+                    <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 w-[25%] whitespace-nowrap">Action</th>
+                    <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 w-[25%] whitespace-nowrap">Target</th>
+                    <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center w-[10%] whitespace-nowrap">Detail</th>
+                  </tr>
+                </GlassTableHeader>
+                <tbody>
+                  {normalizedLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-400 dark:text-neutral-500 text-sm">
+                        <EmptyState title="Belum ada aktivitas" description="Belum ada aktivitas sistem yang tercatat." />
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
-                    {normalizedLogs.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="py-16 text-center text-slate-400 dark:text-neutral-500 text-sm">
-                          Belum ada aktivitas sistem yang tercatat.
+                  ) : normalizedLogs.map(log => {
+                    const theme = getActionTheme(log.action);
+                    return (
+                      <GlassTableRow 
+                        key={log.id} 
+                        onClick={() => setSelectedLog(logs.find(x => x.id === log.id) || null)}
+                      >
+                        <td className="py-3.5 px-5 text-xs text-slate-500 dark:text-neutral-400 whitespace-nowrap font-mono">
+                          {formatDate(log.created_at)}
                         </td>
-                      </tr>
-                    ) : normalizedLogs.map(log => {
-                      const theme = getActionTheme(log.action);
-                      return (
-                        <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
-                          <td className="py-3.5 px-5 text-xs text-slate-500 dark:text-neutral-400 whitespace-nowrap font-mono">
-                            {formatDate(log.created_at)}
-                          </td>
-                          <td className="py-3.5 px-5 whitespace-nowrap">
-                            <div className="flex flex-col">
-                              <span className="text-xs font-semibold text-slate-800 dark:text-white">{log.userName}</span>
-                              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mt-0.5">{log.role}</span>
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-5 whitespace-nowrap">
-                            <span className={`inline-block px-2.5 py-0.5 rounded-md border text-[9px] font-extrabold uppercase tracking-wider ${theme.badge}`}>
-                              {log.action}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-5 text-xs font-mono text-slate-650 dark:text-neutral-350 whitespace-nowrap">
-                            {log.target}
-                          </td>
-                          <td className="py-3.5 px-5 text-center whitespace-nowrap">
-                            <button
-                              onClick={() => setSelectedLog(logs.find(x => x.id === log.id) || null)}
-                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-slate-500 dark:text-neutral-400 transition-all cursor-pointer inline-flex items-center justify-center"
-                              title="Lihat Detail Log"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                        <td className="py-3.5 px-5 whitespace-nowrap">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-semibold text-slate-800 dark:text-white">{log.userName}</span>
+                            <span className="text-[10px] font-mono text-slate-400 dark:text-neutral-500 uppercase tracking-wider mt-0.5">{log.role}</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-5 whitespace-nowrap">
+                          <span className={`inline-block px-2.5 py-0.5 rounded-md border text-[9px] font-extrabold uppercase tracking-wider ${theme.badge}`}>
+                            {log.action}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-5 text-xs font-mono text-slate-650 dark:text-neutral-350 whitespace-nowrap">
+                          {log.target}
+                        </td>
+                        <td className="py-3.5 px-5 text-center whitespace-nowrap">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedLog(logs.find(x => x.id === log.id) || null);
+                            }}
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-slate-500 dark:text-neutral-400 transition-all cursor-pointer inline-flex items-center justify-center"
+                            title="Lihat Detail Log"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </GlassTableRow>
+                    );
+                  })}
+                </tbody>
+              </GlassTable>
 
               {/* Pagination */}
               {totalPages > 1 && (
@@ -629,24 +635,38 @@ export default function AuditLogPage() {
                   </div>
                 </div>
               )}
-            </div>
+            </ResponsiveTableWrapper>
           )}
         </>
       )}
 
       {/* Log Detail Modal */}
-      {selectedLog && (() => {
-        const norm = normalizeEntry(selectedLog);
-        const theme = getActionTheme(norm.action);
-        
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setSelectedLog(null)} />
-            
-            {/* Modal Body */}
-            <div className="relative w-full max-w-2xl bg-white dark:bg-[#09090F] border border-slate-200 dark:border-neutral-900 rounded-2xl p-6 shadow-2xl overflow-hidden">
-              <div className="absolute -top-10 -right-10 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
+      <AnimatePresence>
+        {selectedLog && (() => {
+          const norm = normalizeEntry(selectedLog);
+          const theme = getActionTheme(norm.action);
+          
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              {/* Backdrop */}
+              <motion.div
+                variants={fadeIn}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                onClick={() => setSelectedLog(null)}
+              />
+              
+              {/* Modal Body */}
+              <motion.div
+                variants={modalTransition}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                className="relative w-full max-w-2xl bg-white dark:bg-[#09090F] border border-slate-200 dark:border-neutral-900 rounded-2xl p-6 shadow-2xl overflow-hidden z-10"
+              >
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
               
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-neutral-900/80 pb-4 mb-4">
                 <div className="flex items-center gap-2.5">
@@ -726,10 +746,12 @@ export default function AuditLogPage() {
                   Tutup Rincian
                 </button>
               </div>
+              </motion.div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
+      </AnimatePresence>
     </div>
+    </PageTransition>
   );
 }

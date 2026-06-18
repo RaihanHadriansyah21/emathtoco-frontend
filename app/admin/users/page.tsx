@@ -6,8 +6,11 @@ import { Users, Search, Loader2, ChevronLeft, ChevronRight, Shield, GraduationCa
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import ConfirmModal from '@/app/components/ConfirmModal';
+import { GlassTable, GlassTableHeader, GlassTableRow, EmptyState, ResponsiveTableWrapper } from '@/components/ui/table';
 import { useToast } from '@/app/hooks/useToast';
 import ToastContainer from '@/app/components/Toast';
+import PageTransition from '@/components/ui/PageTransition';
+import { PageLoader } from '@/components/ui/loaders';
 
 interface UserProfile {
   id: string;
@@ -225,15 +228,12 @@ export default function UserManagementPage() {
   };
 
   if (isChecking) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-cyan-500 dark:text-cyan-400 animate-spin" />
-      </div>
-    );
+    return <PageLoader message="Memverifikasi admin..." />;
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+    <PageTransition>
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
@@ -280,83 +280,87 @@ export default function UserManagementPage() {
           <Loader2 className="w-8 h-8 text-cyan-500 dark:text-cyan-400 animate-spin" />
         </div>
       ) : (
-        <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[800px]">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black/40">
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Nama Lengkap</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">NIM/NIP</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Kelas</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Role</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Terdaftar</th>
-                  <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right whitespace-nowrap">Aksi</th>
+        <ResponsiveTableWrapper>
+          <GlassTable className="min-w-[800px]">
+            <GlassTableHeader>
+              <tr>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Nama Lengkap</th>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">NIM/NIP</th>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Kelas</th>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Role</th>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Terdaftar</th>
+                <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right whitespace-nowrap">Aksi</th>
+              </tr>
+            </GlassTableHeader>
+            <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
+              {paginatedUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12">
+                    <EmptyState 
+                      title="Tidak ada pengguna" 
+                      description="Tidak ada pengguna ditemukan."
+                    />
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
-                {paginatedUsers.length === 0 ? (
-                  <tr><td colSpan={6} className="py-12 text-center text-slate-400 dark:text-neutral-500 text-sm">Tidak ada pengguna ditemukan.</td></tr>
-                ) : paginatedUsers.map((user) => {
-                  const badge = roleBadge(user.role);
-                  const Icon = badge.icon;
-                  return (
-                    <tr key={user.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors group">
-                      <td className="py-3 px-5 whitespace-nowrap">
-                        <span className="text-sm font-semibold text-slate-800 dark:text-white">{user.nama_lengkap}</span>
-                      </td>
-                      <td className="py-3 px-5 text-sm font-mono text-slate-500 dark:text-neutral-400 whitespace-nowrap">{user.nim_nip || '-'}</td>
-                      <td className="py-3 px-5 text-sm text-slate-600 dark:text-neutral-300 whitespace-nowrap">{user.kelas || '-'}</td>
-                      <td className="py-3 px-5 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${badge.bg} ${badge.border} ${badge.text}`}>
-                          <Icon className="w-3 h-3" /> {normalizeRole(user.role) === 'admin' ? 'Administrator Utama' : user.role}
-                        </span>
-                      </td>
-                      <td className="py-3 px-5 text-xs text-slate-400 dark:text-neutral-500 whitespace-nowrap">{formatDate(user.created_at)}</td>
-                      <td className="py-3 px-5 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-2">
-                          {normalizeRole(user.role) === 'admin' ? (
-                            <>
-                              <span
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs font-semibold select-none cursor-default"
-                                title="Administrator accounts cannot be modified."
-                              >
-                                🔒 Administrator Utama
-                              </span>
-                              <span
-                                className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 text-neutral-400 dark:text-neutral-500 text-xs font-bold select-none cursor-default opacity-60"
-                                title="Administrator accounts cannot be modified."
-                              >
-                                System Account
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <select
-                                value={user.role}
-                                onChange={(e) => setRoleChangeTarget({ id: user.id, name: user.nama_lengkap, newRole: e.target.value })}
-                                className="text-xs bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800 rounded-lg px-2 py-1.5 text-slate-700 dark:text-neutral-300 cursor-pointer focus:outline-none focus:border-cyan-500/60"
-                              >
-                                {['Mahasiswa', 'Dosen'].map(r => (
-                                  <option key={r} value={r}>{r}</option>
-                                ))}
-                              </select>
-                              <button
-                                onClick={() => setDeleteTarget({ id: user.id, name: user.nama_lengkap })}
-                                className="text-xs px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 hover:bg-red-500/20 hover:border-red-500/40 transition-all cursor-pointer font-bold"
-                              >
-                                Hapus
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
+              ) : paginatedUsers.map((user) => {
+                const badge = roleBadge(user.role);
+                const Icon = badge.icon;
+                return (
+                  <GlassTableRow key={user.id}>
+                    <td className="py-3 px-5 whitespace-nowrap">
+                      <span className="text-sm font-semibold text-slate-800 dark:text-white">{user.nama_lengkap}</span>
+                    </td>
+                    <td className="py-3 px-5 text-sm font-mono text-slate-500 dark:text-neutral-400 whitespace-nowrap">{user.nim_nip || '-'}</td>
+                    <td className="py-3 px-5 text-sm text-slate-600 dark:text-neutral-300 whitespace-nowrap">{user.kelas || '-'}</td>
+                    <td className="py-3 px-5 whitespace-nowrap">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${badge.bg} ${badge.border} ${badge.text}`}>
+                        <Icon className="w-3 h-3" /> {normalizeRole(user.role) === 'admin' ? 'Administrator Utama' : user.role}
+                      </span>
+                    </td>
+                    <td className="py-3 px-5 text-xs text-slate-400 dark:text-neutral-500 whitespace-nowrap">{formatDate(user.created_at)}</td>
+                    <td className="py-3 px-5 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-2">
+                        {normalizeRole(user.role) === 'admin' ? (
+                          <>
+                            <span
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs font-semibold select-none cursor-default"
+                              title="Administrator accounts cannot be modified."
+                            >
+                              🔒 Administrator Utama
+                            </span>
+                            <span
+                              className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 text-neutral-400 dark:text-neutral-500 text-xs font-bold select-none cursor-default opacity-60"
+                              title="Administrator accounts cannot be modified."
+                            >
+                              System Account
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <select
+                              value={user.role}
+                              onChange={(e) => setRoleChangeTarget({ id: user.id, name: user.nama_lengkap, newRole: e.target.value })}
+                              className="text-xs bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800 rounded-lg px-2 py-1.5 text-slate-700 dark:text-neutral-300 cursor-pointer focus:outline-none focus:border-cyan-500/60"
+                            >
+                              {['Mahasiswa', 'Dosen'].map(r => (
+                                <option key={r} value={r}>{r}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => setDeleteTarget({ id: user.id, name: user.nama_lengkap })}
+                              className="text-xs px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 hover:bg-red-500/20 hover:border-red-500/40 transition-all cursor-pointer font-bold"
+                            >
+                              Hapus
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </GlassTableRow>
+                );
+              })}
+            </tbody>
+          </GlassTable>
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="border-t border-slate-200 dark:border-neutral-900 px-5 py-3 flex items-center justify-between">
@@ -382,7 +386,7 @@ export default function UserManagementPage() {
               </div>
             </div>
           )}
-        </div>
+        </ResponsiveTableWrapper>
       )}
 
       {/* Role Change Modal */}
@@ -411,5 +415,6 @@ export default function UserManagementPage() {
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
+    </PageTransition>
   );
 }

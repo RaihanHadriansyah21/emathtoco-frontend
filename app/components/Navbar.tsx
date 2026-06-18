@@ -218,17 +218,17 @@ export default function Navbar({
               {/* Logo */}
               <div
                 onClick={() => router.push('/')}
-                className="flex items-center gap-2.5 cursor-pointer select-none flex-shrink-0"
+                className="flex items-center gap-2 sm:gap-2.5 cursor-pointer select-none flex-shrink-0"
               >
-                <div className="bg-white border border-slate-200 rounded-lg p-1.5 shadow-sm flex items-center justify-center flex-shrink-0">
+                <div className="bg-white border border-slate-200 rounded-lg p-1 sm:p-1.5 shadow-sm flex items-center justify-center flex-shrink-0">
                   <Image
                     src={Logo}
                     alt="Logo E-MATHTOCO"
-                    className="h-6 w-auto object-contain"
+                    className="h-5 sm:h-6 w-auto object-contain"
                     priority
                   />
                 </div>
-                <span className={`text-xl font-bold tracking-wider text-slate-900 dark:text-white ${title ? 'hidden md:inline-block' : ''}`}>
+                <span className={`text-lg sm:text-xl font-bold tracking-wider text-slate-900 dark:text-white ${title ? 'hidden md:inline-block' : ''}`}>
                   E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-extrabold">TOCO</span>
                 </span>
               </div>
@@ -237,14 +237,14 @@ export default function Navbar({
 
           {/* Page Title Context */}
           {title && (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3">
               <div className="h-5 w-[1px] bg-slate-200 dark:bg-neutral-800 flex-shrink-0" />
               <div className="min-w-0">
-                <h1 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider truncate">
+                <h1 className="text-[12px] sm:text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider truncate">
                   {title}
                 </h1>
                 {subtitle && (
-                  <p className="text-[10px] text-slate-400 dark:text-neutral-500 uppercase tracking-widest truncate mt-0.5">
+                  <p className="text-[9px] sm:text-[10px] text-slate-400 dark:text-neutral-500 uppercase tracking-widest truncate mt-0.5">
                     {subtitle}
                   </p>
                 )}
@@ -254,12 +254,12 @@ export default function Navbar({
         </div>
 
         {/* Right section: Theme Toggle + Profile Dropdown */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Theme Toggle Button */}
           {mounted && (
             <button
               onClick={toggleTheme}
-              className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-600 hover:text-slate-800 dark:bg-black/40 dark:border-neutral-800 dark:text-neutral-400 dark:hover:text-white dark:hover:border-cyan-500/40 transition-all duration-300 cursor-pointer flex-shrink-0"
+              className="p-2 sm:p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-600 hover:text-slate-800 dark:bg-black/40 dark:border-neutral-800 dark:text-neutral-400 dark:hover:text-white dark:hover:border-cyan-500/40 transition-all duration-300 cursor-pointer flex-shrink-0"
               title={currentTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
               {currentTheme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-600" />}
@@ -271,7 +271,7 @@ export default function Navbar({
             {/* Trigger Button */}
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 hover:border-slate-300 dark:bg-black/40 dark:border-neutral-800 dark:hover:border-cyan-500/40 transition-all duration-300 cursor-pointer select-none"
+              className="flex items-center gap-1.5 sm:gap-2.5 px-2 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-100 border border-slate-250 hover:border-slate-350 dark:bg-black/40 dark:border-neutral-800 dark:hover:border-cyan-500/40 transition-all duration-300 cursor-pointer select-none"
             >
               {/* Avatar circular */}
               {avatarUrl && !imageError ? (
@@ -279,18 +279,18 @@ export default function Navbar({
                   src={avatarUrl}
                   alt={fullName}
                   onError={() => setImageError(true)}
-                  className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-neutral-800"
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-slate-200 dark:border-neutral-800"
                 />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 flex items-center justify-center text-white text-sm font-bold shadow-inner uppercase">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 flex items-center justify-center text-white text-xs sm:text-sm font-bold shadow-inner uppercase">
                   {getInitials(getDisplayName(fullName))}
                 </div>
               )}
-              <span className="text-sm font-medium text-slate-700 dark:text-neutral-200 hidden sm:inline-block max-w-[120px] truncate">
+              <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-neutral-200 hidden sm:inline-block max-w-[120px] truncate">
                 {getDisplayName(fullName)}
               </span>
               {normalizedRole !== 'mahasiswa' && (
-                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border tracking-wide uppercase hidden sm:inline-block ${
+                <span className={`text-[9px] sm:text-[10px] font-extrabold px-1.5 sm:px-2 py-0.5 rounded-full border tracking-wide uppercase hidden sm:inline-block ${
                   normalizedRole === 'dosen' 
                     ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.1)]' 
                     : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400 shadow-[0_0_10px_rgba(99,102,241,0.1)]'
@@ -298,7 +298,7 @@ export default function Navbar({
                   {role}
                 </span>
               )}
-              <ChevronDown className={`w-4 h-4 text-slate-500 dark:text-neutral-400 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 dark:text-neutral-400 transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Dropdown Menu card */}

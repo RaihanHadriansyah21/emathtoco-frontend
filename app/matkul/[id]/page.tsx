@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { UploadCloud, CheckCircle, Loader2, AlertTriangle, Eye, Lock, X, RefreshCw, Trophy, Camera, Image as ImageIcon, Trash2, Zap, ZapOff } from 'lucide-react';
 import Navbar from '../../components/Navbar';
+import PageTransition from '@/components/ui/PageTransition';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/app/hooks/useToast';
 import ToastContainer from '@/app/components/Toast';
@@ -2846,7 +2847,8 @@ export default function UploadWorkspace() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-24 relative overflow-hidden flex flex-col">
+        <PageTransition>
+            <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-24 relative overflow-hidden flex flex-col">
             <ToastContainer toasts={toasts} onRemove={removeToast} />
             {/* Elegant Background Glows */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
@@ -3872,5 +3874,6 @@ export default function UploadWorkspace() {
                 />
             )}
         </div>
+        </PageTransition>
     );
 }

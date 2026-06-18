@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase';
 import { createAuditLog } from '@/lib/services/audit-service';
 import { normalizeRole } from '@/lib/utils';
 import { API_URL } from '@/lib/config';
+import PageTransition from '@/components/ui/PageTransition';
+import { PageLoader } from '@/components/ui/loaders';
 
 export default function DemoResetPage() {
   const router = useRouter();
@@ -311,7 +313,7 @@ export default function DemoResetPage() {
   };
 
   if (isChecking) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 text-cyan-500 dark:text-cyan-400 animate-spin" /></div>;
+    return <PageLoader message="Memverifikasi admin..." />;
   }
 
   const resetOptions = [
@@ -345,7 +347,8 @@ export default function DemoResetPage() {
   ];
 
   return (
-    <div className="p-6 lg:p-8 max-w-4xl mx-auto w-full space-y-6">
+    <PageTransition>
+      <div className="p-6 lg:p-8 max-w-4xl mx-auto w-full space-y-6">
       <div>
         <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
           <RotateCcw className="w-6 h-6 text-red-500 dark:text-red-400" />
@@ -488,5 +491,6 @@ export default function DemoResetPage() {
         );
       })()}
     </div>
+    </PageTransition>
   );
 }

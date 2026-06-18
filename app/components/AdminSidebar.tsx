@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import {
   LayoutDashboard,
   Users,
@@ -66,14 +67,17 @@ export default function AdminSidebar({
     return pathname.startsWith(href);
   };
 
+  const sidebarWidth = hideToggle ? '100%' : (collapsed ? 80 : 270);
+
   return (
-    <aside
-      className={`h-full flex-shrink-0 flex flex-col transition-all duration-300 ${
+    <motion.aside
+      initial={false}
+      animate={{ width: sidebarWidth }}
+      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+      className={`h-full flex-shrink-0 flex flex-col ${
         hideToggle
           ? 'w-full border-none bg-transparent'
-          : `hidden md:flex sticky top-16 h-[calc(100vh-4rem)] border-r border-slate-200 dark:border-neutral-900 bg-white/80 dark:bg-[#070710]/80 backdrop-blur-md z-30 ${
-              collapsed ? 'w-[80px]' : 'w-[270px]'
-            }`
+          : `hidden md:flex sticky top-16 h-[calc(100vh-4rem)] border-r border-slate-200 dark:border-neutral-900 bg-white/80 dark:bg-[#070710]/80 backdrop-blur-md z-30`
       }`}
     >
       {/* Nav items */}
@@ -164,6 +168,6 @@ export default function AdminSidebar({
           </button>
         </div>
       )}
-    </aside>
+    </motion.aside>
   );
 }

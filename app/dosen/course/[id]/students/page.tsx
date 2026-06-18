@@ -26,9 +26,13 @@ import {
 import Navbar from '../../../../components/Navbar';
 import ToastContainer from '../../../../components/Toast';
 import { useToast } from '@/app/hooks/useToast';
+import { GlassTable, GlassTableHeader, GlassTableRow, ResponsiveTableWrapper } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import { apiGet, apiPost } from '@/lib/api-client';
+import { motion, AnimatePresence } from 'framer-motion';
+import { fadeIn, modalTransition } from '@/styles/motion';
+import PageTransition from '@/components/ui/PageTransition';
 
 interface StudentProfile {
     id: string;
@@ -450,7 +454,8 @@ export default function LecturerStudentRoster() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-16 relative overflow-hidden flex flex-col">
+        <PageTransition>
+            <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-16 relative overflow-hidden flex flex-col">
             <ToastContainer toasts={toasts} onRemove={removeToast} />
 
             {/* Background Glows */}
@@ -548,112 +553,124 @@ export default function LecturerStudentRoster() {
                         <p className="text-slate-500 dark:text-neutral-400 text-sm">Tidak ada data mahasiswa yang cocok dengan kriteria.</p>
                     </div>
                 ) : (
-                    <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse min-w-[950px]">
-                                <thead>
-                                    <tr className="border-b border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black/40">
-                                        <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap w-[40px]">Foto</th>
-                                        <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mahasiswa</th>
-                                        <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Kelas</th>
-                                        <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Status Submit</th>
-                                        <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Lembar Upload</th>
-                                        <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Nilai Final</th>
-                                        <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Waktu Submit</th>
-                                        <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right whitespace-nowrap">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
-                                    {filteredStudents.map((student) => {
-                                        const statusBadge = getStatusBadge(student.submission);
-                                        const sheetsUploaded = student.submission?.lembar_jawaban?.length || 0;
+                    <ResponsiveTableWrapper className="bg-white dark:bg-[#0A0A0F]/80 shadow-xl">
+                        <GlassTable className="min-w-[950px]">
+                            <GlassTableHeader>
+                                <tr>
+                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 whitespace-nowrap w-[40px]">Foto</th>
+                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 whitespace-nowrap">Mahasiswa</th>
+                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 whitespace-nowrap">Kelas</th>
+                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 text-center whitespace-nowrap">Status Submit</th>
+                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 text-center whitespace-nowrap">Lembar Upload</th>
+                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 text-center whitespace-nowrap">Nilai Final</th>
+                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 whitespace-nowrap">Waktu Submit</th>
+                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 text-right whitespace-nowrap">Aksi</th>
+                                </tr>
+                            </GlassTableHeader>
+                            <tbody>
+                                {filteredStudents.map((student) => {
+                                    const statusBadge = getStatusBadge(student.submission);
+                                    const sheetsUploaded = student.submission?.lembar_jawaban?.length || 0;
 
-                                        return (
-                                            <tr key={student.id} className="hover:bg-slate-50/50 dark:hover:bg-white/1 transition-colors duration-200 group">
-                                                {/* Profile Photo */}
-                                                <td className="py-4 px-6 whitespace-nowrap">
-                                                    {student.foto_profil_url ? (
-                                                        <img
-                                                            src={student.foto_profil_url}
-                                                            alt={student.nama_lengkap}
-                                                            className="w-10 h-10 rounded-xl object-cover border border-slate-200 dark:border-neutral-800"
-                                                        />
-                                                    ) : (
-                                                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 flex items-center justify-center font-bold text-cyan-400 text-xs tracking-wider font-mono">
-                                                            {getInitials(student.nama_lengkap)}
-                                                        </div>
-                                                    )}
-                                                </td>
-
-                                                {/* Profile Details */}
-                                                <td className="py-4 px-6 whitespace-nowrap">
-                                                    <div className="text-sm font-semibold text-slate-800 dark:text-white group-hover:text-cyan-600 dark:group-hover:text-cyan-300 transition-colors duration-200">{student.nama_lengkap}</div>
-                                                    <div className="text-xs text-slate-500 dark:text-neutral-400 font-mono mt-0.5">NIM: {student.nim_nip}</div>
-                                                </td>
-
-                                                {/* Class */}
-                                                <td className="py-4 px-6 text-sm font-semibold text-slate-700 dark:text-neutral-350 whitespace-nowrap">{student.kelas}</td>
-
-                                                {/* Submission Status */}
-                                                <td className="py-4 px-6 text-center whitespace-nowrap">
-                                                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-bold uppercase tracking-wider ${statusBadge.bg} ${statusBadge.border} ${statusBadge.color}`}>
-                                                        <span>{statusBadge.icon}</span>
-                                                        <span>{statusBadge.text}</span>
-                                                    </span>
-                                                </td>
-
-                                                {/* Sheets uploaded */}
-                                                <td className="py-4 px-6 text-center whitespace-nowrap">
-                                                    {student.submission ? (
-                                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 text-sm font-mono font-bold">
-                                                            <span className={sheetsUploaded === 24 ? 'text-cyan-600 dark:text-cyan-400' : 'text-slate-500 dark:text-neutral-400'}>{sheetsUploaded}</span>
-                                                            <span className="text-slate-300 dark:text-neutral-600">/</span>
-                                                            <span className="text-slate-400 dark:text-neutral-500">24</span>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-slate-400 dark:text-neutral-600 font-mono text-sm">-</span>
-                                                    )}
-                                                </td>
-
-                                                {/* Final Score */}
-                                                <td className="py-4 px-6 text-center whitespace-nowrap">
-                                                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 text-sm font-mono font-bold ${student.submission?.nilai_akhir !== null ? 'text-purple-600 dark:text-purple-400' : 'text-slate-400 dark:text-neutral-600'}`}>
-                                                        {student.submission?.nilai_akhir !== null ? student.submission?.nilai_akhir : '-'}
+                                    return (
+                                        <GlassTableRow key={student.id} onClick={() => handleOpenModal(student)} hoverable={true}>
+                                            {/* Profile Photo */}
+                                            <td className="py-4 px-6 whitespace-nowrap">
+                                                {student.foto_profil_url ? (
+                                                    <img
+                                                        src={student.foto_profil_url}
+                                                        alt={student.nama_lengkap}
+                                                        className="w-10 h-10 rounded-xl object-cover border border-slate-200 dark:border-neutral-800"
+                                                    />
+                                                ) : (
+                                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 flex items-center justify-center font-bold text-cyan-400 text-xs tracking-wider font-mono">
+                                                        {getInitials(student.nama_lengkap)}
                                                     </div>
-                                                </td>
+                                                )}
+                                            </td>
 
-                                                {/* Date submitted */}
-                                                <td className="py-4 px-6 text-xs text-slate-500 dark:text-neutral-450 font-medium whitespace-nowrap">
-                                                    {student.submission ? formatDate(student.submission.waktu_submit) : '-'}
-                                                </td>
+                                            {/* Profile Details */}
+                                            <td className="py-4 px-6 whitespace-nowrap">
+                                                <div className="text-sm font-semibold text-slate-800 dark:text-white group-hover:text-cyan-600 dark:group-hover:text-cyan-300 transition-colors duration-200">{student.nama_lengkap}</div>
+                                                <div className="text-xs text-slate-500 dark:text-neutral-400 font-mono mt-0.5">NIM: {student.nim_nip}</div>
+                                            </td>
 
-                                                {/* Actions */}
-                                                <td className="py-4 px-6 text-right whitespace-nowrap">
-                                                    <button
-                                                        onClick={() => handleOpenModal(student)}
-                                                        className="inline-flex items-center bg-gradient-to-r from-slate-100 to-slate-200 dark:from-neutral-950 dark:to-neutral-900 border border-slate-200 dark:border-neutral-800 text-slate-800 dark:text-neutral-350 px-3.5 py-2 rounded-xl text-xs font-bold tracking-wider hover:border-cyan-500/40 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all cursor-pointer"
-                                                    >
-                                                        <span>DETAIL</span>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                                            {/* Class */}
+                                            <td className="py-4 px-6 text-sm font-semibold text-slate-700 dark:text-neutral-350 whitespace-nowrap">{student.kelas}</td>
+
+                                            {/* Submission Status */}
+                                            <td className="py-4 px-6 text-center whitespace-nowrap">
+                                                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-bold uppercase tracking-wider ${statusBadge.bg} ${statusBadge.border} ${statusBadge.color}`}>
+                                                    <span>{statusBadge.icon}</span>
+                                                    <span>{statusBadge.text}</span>
+                                                </span>
+                                            </td>
+
+                                            {/* Sheets uploaded */}
+                                            <td className="py-4 px-6 text-center whitespace-nowrap">
+                                                {student.submission ? (
+                                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 text-sm font-mono font-bold">
+                                                        <span className={sheetsUploaded === 24 ? 'text-cyan-600 dark:text-cyan-400' : 'text-slate-500 dark:text-neutral-400'}>{sheetsUploaded}</span>
+                                                        <span className="text-slate-300 dark:text-neutral-600">/</span>
+                                                        <span className="text-slate-400 dark:text-neutral-500">24</span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-400 dark:text-neutral-600 font-mono text-sm">-</span>
+                                                )}
+                                            </td>
+
+                                            {/* Final Score */}
+                                            <td className="py-4 px-6 text-center whitespace-nowrap">
+                                                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 text-sm font-mono font-bold ${student.submission?.nilai_akhir !== null ? 'text-purple-600 dark:text-purple-400' : 'text-slate-400 dark:text-neutral-600'}`}>
+                                                    {student.submission?.nilai_akhir !== null ? student.submission?.nilai_akhir : '-'}
+                                                </div>
+                                            </td>
+
+                                            {/* Date submitted */}
+                                            <td className="py-4 px-6 text-xs text-slate-550 dark:text-neutral-450 font-medium whitespace-nowrap">
+                                                {student.submission ? formatDate(student.submission.waktu_submit) : '-'}
+                                            </td>
+
+                                            {/* Actions */}
+                                            <td className="py-4 px-6 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    onClick={() => handleOpenModal(student)}
+                                                    className="inline-flex items-center bg-gradient-to-r from-slate-100 to-slate-200 dark:from-neutral-950 dark:to-neutral-900 border border-slate-200 dark:border-neutral-800 text-slate-800 dark:text-neutral-350 px-3.5 py-2 rounded-xl text-xs font-bold tracking-wider hover:border-cyan-500/40 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all cursor-pointer"
+                                                >
+                                                    <span>DETAIL</span>
+                                                </button>
+                                            </td>
+                                        </GlassTableRow>
+                                    );
+                                })}
+                            </tbody>
+                        </GlassTable>
+                    </ResponsiveTableWrapper>
                 )}
 
                 {/* STUDENT DETAIL MODAL */}
-                {selectedStudent && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                        {/* Background Overlay */}
-                        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setSelectedStudent(null)} />
-
-                        {/* Modal Box */}
-                        <div className="relative bg-white border border-slate-200 dark:bg-[#0A0A0F] dark:border-neutral-800 rounded-3xl w-full max-w-4xl shadow-[0_0_60px_rgba(6,182,212,0.06)] overflow-hidden flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200">
-                            {/* Modal Header */}
+                <AnimatePresence>
+                    {selectedStudent && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                            {/* Background Overlay */}
+                            <motion.div
+                                variants={fadeIn}
+                                initial="initial"
+                                animate="animate"
+                                exit="exit"
+                                className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                                onClick={() => setSelectedStudent(null)}
+                            />
+    
+                            {/* Modal Box */}
+                            <motion.div
+                                variants={modalTransition}
+                                initial="initial"
+                                animate="animate"
+                                exit="exit"
+                                className="relative bg-white border border-slate-200 dark:bg-[#0A0A0F] dark:border-neutral-800 rounded-3xl w-full max-w-4xl shadow-[0_0_60px_rgba(6,182,212,0.06)] overflow-hidden flex flex-col max-h-[85vh] z-10"
+                            >
+                                {/* Modal Header */}
                             <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100 dark:border-neutral-900/80">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
@@ -841,10 +858,12 @@ export default function LecturerStudentRoster() {
                                     </button>
                                 </div>
                             </div>
+                            </motion.div>
                         </div>
-                    </div>
-                )}
+                    )}
+                </AnimatePresence>
             </main>
         </div>
+        </PageTransition>
     );
 }

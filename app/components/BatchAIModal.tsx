@@ -5,6 +5,8 @@ import {
   X, Cpu, Play, CheckCircle, AlertTriangle,
   Loader2, ChevronDown, Filter, Zap, BarChart3
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { fadeIn, modalTransition } from '@/styles/motion';
 import type {
   AIModel,
   BatchAIProgress,
@@ -185,15 +187,32 @@ export default function BatchAIModal({
   };
 
   // --- Render ---
-  if (!isOpen) return null;
-
   const overallPercent = progress
     ? Math.round((progress.processedSections / progress.totalSections) * 100)
     : 0;
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-[#0A0A0F] border border-neutral-800 rounded-2xl max-w-lg w-full shadow-[0_0_60px_rgba(168,85,247,0.06)] overflow-hidden">
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <motion.div
+            variants={fadeIn}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+            onClick={handleClose}
+          />
+
+          {/* Modal Container */}
+          <motion.div
+            variants={modalTransition}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            className="bg-[#0A0A0F] border border-neutral-800 rounded-2xl max-w-lg w-full shadow-[0_0_60px_rgba(168,85,247,0.06)] overflow-hidden relative z-10"
+          >
 
         {/* ─── HEADER ─── */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-neutral-900">
@@ -553,8 +572,10 @@ export default function BatchAIModal({
             </div>
           )}
 
+          </div>
+          </motion.div>
         </div>
-      </div>
-    </div>
+      )}
+    </AnimatePresence>
   );
 }

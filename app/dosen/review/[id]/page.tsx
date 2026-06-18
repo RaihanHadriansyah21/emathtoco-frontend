@@ -4,6 +4,7 @@ import React, { useState, useEffect, useTransition, useRef, useCallback } from '
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Loader2, Play, CheckCircle, Save, AlertTriangle, Eye, X, HelpCircle, Lock, RotateCcw } from 'lucide-react';
 import Navbar from '../../../components/Navbar';
+import PageTransition from '@/components/ui/PageTransition';
 import { supabase } from '@/lib/supabase';
 import { createAuditLog } from '@/lib/services/audit-service';
 import { normalizeRole } from '@/lib/utils';
@@ -984,30 +985,33 @@ export default function ReviewWorkspace() {
   }
   if (isAccessDenied) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans relative overflow-hidden flex flex-col">
-        <Navbar showBack backUrl={courseId ? `/dosen/course/${courseId}` : "/dosen"} title="Akses Ditolak" />
-        <main className="flex-grow flex items-center justify-center">
-          <div className="text-center max-w-md mx-auto px-6 space-y-4">
-            <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto">
-              <Lock className="w-8 h-8 text-red-400" />
+      <PageTransition>
+        <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-16 relative overflow-hidden flex flex-col">
+          <Navbar showBack backUrl={courseId ? `/dosen/course/${courseId}` : "/dosen"} title="Akses Ditolak" />
+          <main className="flex-grow flex items-center justify-center">
+            <div className="text-center max-w-md mx-auto px-6 space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto">
+                <Lock className="w-8 h-8 text-red-400" />
+              </div>
+              <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">Akses Ditolak</h1>
+              <p className="text-slate-500 dark:text-neutral-400 text-sm">Anda tidak ditugaskan ke mata kuliah dari pengumpulan tugas ini. Silakan hubungi administrator.</p>
+              <button
+                onClick={() => router.push(courseId ? `/dosen/course/${courseId}` : "/dosen")}
+                className="mt-4 px-6 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-cyan-500 to-blue-600 text-white cursor-pointer transition-all hover:from-cyan-400 hover:to-blue-500"
+              >
+                Kembali ke Dashboard
+              </button>
             </div>
-            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">Akses Ditolak</h1>
-            <p className="text-slate-500 dark:text-neutral-400 text-sm">Anda tidak ditugaskan ke mata kuliah dari pengumpulan tugas ini. Silakan hubungi administrator.</p>
-            <button
-              onClick={() => router.push(courseId ? `/dosen/course/${courseId}` : "/dosen")}
-              className="mt-4 px-6 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-cyan-500 to-blue-600 text-white cursor-pointer transition-all hover:from-cyan-400 hover:to-blue-500"
-            >
-              Kembali ke Dashboard
-            </button>
-          </div>
-        </main>
-      </div>
+          </main>
+        </div>
+      </PageTransition>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-24 relative flex flex-col">
-      <ToastContainer toasts={toasts} onRemove={removeToast} />
+    <PageTransition>
+      <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-24 relative flex flex-col">
+        <ToastContainer toasts={toasts} onRemove={removeToast} />
 
       {/* Inline Confirmation Modal */}
       {showConfirmModal && (
@@ -1594,5 +1598,6 @@ export default function ReviewWorkspace() {
       )}
 
     </div>
+    </PageTransition>
   );
 }

@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 import { apiGet, apiPost } from '@/lib/api-client';
+import PageTransition from '@/components/ui/PageTransition';
+import { PageLoader } from '@/components/ui/loaders';
 
 export default function SystemSettingsPage() {
   const router = useRouter();
@@ -105,7 +107,7 @@ export default function SystemSettingsPage() {
   };
 
   if (isChecking) {
-    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 text-cyan-500 dark:text-cyan-400 animate-spin" /></div>;
+    return <PageLoader message="Memverifikasi admin..." />;
   }
 
   const currentTheme = mounted ? (theme === 'system' ? resolvedTheme : theme) : 'dark';
@@ -119,7 +121,8 @@ export default function SystemSettingsPage() {
   ];
 
   return (
-    <div className="p-6 lg:p-8 max-w-4xl mx-auto w-full space-y-6">
+    <PageTransition>
+      <div className="p-6 lg:p-8 max-w-4xl mx-auto w-full space-y-6">
       <div>
         <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
           <Settings className="w-6 h-6 text-slate-500 dark:text-neutral-400" />
@@ -241,5 +244,6 @@ export default function SystemSettingsPage() {
         </div>
       </div>
     </div>
+    </PageTransition>
   );
 }

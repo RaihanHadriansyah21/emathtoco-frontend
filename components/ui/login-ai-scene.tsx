@@ -29,6 +29,12 @@ export default function LoginAIScene() {
     // CDN-hosted scenes are larger and need more time to download.
     // ═══════════════════════════════════════════════════════
     useEffect(() => {
+        if (typeof window !== 'undefined' && window.innerWidth < 768) {
+            setHasError(true);
+            setIsLoading(false);
+            return;
+        }
+
         const safeguardTimer = setTimeout(() => {
             if (isLoading) {
                 console.warn('Spline load timed out (20s safeguard). Falling back to premium static view.');

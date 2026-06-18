@@ -3,7 +3,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Search, Loader2, ArrowLeft, ArrowRight, BookOpen, Clock, Calendar, CheckSquare, Cpu, Download, FileSpreadsheet, Lock, Zap, ChevronDown, CheckCircle, X, Users } from 'lucide-react';
+import { GlassTable, GlassTableHeader, GlassTableRow, ResponsiveTableWrapper } from '@/components/ui/table';
 import Navbar from '../../../components/Navbar';
+import PageTransition from '@/components/ui/PageTransition';
 import BatchAIModal from '../../../components/BatchAIModal';
 import ExportCSVModal from '../../../components/ExportCSVModal';
 import ToastContainer from '../../../components/Toast';
@@ -453,7 +455,8 @@ export default function LecturerCoursePortal() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-16 relative overflow-hidden flex flex-col">
+    <PageTransition>
+      <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-16 relative overflow-hidden flex flex-col">
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
 
@@ -747,11 +750,11 @@ export default function LecturerCoursePortal() {
         ) : (
           <>
             {/* Desktop Table View */}
-            <div className="hidden md:block bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl overflow-hidden shadow-xl dark:shadow-2xl backdrop-blur-md">
-              <div className="overflow-x-auto overflow-y-auto max-h-[520px] pr-0.5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-neutral-800/60 dark:scrollbar-thumb-neutral-800/40">
-                <table className="w-full text-left border-collapse min-w-[800px]">
-                  <thead className="sticky top-0 z-20 bg-slate-50/95 dark:bg-[#07070a]/95 backdrop-blur-md border-b border-slate-200 dark:border-neutral-900">
-                    <tr className="bg-slate-50/20 dark:bg-black/20">
+            <div className="hidden md:block">
+              <ResponsiveTableWrapper className="bg-white dark:bg-[#0A0A0F]/80 shadow-xl max-h-[520px]">
+                <GlassTable className="min-w-[800px]">
+                  <GlassTableHeader className="sticky top-0 z-20">
+                    <tr>
                       <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mahasiswa</th>
                       <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Kelas</th>
                       <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Jumlah Jawaban</th>
@@ -760,14 +763,14 @@ export default function LecturerCoursePortal() {
                       <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Waktu Submit</th>
                       <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right whitespace-nowrap">Aksi</th>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-neutral-900/50">
+                  </GlassTableHeader>
+                  <tbody>
                     {filteredSubmissions.map((sub) => {
                       const statusBadge = getStatusBadge(sub.ai_status);
                       const uploadedCount = sub.lembar_jawaban ? sub.lembar_jawaban.length : 0;
                       const mhs = Array.isArray(sub.mahasiswa) ? sub.mahasiswa[0] : sub.mahasiswa;
                       return (
-                        <tr key={sub.id} className="hover:bg-slate-50/50 dark:hover:bg-white/1 transition-colors duration-200 group">
+                        <GlassTableRow key={sub.id} onClick={() => router.push(`/dosen/review/${sub.id}`)} hoverable={true}>
                           <td className="py-3.5 px-5 whitespace-nowrap">
                             <div className="text-sm font-semibold text-slate-800 dark:text-white group-hover:text-cyan-600 dark:group-hover:text-cyan-300 transition-colors duration-200">{mhs?.nama_lengkap || 'Unknown'}</div>
                             <div className="text-xs text-slate-500 dark:text-neutral-400 font-mono mt-0.5">{mhs?.nim_nip || '-'}</div>
@@ -792,7 +795,7 @@ export default function LecturerCoursePortal() {
                             </span>
                           </td>
                           <td className="py-3.5 px-5 text-xs text-slate-500 dark:text-neutral-400 font-medium whitespace-nowrap">{formatDate(sub.waktu_submit)}</td>
-                          <td className="py-3.5 px-5 text-right whitespace-nowrap">
+                          <td className="py-3.5 px-5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => router.push(`/dosen/review/${sub.id}`)}
                               className="inline-flex items-center gap-2 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500 hover:to-blue-600 border border-cyan-500/30 hover:border-transparent text-cyan-600 dark:text-cyan-400 hover:text-white px-4 py-2 rounded-xl text-xs font-extrabold tracking-wider transition-all duration-300 shadow-md cursor-pointer"
@@ -801,12 +804,12 @@ export default function LecturerCoursePortal() {
                               <ArrowRight className="w-3.5 h-3.5" />
                             </button>
                           </td>
-                        </tr>
+                        </GlassTableRow>
                       );
                     })}
                   </tbody>
-                </table>
-              </div>
+                </GlassTable>
+              </ResponsiveTableWrapper>
             </div>
 
             {/* Mobile Cards Stack */}
@@ -871,5 +874,6 @@ export default function LecturerCoursePortal() {
         )}
       </main>
     </div>
+    </PageTransition>
   );
 }

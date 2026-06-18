@@ -9,6 +9,7 @@ import Image from 'next/image';
 import Logo from '../../Emathtoco.png';
 import { Eye, EyeOff, ArrowLeft, BookOpen } from 'lucide-react';
 import { motion } from 'framer-motion';
+import PageTransition from '@/components/ui/PageTransition';
 
 export default function DosenLoginPage() {
     const router = useRouter();
@@ -216,22 +217,23 @@ export default function DosenLoginPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#060814] via-[#020205] to-[#000000] flex items-center justify-center px-4 font-sans relative overflow-hidden">
-            {/* Elegant Background Glows */}
-            <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-                <div className="absolute top-[10%] left-[15%] w-[450px] h-[450px] bg-indigo-500/12 rounded-full blur-[120px] animate-float-blue"></div>
-                <div className="absolute bottom-[15%] right-[15%] w-[500px] h-[500px] bg-purple-500/12 rounded-full blur-[130px] animate-float-purple"></div>
-            </div>
+        <PageTransition>
+            <div className="min-h-screen bg-gradient-to-br from-[#060814] via-[#020205] to-[#000000] flex items-center justify-center px-4 pt-[calc(4.5rem+env(safe-area-inset-top))] pb-[calc(2rem+env(safe-area-inset-bottom))] font-sans relative overflow-hidden">
+                {/* Elegant Background Glows */}
+                <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+                    <div className="absolute top-[10%] left-[15%] w-[450px] h-[450px] bg-indigo-500/12 rounded-full blur-[120px] animate-float-blue"></div>
+                    <div className="absolute bottom-[15%] right-[15%] w-[500px] h-[500px] bg-purple-500/12 rounded-full blur-[130px] animate-float-purple"></div>
+                </div>
 
             {/* Top Navigation Bar with brand text only */}
             <motion.nav
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.2 }}
-                className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-6 sm:px-10 lg:px-14 py-5"
+                className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 md:px-10 lg:px-14 pt-[calc(1.25rem+env(safe-area-inset-top))] pb-5"
             >
                 <div className="flex items-center">
-                    <span className="text-white text-sm font-bold tracking-wider">
+                    <span className="text-white text-xs sm:text-sm font-bold tracking-wider select-none">
                         E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-bold">TOCO</span>
                     </span>
                 </div>
@@ -241,7 +243,7 @@ export default function DosenLoginPage() {
                 initial={{ opacity: 0, y: 30, scale: 0.97 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                className="w-full max-w-md bg-[#0A0A0F]/80 border border-neutral-800/80 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-[0_0_50px_rgba(0,0,0,0.8)] relative z-10 overflow-hidden"
+                className="w-full max-w-md glass-card rounded-2xl p-5 sm:p-8 shadow-[0_0_50px_rgba(0,0,0,0.8)] relative z-10 overflow-hidden"
             >
                 <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none"></div>
 
@@ -251,7 +253,7 @@ export default function DosenLoginPage() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.3, delay: 0.2 }}
                     onClick={() => router.push('/login?select=true')}
-                    className="flex items-center gap-1.5 text-neutral-500 hover:text-indigo-400 text-xs font-bold uppercase tracking-widest mb-6 transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 text-neutral-500 hover:text-indigo-400 text-xs font-bold uppercase tracking-widest mb-4 sm:mb-6 transition-colors cursor-pointer"
                 >
                     <ArrowLeft className="w-3.5 h-3.5" />
                     <span>Kembali</span>
@@ -347,5 +349,6 @@ export default function DosenLoginPage() {
                 </motion.form>
             </motion.div>
         </div>
+        </PageTransition>
     );
 }
