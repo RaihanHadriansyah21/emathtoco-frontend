@@ -2344,6 +2344,12 @@ export default function UploadWorkspace() {
             return;
         }
 
+        // Client-side file size validation (max 10 MB)
+        if (file.size > 10 * 1024 * 1024) {
+            toast.error('File Terlalu Besar', 'Ukuran file maksimal yang diperbolehkan adalah 10 MB.');
+            return;
+        }
+
         const currentSlot = slots.find(s => s.label === label);
         if (currentSlot && isSlotLocked(currentSlot)) {
             console.log('Upload blocked: Slot is locked.');
@@ -2382,6 +2388,9 @@ export default function UploadWorkspace() {
         console.log('PREVIEW URL', localPreviewUrl);
         setSlots(prev => prev.map(s => s.label === label ? { ...s, status: 'uploading', localPreviewUrl } : s));
         console.log('STATE UPDATED — slot', label, 'set to uploading with local preview');
+
+        let filePath = '';
+        let storageUploaded = false;
 
         try {
             console.log('--- STARTING UPLOAD WORKFLOW ---');
@@ -2433,7 +2442,9 @@ export default function UploadWorkspace() {
             // Task 6: force 'jpg' lowercase extension
             const extension = 'jpg';
             // Struktur nama file unik: userId/submissionId/section_code.extension
-            const filePath = `${userId}/${activeSubmissionId}/${sectionCode}.${extension}`;
+            filePath = `${userId}/${activeSubmissionId}/${sectionCode}.${extension}`;
+
+            storageUploaded = false;
 
             console.log('Generated upload details:', {
                 activeSubmissionId,
@@ -2469,6 +2480,7 @@ export default function UploadWorkspace() {
                 throw storageError;
             }
             console.log('Storage upload successful:', storageData);
+            storageUploaded = true;
 
             // 4. Simpan baris data detail lembar_jawaban (upsert manual aman)
             console.log('Upserting lembar_jawaban metadata row...');
@@ -2590,6 +2602,18 @@ export default function UploadWorkspace() {
                 label,
                 submissionId
             });
+
+            // Clean up orphan file in storage if DB metadata upsert failed
+            if (storageUploaded && filePath) {
+                console.warn('DB metadata update failed. Cleaning up orphan storage file:', filePath);
+                try {
+                    await supabase.storage.from('lembar-jawaban').remove([filePath]);
+                    console.log('Orphan storage file cleaned up successfully.');
+                } catch (cleanupErr) {
+                    console.error('Failed to clean up orphan storage file:', cleanupErr);
+                }
+            }
+
             toast.error('Gagal Mengunggah', err instanceof Error ? err.message : 'Terjadi kesalahan saat upload.');
             if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
             setSlots(prev => prev.map(s => s.label === label ? { ...s, status: 'error', fileUrl: null, localPreviewUrl: null } : s));
@@ -2610,7 +2634,7 @@ export default function UploadWorkspace() {
             return;
         }
 
-        if (!submissionId || isReadOnly || (submissionStatus && submissionStatus !== 'draft')) return;
+        if (!submissionId || isReadOnly || (submissionStatus && submissionStatus !== 'draft') || isSubmitting) return;
 
         setIsSubmitting(true);
 
@@ -2685,6 +2709,7 @@ export default function UploadWorkspace() {
     };
 
     const handleDeleteSlot = async (label: string) => {
+        if (isDeletingSlot || isSubmitting) return;
         const slot = slots.find(s => s.label === label);
         if (!slot || slot.status !== 'success' || !submissionId) return;
         if (isSlotLocked(slot) || submissionStatus === 'submitted') {

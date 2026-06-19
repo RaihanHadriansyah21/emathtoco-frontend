@@ -721,7 +721,7 @@ export default function ReviewWorkspace() {
 
   // Save Draft logic
   const saveDraftReview = async () => {
-    if (!submission) return;
+    if (!submission || isSaving || isPredicting) return;
     setIsSaving(true);
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -801,7 +801,7 @@ export default function ReviewWorkspace() {
 
   const doFinalize = async () => {
     setShowConfirmModal(false);
-    if (!submission) return;
+    if (!submission || isFinalizing) return;
 
     setIsFinalizing(true);
     setErrorMsg(null);
@@ -885,7 +885,7 @@ export default function ReviewWorkspace() {
   };
 
   const handleRequestReupload = async () => {
-    if (!reuploadTargetSlot || !reuploadReason.trim()) return;
+    if (!reuploadTargetSlot || !reuploadReason.trim() || isRequestingReupload) return;
 
     const targetSlot = slots.find(s => s.label === reuploadTargetSlot);
     if (!targetSlot?.sheetId) return;

@@ -9,6 +9,9 @@ import ConfirmModal from '@/app/components/ConfirmModal';
 import { GlassTable, GlassTableHeader, GlassTableRow, EmptyState, ResponsiveTableWrapper } from '@/components/ui/table';
 import PageTransition from '@/components/ui/PageTransition';
 import { PageLoader } from '@/components/ui/loaders';
+import { useToast } from '@/app/hooks/useToast';
+import ToastContainer from '@/app/components/Toast';
+import { apiDelete } from '@/lib/api-client';
 
 interface Student {
   id: string;
@@ -38,6 +41,7 @@ const ITEMS_PER_PAGE = 20;
 
 export default function EnrollmentPage() {
   const router = useRouter();
+  const { toasts, toast, removeToast } = useToast();
   const [isChecking, setIsChecking] = useState(true);
   const [students, setStudents] = useState<Student[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -148,15 +152,28 @@ export default function EnrollmentPage() {
   };
 
   const handleDelete = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || isDeleting) return;
     setIsDeleting(true);
     try {
-      const { error } = await supabase.from('mahasiswa_mata_kuliah').delete().eq('id', deleteTarget.id);
-      if (error) throw error;
+      console.log(`[Delete Enrollment] Sending backend deletion request for enrollment ID: ${deleteTarget.id}`);
+      const res = await apiDelete(`/admin/enrollment/${deleteTarget.id}`);
+      if (!res.ok) {
+        let errorMsg = 'Gagal menghapus pendaftaran pada backend.';
+        try {
+          const errJson = await res.json();
+          if (errJson && errJson.detail) {
+            errorMsg = errJson.detail;
+          }
+        } catch (_) {}
+        throw new Error(errorMsg);
+      }
+
       setEnrollments(prev => prev.filter(e => e.id !== deleteTarget.id));
+      toast.success('Hapus Berhasil', `Pendaftaran mahasiswa "${deleteTarget.student_name}" berhasil dihapus beserta seluruh berkas & tugas terkait.`);
       setDeleteTarget(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error deleting enrollment:', err);
+      toast.error('Gagal Menghapus', err.message || 'Terjadi kesalahan saat menghapus enrollment.');
     } finally {
       setIsDeleting(false);
     }
@@ -376,7 +393,8 @@ export default function EnrollmentPage() {
         </div>
       )}
 
-      <ConfirmModal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Hapus Enrollment" message={`Hapus ${deleteTarget?.student_name} dari ${deleteTarget?.course_name}?`} confirmLabel="Hapus" variant="danger" isLoading={isDeleting} />
+      <ConfirmModal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Hapus Enrollment" message={`Apakah Anda yakin ingin menghapus pendaftaran "${deleteTarget?.student_name}" dari mata kuliah "${deleteTarget?.course_name}"? Semua data nilai dan lembar jawaban mahasiswa tersebut di mata kuliah ini akan ikut terhapus secara permanen.`} confirmLabel="Hapus" variant="danger" isLoading={isDeleting} />
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
     </PageTransition>
   );

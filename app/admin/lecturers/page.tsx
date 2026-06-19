@@ -139,7 +139,7 @@ export default function LecturerAssignmentPage() {
   };
 
   const handleDelete = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || isDeleting) return;
     setIsDeleting(true);
     try {
       const { error } = await supabase.from('dosen_mata_kuliah').delete().eq('id', deleteTarget.id);

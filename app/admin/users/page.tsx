@@ -148,7 +148,7 @@ export default function UserManagementPage() {
   };
 
   const handleDelete = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || isDeleting) return;
     setIsDeleting(true);
 
     console.log("Delete User Payload", {

@@ -72,11 +72,8 @@ export default function DosenLoginPage() {
     const sendLoginAuditLog = (auditPayload: {
         action: string;
         target: string;
-        detail: any;
-        user_id: string;
-        user_name: string;
-        role: string;
-    }) => {
+        details: any;
+    }, token?: string) => {
         const url = `${API_URL}/audit/log`;
         const body = JSON.stringify(auditPayload);
 
@@ -87,6 +84,7 @@ export default function DosenLoginPage() {
                     'Content-Type': 'application/json',
                     'ngrok-skip-browser-warning': 'true',
                     'Accept': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
                 },
                 body,
                 keepalive: true,
@@ -195,11 +193,8 @@ export default function DosenLoginPage() {
                             sendLoginAuditLog({
                                 action: auditAction,
                                 target: auditTarget,
-                                detail: { role },
-                                user_id: data.session.user.id,
-                                user_name: userName,
-                                role: role,
-                            });
+                                details: { role },
+                            }, data.session.access_token);
                             console.log("[AUDIT DEBUG] Audit log request sent via sendBeacon");
                         }
                     }

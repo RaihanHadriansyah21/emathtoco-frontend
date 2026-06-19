@@ -1,4 +1,5 @@
 import { API_URL } from './config';
+import { supabase } from './supabase';
 
 export interface RequestOptions extends Omit<RequestInit, 'headers'> {
   headers?: HeadersInit;
@@ -42,16 +43,40 @@ export async function apiRequest(
     });
   }
 
+  // 3. Inject Supabase Access Token dynamically if session exists
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      headers.set('Authorization', `Bearer ${session.access_token}`);
+    }
+  } catch (err) {
+    console.error('[API CLIENT] Error fetching supabase session:', err);
+  }
+
+  // AbortController for 60-second timeout safety
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, 60000);
+
   const mergedOptions: RequestInit = {
     ...options,
     headers,
+    signal: controller.signal,
   };
 
   // Debug logging (dapat dihapus setelah deployment stabil)
   console.log('[API DEBUG] URL:', url);
   console.log('[API DEBUG] METHOD:', mergedOptions.method || 'GET');
 
-  return fetch(url, mergedOptions);
+  try {
+    const response = await fetch(url, mergedOptions);
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
 }
 
 /**

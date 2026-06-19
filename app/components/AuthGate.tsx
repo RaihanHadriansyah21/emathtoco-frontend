@@ -97,12 +97,12 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                                  currentPath.startsWith('/reset-password') || 
                                  currentPath.startsWith('/register');
                 
-                if (isPublic && event === 'SIGNED_IN' && session) {
-                    setLoading(true);
-                    router.replace('/');
-                } else {
-                    await checkAuth();
+                if (isPublic) {
+                    // Let the login/register/reset pages handle their own redirection and state transitions
+                    return;
                 }
+                
+                await checkAuth();
             }
         });
 

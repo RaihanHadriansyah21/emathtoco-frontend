@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { createAuditLog } from '@/lib/services/audit-service';
 import { normalizeRole } from '@/lib/utils';
 import { API_URL } from '@/lib/config';
+import { apiPost } from '@/lib/api-client';
 import PageTransition from '@/components/ui/PageTransition';
 import { PageLoader } from '@/components/ui/loaders';
 
@@ -101,11 +102,7 @@ export default function DemoResetPage() {
         console.log('[RESET] Step 3: Fetching related hasil_prediksi...');
         let initialPredCount = 0;
         if (answerSheetIds.length > 0) {
-          const countRes = await fetch(`${API_URL}/admin/predictions/count`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lembar_jawaban_ids: answerSheetIds })
-          });
+          const countRes = await apiPost('/admin/predictions/count', { lembar_jawaban_ids: answerSheetIds });
           if (!countRes.ok) {
             const errText = await countRes.text();
             throw new Error(`Gagal menghitung hasil_prediksi: ${errText}`);
@@ -149,11 +146,7 @@ export default function DemoResetPage() {
 
         if (answerSheetIds.length > 0) {
           console.log('[RESET] Step 5: Deleting all related hasil_prediksi...');
-          const deleteRes = await fetch(`${API_URL}/admin/predictions/delete`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lembar_jawaban_ids: answerSheetIds })
-          });
+          const deleteRes = await apiPost('/admin/predictions/delete', { lembar_jawaban_ids: answerSheetIds });
           if (!deleteRes.ok) {
             const errText = await deleteRes.text();
             throw new Error(`Gagal menghapus hasil_prediksi: ${errText}`);
@@ -162,11 +155,7 @@ export default function DemoResetPage() {
           predictionsDeleted = deleteData.deleted;
 
           // Verifikasi: SELECT COUNT(*) harus 0 untuk prediksi yang terkait.
-          const verifyRes = await fetch(`${API_URL}/admin/predictions/count`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lembar_jawaban_ids: answerSheetIds })
-          });
+          const verifyRes = await apiPost('/admin/predictions/count', { lembar_jawaban_ids: answerSheetIds });
           if (!verifyRes.ok) {
             const errText = await verifyRes.text();
             throw new Error(`Gagal memverifikasi sisa hasil_prediksi: ${errText}`);

@@ -5,10 +5,8 @@ import { apiPost } from '@/lib/api-client';
 export interface CreateAuditLogParams {
   action: string;
   target: string;
-  detail: any;
-  userId?: string | null;
-  userName?: string | null;
-  role?: string | null;
+  detail?: any;
+  details?: any;
 }
 
 /**
@@ -57,7 +55,8 @@ export async function checkEnterpriseSchema(): Promise<boolean> {
  */
 export async function createAuditLog(params: CreateAuditLogParams): Promise<void> {
   try {
-    let { action, target, detail, userId, userName, role } = params;
+    let { action, target, detail, details } = params;
+    let finalDetails = details !== undefined ? details : detail;
 
     // Standardize model names across action, target, and details
     if (typeof action === 'string') {
@@ -67,61 +66,24 @@ export async function createAuditLog(params: CreateAuditLogParams): Promise<void
       target = standardizeModelName(target);
     }
 
-    if (detail) {
-      if (typeof detail === 'string') {
-        detail = standardizeModelName(detail);
-      } else if (typeof detail === 'object') {
+    if (finalDetails) {
+      if (typeof finalDetails === 'string') {
+        finalDetails = standardizeModelName(finalDetails);
+      } else if (typeof finalDetails === 'object') {
         try {
-          const detailStr = JSON.stringify(detail);
+          const detailStr = JSON.stringify(finalDetails);
           const updatedDetailStr = standardizeModelName(detailStr);
-          detail = JSON.parse(updatedDetailStr);
+          finalDetails = JSON.parse(updatedDetailStr);
         } catch {
           // ignore parsing error and keep original object
         }
       }
     }
 
-    // Resolve user details from active session if missing
-    if (!userId || !userName || !role) {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          if (!userId) userId = user.id;
-          
-          const { data: profile } = await supabase
-            .from('profil_pengguna')
-            .select('nama_lengkap, role')
-            .eq('id', user.id)
-            .maybeSingle();
-
-          if (profile) {
-            if (!userName) userName = profile.nama_lengkap || user.email || 'Anonymous';
-            if (!role) role = normalizeRole(profile.role);
-          } else {
-            if (!userName) userName = user.email || 'Anonymous';
-            if (!role) role = 'unknown';
-          }
-        } else {
-          // Fallback for system / guest actions
-          if (!userId) userId = null;
-          if (!userName) userName = 'System';
-          if (!role) role = 'system';
-        }
-      } catch (authErr) {
-        console.warn('[AUDIT] Failed to fetch session user for audit log:', authErr);
-        if (!userId) userId = null;
-        if (!userName) userName = 'System';
-        if (!role) role = 'system';
-      }
-    }
-
     const payload = {
-      user_id: userId,
-      user_name: userName,
-      role: role,
       action: action,
       target: target,
-      detail: detail
+      details: finalDetails
     };
 
     const response = await apiPost('/audit/log', payload);

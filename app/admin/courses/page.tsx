@@ -9,6 +9,9 @@ import ConfirmModal from '@/app/components/ConfirmModal';
 import { GlassTable, GlassTableHeader, GlassTableRow, EmptyState, ResponsiveTableWrapper } from '@/components/ui/table';
 import PageTransition from '@/components/ui/PageTransition';
 import { PageLoader } from '@/components/ui/loaders';
+import { useToast } from '@/app/hooks/useToast';
+import ToastContainer from '@/app/components/Toast';
+import { apiDelete } from '@/lib/api-client';
 
 interface Course {
   id: string;
@@ -31,6 +34,7 @@ const iconMap: Record<string, string> = { security: '🔒', compress: '🗜️',
 
 export default function CourseManagementPage() {
   const router = useRouter();
+  const { toasts, toast, removeToast } = useToast();
   const [isChecking, setIsChecking] = useState(true);
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -114,15 +118,28 @@ export default function CourseManagementPage() {
   };
 
   const handleDelete = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || isDeleting) return;
     setIsDeleting(true);
     try {
-      const { error } = await supabase.from('mata_kuliah').delete().eq('id', deleteTarget.id);
-      if (error) throw error;
+      console.log(`[Delete Course] Sending backend deletion request for course ID: ${deleteTarget.id}`);
+      const res = await apiDelete(`/admin/course/${deleteTarget.id}`);
+      if (!res.ok) {
+        let errorMsg = 'Gagal menghapus mata kuliah pada backend.';
+        try {
+          const errJson = await res.json();
+          if (errJson && errJson.detail) {
+            errorMsg = errJson.detail;
+          }
+        } catch (_) {}
+        throw new Error(errorMsg);
+      }
+
       setCourses(prev => prev.filter(c => c.id !== deleteTarget.id));
+      toast.success('Hapus Berhasil', `Mata kuliah "${deleteTarget.nama_matkul}" berhasil dihapus beserta seluruh berkas & data terkait.`);
       setDeleteTarget(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error deleting course:', err);
+      toast.error('Gagal Menghapus', err.message || 'Terjadi kesalahan saat menghapus mata kuliah.');
     } finally {
       setIsDeleting(false);
     }
@@ -288,11 +305,12 @@ export default function CourseManagementPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Hapus Mata Kuliah"
-        message={`Apakah Anda yakin ingin menghapus "${deleteTarget?.nama_matkul}"? Pastikan tidak ada pengumpulan tugas yang masih terhubung.`}
+        message={`Apakah Anda yakin ingin menghapus "${deleteTarget?.nama_matkul}"? Semua data mahasiswa, nilai, dan lembar jawaban terunggah di mata kuliah ini akan dihapus secara permanen.`}
         confirmLabel="Hapus"
         variant="danger"
         isLoading={isDeleting}
       />
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
     </PageTransition>
   );

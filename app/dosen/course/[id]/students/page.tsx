@@ -246,13 +246,28 @@ export default function LecturerStudentRoster() {
             const res = await apiGet(`/prediction/${student.submission.id}`);
             if (res.ok) {
                 const data = await res.json();
-                setPredictionDetails(data);
+                setSelectedStudent(current => {
+                    if (current?.id === student.id) {
+                        setPredictionDetails(data);
+                    }
+                    return current;
+                });
             } else {
-                setPredictionError('Gagal mengambil detail penilaian AI dari backend.');
+                setSelectedStudent(current => {
+                    if (current?.id === student.id) {
+                        setPredictionError('Gagal mengambil detail penilaian AI dari backend.');
+                    }
+                    return current;
+                });
             }
         } catch (err) {
             console.error('Failed to load predictions:', err);
-            setPredictionError('Backend AI tidak dapat dihubungi.');
+            setSelectedStudent(current => {
+                if (current?.id === student.id) {
+                    setPredictionError('Backend AI tidak dapat dihubungi.');
+                }
+                return current;
+            });
         } finally {
             setIsLoadingPrediction(false);
         }
@@ -308,10 +323,7 @@ export default function LecturerStudentRoster() {
                 await apiPost('/audit/log', {
                     action: 'FINAL_SCORE_SUBMITTED',
                     target: 'pengumpulan_tugas',
-                    detail: { new_score: overallScore, source: 'roster_modal' },
-                    user_id: (await supabase.auth.getUser()).data.user?.id,
-                    user_name: lecturerName,
-                    role: 'dosen'
+                    details: { new_score: overallScore, source: 'roster_modal' }
                 });
             } catch (_) {}
 
