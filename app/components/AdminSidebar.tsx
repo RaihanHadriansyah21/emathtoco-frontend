@@ -152,19 +152,30 @@ export default function AdminSidebar({
 
       {/* Collapse toggle */}
       {!hideToggle && (
-        <div className="border-t border-slate-200 dark:border-neutral-900 p-2">
+        <div className="border-t border-slate-200 dark:border-neutral-900 px-3 py-2">
           <button
             onClick={onToggle}
-            className={`w-full flex items-center justify-center py-2 rounded-xl text-slate-400 dark:text-neutral-600 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-all duration-300 cursor-pointer ${
-              collapsed ? 'gap-0' : 'gap-2'
+            className={`w-full flex items-center rounded-xl text-slate-400 dark:text-neutral-600 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-all duration-300 cursor-pointer ${
+              collapsed ? 'justify-center py-3' : 'px-3 py-2.5'
             }`}
           >
-            <ChevronLeft className={`w-4 h-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
-            <span className={`text-xs font-semibold transition-all duration-300 origin-left overflow-hidden ${
-              collapsed ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[50px]'
-            }`}>
+            <ChevronLeft
+              className={`w-4 h-4 flex-shrink-0 transition-transform duration-[250ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                collapsed ? 'rotate-180' : ''
+              }`}
+            />
+            <motion.span
+              initial={false}
+              animate={{
+                width: collapsed ? 0 : 'auto',
+                opacity: collapsed ? 0 : 1,
+                marginLeft: collapsed ? 0 : 14,
+              }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="text-xs font-semibold whitespace-nowrap overflow-hidden inline-block"
+            >
               Tutup
-            </span>
+            </motion.span>
           </button>
         </div>
       )}

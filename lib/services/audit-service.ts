@@ -18,7 +18,11 @@ export function standardizeModelName(str: string): string {
   if (!str) return str;
   return str.replace(/DenseNet201/g, 'DenseNet121')
             .replace(/DenseNet-121/g, 'DenseNet121')
-            .replace(/Dense\s+Net\s+121/g, 'DenseNet121');
+            .replace(/Dense\s+Net\s+121/g, 'DenseNet121')
+            .replace(/\bDenseNet\b/g, 'DenseNet121')
+            .replace(/\bInception\b/g, 'InceptionV3')
+            .replace(/\bMobileNet\b/g, 'MobileNetV2')
+            .replace(/\bMobilenetV2\b/g, 'MobileNetV2');
 }
 
 /**

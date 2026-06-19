@@ -278,7 +278,7 @@ export default function MahasiswaLoginPage() {
                                 Masuk sebagai <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">Mahasiswa</span>
                             </h1>
                         </div>
-                        <p className="text-neutral-550 text-[10px] sm:text-xs uppercase tracking-widest mt-1">Akses pengumpulan tugas dan hasil penilaian AI</p>
+                        <p className="text-neutral-500 text-[10px] sm:text-xs uppercase tracking-widest mt-1">Akses pengumpulan tugas dan hasil penilaian AI</p>
                     </motion.div>
 
                     {errorMessage && (
@@ -329,7 +329,7 @@ export default function MahasiswaLoginPage() {
                                     type="button"
                                     onClick={togglePasswordVisibility}
                                     aria-label={showPassword ? "Hide password" : "Show password"}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-350 active:scale-95 transition-all p-1 rounded-lg hover:bg-neutral-900/50 cursor-pointer flex items-center justify-center"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 active:scale-95 transition-all p-1 rounded-lg hover:bg-neutral-900/50 cursor-pointer flex items-center justify-center"
                                 >
                                     {showPassword ? (
                                         <EyeOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" />

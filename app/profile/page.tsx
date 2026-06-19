@@ -512,7 +512,7 @@ export default function ProfilePage() {
                                 type="text"
                                 value={email}
                                 disabled
-                                className="w-full bg-slate-100 border border-slate-200 dark:bg-neutral-950/50 dark:border-neutral-900/80 rounded-xl py-3 px-4 text-slate-500 dark:text-neutral-550 text-sm focus:outline-none cursor-not-allowed"
+                                className="w-full bg-slate-100 border border-slate-200 dark:bg-neutral-950/50 dark:border-neutral-900/80 rounded-xl py-3 px-4 text-slate-500 dark:text-neutral-500 text-sm focus:outline-none cursor-not-allowed"
                             />
                         </div>
 
@@ -792,7 +792,7 @@ export default function ProfilePage() {
                             <button
                                 type="button"
                                 onClick={() => setShowDeleteConfirm(false)}
-                                className="flex-1 py-2.5 bg-transparent border border-neutral-800 hover:border-neutral-700 text-neutral-450 hover:text-white font-bold text-xs rounded-xl tracking-wider transition-all cursor-pointer"
+                                className="flex-1 py-2.5 bg-transparent border border-neutral-800 hover:border-neutral-700 text-neutral-400 hover:text-white font-bold text-xs rounded-xl tracking-wider transition-all cursor-pointer"
                             >
                                 BATAL
                             </button>

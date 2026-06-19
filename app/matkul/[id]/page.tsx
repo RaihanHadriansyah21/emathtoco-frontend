@@ -905,7 +905,10 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
                 style={{ zIndex: 9999 }}
             >
                 {/* Header bar */}
-                <div className="w-full h-14 bg-black/60 backdrop-blur-md flex items-center justify-between px-4 z-20">
+                <div 
+                    className="w-full bg-black/60 backdrop-blur-md flex items-center justify-between px-4 z-20"
+                    style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(3.5rem + env(safe-area-inset-top))' }}
+                >
                     <button
                         onClick={() => {
                             stopCamera();
@@ -974,7 +977,8 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
         >
             {/* Header bar */}
             <div
-                className="w-full h-14 bg-gradient-to-b from-black/80 to-transparent flex items-center justify-between px-4 z-20 relative"
+                className="w-full bg-gradient-to-b from-black/80 to-transparent flex items-center justify-between px-4 z-20 relative"
+                style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(3.5rem + env(safe-area-inset-top))' }}
             >
                 <button
                     onClick={() => {
@@ -1683,7 +1687,10 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
 
     return (
         <div className="fixed inset-0 bg-[#09090b]/98 backdrop-blur-md z-[9999] flex flex-col justify-between text-white select-none">
-            <div className="w-full h-14 bg-black/60 border-b border-white/10 flex items-center justify-between px-4 z-20">
+            <div 
+                className="w-full bg-black/60 border-b border-white/10 flex items-center justify-between px-4 z-20"
+                style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(3.5rem + env(safe-area-inset-top))' }}
+            >
                 <button
                     onClick={onClose}
                     className="p-2 text-white/85 hover:text-white cursor-pointer transition-colors text-sm font-semibold"
@@ -2881,7 +2888,7 @@ export default function UploadWorkspace() {
                                 return {
                                     icon: '🤖',
                                     title: 'Sedang Diproses AI',
-                                    description: `Lembar jawaban Anda sedang dianalisis menggunakan model ${modelAi || 'DenseNet'}. Pengeditan tidak diizinkan.`,
+                                    description: `Lembar jawaban Anda sedang dianalisis menggunakan model ${modelAi || 'DenseNet121'}. Pengeditan tidak diizinkan.`,
                                     accentColor: 'from-purple-500 to-indigo-500',
                                     glowColor: 'bg-purple-500/12',
                                 };
@@ -3199,7 +3206,7 @@ export default function UploadWorkspace() {
                                                     ) : (
                                                         <div className="w-full h-full flex flex-col items-center justify-center gap-1">
                                                             <Camera className="w-5 h-5 text-neutral-500 group-hover:text-cyan-400 transition-colors" />
-                                                            <span className="text-[10px] text-neutral-650 dark:text-neutral-400 font-medium transition-colors">Ambil Foto</span>
+                                                            <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-medium transition-colors">Ambil Foto</span>
                                                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 text-slate-500 dark:text-neutral-500 font-mono font-bold tracking-wide mt-1">
                                                                 Belum Upload
                                                             </span>

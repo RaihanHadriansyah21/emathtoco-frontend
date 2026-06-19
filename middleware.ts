@@ -23,7 +23,10 @@ export function middleware(request: NextRequest) {
     let token = request.cookies.get('sb-access-token')?.value;
     const pathname = request.nextUrl.pathname;
     const isLoginPage = pathname.startsWith('/login');
-    const isPublicPage = isLoginPage || pathname.startsWith('/forgot-password') || pathname.startsWith('/reset-password');
+    const isPublicPage = isLoginPage || 
+                         pathname.startsWith('/forgot-password') || 
+                         pathname.startsWith('/reset-password') ||
+                         pathname.startsWith('/register');
 
     // Jika token terdeteksi kedaluwarsa secara mandiri di server, kosongkan status token
     if (token && isTokenExpired(token)) {
@@ -32,11 +35,7 @@ export function middleware(request: NextRequest) {
 
     // KONDISI 1: Pengguna mencoba masuk Beranda tapi BELUM LOGIN -> Tendang ke halaman login
     if (!token && !isPublicPage) {
-        const response = NextResponse.redirect(new URL('/login', request.url));
-        if (request.cookies.has('sb-access-token')) {
-            response.cookies.delete('sb-access-token');
-        }
-        return response;
+        return NextResponse.redirect(new URL('/login', request.url));
     }
 
     // KONDISI 2 (Dihapus untuk mencegah loop): Biarkan halaman /login memvalidasi user ke backend secara client-side

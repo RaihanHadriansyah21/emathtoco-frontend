@@ -266,3 +266,59 @@ html.dark::-webkit-scrollbar-thumb:hover,
   color: #ffffff !important;
   border-color: rgba(255, 255, 255, 0.05) !important;
 }
+
+/* =================================================═ */
+/* CRITICAL MOBILE PERFORMANCE OVERRIDES             */
+/* =================================================═ */
+
+@media (max-width: 767px) {
+  /* Disable backdrop filter on mobile to resolve iOS Safari hit-testing/click-interception bugs on inputs, and reclaim rendering GPU cycles */
+  .glass-card, 
+  .dark .dark\:glass-card,
+  .glass-panel {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(10, 10, 15, 0.94) !important;
+    box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.2) !important;
+  }
+  
+  /* Disable expensive translate/scale effects on hover for touch devices */
+  .glass-card:hover, 
+  .dark .dark\:glass-card:hover,
+  .btn-primary:hover,
+  .btn-glass:hover,
+  .btn-danger:hover,
+  .btn-ghost:hover {
+    transform: none !important;
+    box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.2) !important;
+  }
+
+  /* Disable heavy ambient floating animations on mobile screen to reclaim GPU frame times */
+  .animate-float-blue,
+  .animate-float-purple {
+    animation: none !important;
+  }
+
+  /* Prevent iOS Safari auto-zoom on input focus by forcing 16px font-size on mobile viewports */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+
+  /* Remove iOS Safari grey tap highlight color for instant, native app-like responsiveness */
+  * {
+    -webkit-tap-highlight-color: transparent !important;
+  }
+}
+
+/* Standard accessibility preference mapping for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-delay: -1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    background-attachment: initial !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+  }
+}

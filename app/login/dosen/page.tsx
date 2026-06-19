@@ -299,22 +299,22 @@ export default function DosenLoginPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, delay: 0.25 }}
                     onSubmit={handleLoginSubmit}
-                    className="space-y-5"
+                    className="space-y-4 sm:space-y-5"
                 >
                     <div>
-                        <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Email</label>
+                        <label className="block text-[10px] sm:text-xs font-bold uppercase tracking-widest text-neutral-400 mb-1.5 sm:mb-2">Email</label>
                         <input
                             type="email"
                             placeholder="dosen@kampus.ac.id"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="w-full bg-black border border-neutral-800 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-indigo-500/80 focus:ring-1 focus:ring-indigo-500/20 transition-all text-sm placeholder:text-neutral-600"
+                            className="w-full bg-black border border-neutral-800 rounded-xl py-2.5 px-3.5 sm:py-3 sm:px-4 text-white focus:outline-none focus:border-indigo-500/80 focus:ring-1 focus:ring-indigo-500/20 transition-all text-xs sm:text-sm placeholder:text-neutral-600"
                         />
                     </div>
 
                     <div>
-                        <div className="flex justify-between items-center mb-2">
-                            <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400">Password</label>
+                        <div className="flex justify-between items-center mb-1.5 sm:mb-2">
+                            <label className="block text-[10px] sm:text-xs font-bold uppercase tracking-widest text-neutral-400">Password</label>
                         </div>
                         <div className="relative">
                             <input
@@ -322,18 +322,18 @@ export default function DosenLoginPage() {
                                 placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full bg-black border border-neutral-800 rounded-xl py-3 pl-4 pr-12 text-white focus:outline-none focus:border-indigo-500/80 focus:ring-1 focus:ring-indigo-500/20 transition-all text-sm placeholder:text-neutral-600"
+                                className="w-full bg-black border border-neutral-800 rounded-xl py-2.5 pl-3.5 pr-11 sm:py-3 sm:pl-4 sm:pr-12 text-white focus:outline-none focus:border-indigo-500/80 focus:ring-1 focus:ring-indigo-500/20 transition-all text-xs sm:text-sm placeholder:text-neutral-600"
                             />
                             <button
                                 type="button"
                                 onClick={togglePasswordVisibility}
                                 aria-label={showPassword ? "Hide password" : "Show password"}
-                                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-350 active:scale-95 transition-all p-1 rounded-lg hover:bg-neutral-900/50 cursor-pointer flex items-center justify-center"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 active:scale-95 transition-all p-1 rounded-lg hover:bg-neutral-900/50 cursor-pointer flex items-center justify-center"
                             >
                                 {showPassword ? (
-                                    <EyeOff className="w-4 h-4" />
+                                    <EyeOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 ) : (
-                                    <Eye className="w-4 h-4" />
+                                    <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 )}
                             </button>
                         </div>
@@ -342,7 +342,7 @@ export default function DosenLoginPage() {
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className="w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-650 hover:from-indigo-600 hover:via-purple-600 hover:to-pink-750 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/10 disabled:opacity-50 text-sm tracking-widest cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
+                        className="w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-600 hover:from-indigo-600 hover:via-purple-600 hover:to-pink-700 text-white font-extrabold py-3 sm:py-3.5 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/10 disabled:opacity-50 text-xs sm:text-sm tracking-widest cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
                     >
                         {isLoading ? <span>Memverifikasi Akun...</span> : <span>MASUK KE SISTEM</span>}
                     </button>

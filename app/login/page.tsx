@@ -91,10 +91,10 @@ export default function LoginSelectionPage() {
                                 router.replace('/login?select=true');
                                 setShowSelection(true);
                             }}
-                            className="group flex items-center gap-2.5 bg-white/[0.07] hover:bg-white/[0.12] backdrop-blur-xl border border-white/[0.12] hover:border-cyan-500/30 text-white px-5 py-2.5 rounded-xl transition-all duration-300 cursor-pointer shadow-lg shadow-black/20 hover:shadow-cyan-500/5"
+                            className="hidden md:flex group items-center gap-1.5 bg-white/[0.03] hover:bg-white/[0.08] backdrop-blur-md border border-white/[0.08] hover:border-cyan-500/30 text-neutral-300 hover:text-white px-3.5 py-2 rounded-xl transition-all duration-300 cursor-pointer shadow-sm active:scale-95 text-xs font-bold tracking-widest uppercase"
                         >
-                            <LogIn className="w-4 h-4 text-cyan-400 group-hover:text-cyan-300 transition-colors" />
-                            <span className="text-sm font-bold tracking-wider uppercase">Masuk</span>
+                            <LogIn className="w-3.5 h-3.5 text-cyan-400 group-hover:text-cyan-300 transition-colors" />
+                            <span>Masuk</span>
                         </motion.button>
                     ) : (
                         <motion.button
@@ -107,10 +107,10 @@ export default function LoginSelectionPage() {
                                 router.replace('/login');
                                 setShowSelection(false);
                             }}
-                            className="group flex items-center gap-2 bg-white/[0.07] hover:bg-white/[0.12] backdrop-blur-xl border border-white/[0.12] hover:border-neutral-500/30 text-white px-5 py-2.5 rounded-xl transition-all duration-300 cursor-pointer"
+                            className="group flex items-center gap-1.5 bg-white/[0.03] hover:bg-white/[0.08] backdrop-blur-md border border-white/[0.08] hover:border-neutral-500/30 text-neutral-300 hover:text-white px-3.5 py-2 rounded-xl transition-all duration-300 cursor-pointer shadow-sm active:scale-95 text-xs font-bold tracking-widest uppercase"
                         >
-                            <ArrowLeft className="w-4 h-4 text-neutral-400 group-hover:text-white transition-colors" />
-                            <span className="text-sm font-bold tracking-wider uppercase">Kembali</span>
+                            <ArrowLeft className="w-3.5 h-3.5 text-neutral-400 group-hover:text-white transition-colors" />
+                            <span>Kembali</span>
                         </motion.button>
                     )}
                 </AnimatePresence>
@@ -258,20 +258,20 @@ export default function LoginSelectionPage() {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.5, delay: 0.25 }}
                                         onClick={() => router.push('/login/mahasiswa')}
-                                        className="group relative bg-[#0A0A0F]/80 border border-neutral-800/80 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-[0_0_50px_rgba(0,0,0,0.6)] overflow-hidden text-left transition-all duration-300 hover:border-cyan-500/40 hover:shadow-[0_0_40px_rgba(6,182,212,0.08)] cursor-pointer w-full"
+                                        className="group relative bg-[#07070C]/65 border border-white/5 dark:border-neutral-800/60 backdrop-blur-md rounded-2xl p-6 sm:p-7 shadow-xl overflow-hidden text-left transition-all duration-300 hover:border-cyan-500/30 hover:shadow-[0_0_30px_rgba(6,182,212,0.05)] cursor-pointer w-full"
                                     >
                                         <div className="absolute -top-10 -right-10 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-cyan-500/10 transition-all duration-500"></div>
 
-                                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 flex items-center justify-center mb-5 group-hover:from-cyan-500/20 group-hover:to-blue-500/20 group-hover:border-cyan-500/40 transition-all duration-300">
-                                            <GraduationCap className="w-7 h-7 text-cyan-400" />
+                                        <div className="w-11 h-11 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-center mb-4 transition-all duration-300 group-hover:border-cyan-500/30 group-hover:bg-cyan-500/5">
+                                            <GraduationCap className="w-5 h-5 text-neutral-400 group-hover:text-cyan-400 transition-colors" />
                                         </div>
 
-                                        <h2 className="text-xl font-extrabold text-white mb-2 tracking-wide group-hover:text-cyan-300 transition-colors duration-200">Mahasiswa</h2>
-                                        <p className="text-neutral-500 text-sm leading-relaxed mb-6">Unggah jawaban, lihat hasil penilaian AI, dan pantau progres tugas.</p>
+                                        <h2 className="text-lg font-bold text-white mb-1.5 tracking-wide group-hover:text-cyan-300 transition-colors duration-200">Mahasiswa</h2>
+                                        <p className="text-neutral-400 text-xs leading-relaxed mb-5">Unggah jawaban, lihat hasil penilaian AI, dan pantau progres tugas.</p>
 
-                                        <div className="flex items-center gap-2 text-cyan-400 text-xs font-bold uppercase tracking-widest group-hover:gap-3 transition-all duration-300">
+                                        <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-450 group-hover:text-cyan-400 transition-colors duration-250">
                                             <span>Masuk sebagai Mahasiswa</span>
-                                            <ArrowRight className="w-4 h-4" />
+                                            <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition-transform duration-200" />
                                         </div>
                                     </motion.button>
 
@@ -281,20 +281,20 @@ export default function LoginSelectionPage() {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.5, delay: 0.35 }}
                                         onClick={() => router.push('/login/dosen')}
-                                        className="group relative bg-[#0A0A0F]/80 border border-neutral-800/80 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-[0_0_50px_rgba(0,0,0,0.6)] overflow-hidden text-left transition-all duration-300 hover:border-indigo-500/40 hover:shadow-[0_0_40px_rgba(99,102,241,0.08)] cursor-pointer w-full"
+                                        className="group relative bg-[#07070C]/65 border border-white/5 dark:border-neutral-800/60 backdrop-blur-md rounded-2xl p-6 sm:p-7 shadow-xl overflow-hidden text-left transition-all duration-300 hover:border-indigo-500/30 hover:shadow-[0_0_30px_rgba(99,102,241,0.05)] cursor-pointer w-full"
                                     >
                                         <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-indigo-500/10 transition-all duration-500"></div>
 
-                                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 flex items-center justify-center mb-5 group-hover:from-indigo-500/20 group-hover:to-purple-500/20 group-hover:border-indigo-500/40 transition-all duration-300">
-                                            <BookOpen className="w-7 h-7 text-indigo-400" />
+                                        <div className="w-11 h-11 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-center mb-4 transition-all duration-300 group-hover:border-indigo-500/30 group-hover:bg-indigo-500/5">
+                                            <BookOpen className="w-5 h-5 text-neutral-400 group-hover:text-indigo-400 transition-colors" />
                                         </div>
 
-                                        <h2 className="text-xl font-extrabold text-white mb-2 tracking-wide group-hover:text-indigo-300 transition-colors duration-200">Dosen</h2>
-                                        <p className="text-neutral-500 text-sm leading-relaxed mb-6">Kelola kelas, pantau mahasiswa, dan review hasil AI.</p>
+                                        <h2 className="text-lg font-bold text-white mb-1.5 tracking-wide group-hover:text-indigo-300 transition-colors duration-200">Dosen</h2>
+                                        <p className="text-neutral-400 text-xs leading-relaxed mb-5">Kelola kelas, pantau mahasiswa, dan review hasil AI.</p>
 
-                                        <div className="flex items-center gap-2 text-indigo-400 text-xs font-bold uppercase tracking-widest group-hover:gap-3 transition-all duration-300">
+                                        <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-450 group-hover:text-indigo-400 transition-colors duration-250">
                                             <span>Masuk sebagai Dosen</span>
-                                            <ArrowRight className="w-4 h-4" />
+                                            <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition-transform duration-200" />
                                         </div>
                                     </motion.button>
                                 </div>

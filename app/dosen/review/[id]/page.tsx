@@ -1231,7 +1231,7 @@ export default function ReviewWorkspace() {
                                     value={slot.manualScore !== null ? slot.manualScore : ''}
                                     onChange={(e) => handleManualScoreChange(slot.label, e.target.value)}
                                     disabled={isReadOnly || isAIProcessing}
-                                    className="w-full bg-slate-50 border border-slate-300 dark:bg-black dark:border-neutral-900 hover:border-slate-450 dark:hover:border-neutral-800 focus:border-cyan-500 dark:focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/10 rounded-xl py-2 px-3 text-slate-800 dark:text-white placeholder:text-slate-550 dark:placeholder:text-neutral-600 text-sm font-mono focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="w-full bg-slate-50 border border-slate-300 dark:bg-black dark:border-neutral-900 hover:border-slate-400 dark:hover:border-neutral-800 focus:border-cyan-500 dark:focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/10 rounded-xl py-2 px-3 text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-neutral-600 text-sm font-mono focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
                                   />
                                   <span className="text-[10px] text-slate-600 dark:text-neutral-500 mt-1 block">
                                     Maksimal nilai: {slot.label.toLowerCase().endsWith('f') ? '5' : '4'}
@@ -1269,7 +1269,7 @@ export default function ReviewWorkspace() {
                                   onChange={(e) => handleFeedbackChange(slot.label, e.target.value)}
                                   disabled={isReadOnly || slot.dbStatus === 'reupload_required' || isAIProcessing}
                                   rows={3}
-                                  className="w-full bg-slate-50 border border-slate-300 dark:bg-black dark:border-neutral-900 hover:border-slate-450 dark:hover:border-neutral-850 text-slate-800 dark:text-neutral-200 placeholder:text-slate-550 dark:placeholder:text-neutral-600 text-xs focus:outline-none resize-none flex-grow disabled:opacity-40 disabled:cursor-not-allowed"
+                                  className="w-full bg-slate-50 border border-slate-300 dark:bg-black dark:border-neutral-900 hover:border-slate-400 dark:hover:border-neutral-800 text-slate-800 dark:text-neutral-200 placeholder:text-slate-400 dark:placeholder:text-neutral-600 text-xs focus:outline-none resize-none flex-grow disabled:opacity-40 disabled:cursor-not-allowed"
                                 />
 
                                 {/* Reupload Request Button */}
@@ -1339,30 +1339,30 @@ export default function ReviewWorkspace() {
 
               <div className="space-y-4">
                 <div>
-                  <span className="text-[10px] text-slate-500 dark:text-neutral-450 font-bold uppercase tracking-wider block">Nama Lengkap</span>
+                  <span className="text-[10px] text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-wider block">Nama Lengkap</span>
                   <span className="text-lg font-bold text-slate-800 dark:text-white">{Array.isArray(submission?.mahasiswa) ? submission?.mahasiswa[0]?.nama_lengkap : submission?.mahasiswa?.nama_lengkap || 'Unknown'}</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <span className="text-[10px] text-slate-500 dark:text-neutral-450 font-bold uppercase tracking-wider block">NIM / NIP</span>
+                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-wider block">NIM / NIP</span>
                     <span className="text-sm font-mono text-slate-700 dark:text-neutral-300">{Array.isArray(submission?.mahasiswa) ? submission?.mahasiswa[0]?.nim_nip : submission?.mahasiswa?.nim_nip || '-'}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-500 dark:text-neutral-450 font-bold uppercase tracking-wider block">Kelas</span>
+                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-wider block">Kelas</span>
                     <span className="text-sm font-semibold text-slate-700 dark:text-neutral-300">{Array.isArray(submission?.mahasiswa) ? submission?.mahasiswa[0]?.kelas : submission?.mahasiswa?.kelas || '-'}</span>
                   </div>
                 </div>
 
                 <div>
-                  <span className="text-[10px] text-slate-500 dark:text-neutral-450 font-bold uppercase tracking-wider block">Mata Kuliah</span>
+                  <span className="text-[10px] text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-wider block">Mata Kuliah</span>
                   <span className="text-sm font-semibold text-slate-700 dark:text-neutral-300">{Array.isArray(submission?.mata_kuliah) ? submission?.mata_kuliah[0]?.nama_matkul : submission?.mata_kuliah?.nama_matkul || '-'}</span>
-                  <span className="text-[10px] text-slate-500 dark:text-neutral-450 font-mono block mt-0.5 uppercase">{Array.isArray(submission?.mata_kuliah) ? submission?.mata_kuliah[0]?.kode_matkul : submission?.mata_kuliah?.kode_matkul || ''}</span>
+                  <span className="text-[10px] text-slate-500 dark:text-neutral-400 font-mono block mt-0.5 uppercase">{Array.isArray(submission?.mata_kuliah) ? submission?.mata_kuliah[0]?.kode_matkul : submission?.mata_kuliah?.kode_matkul || ''}</span>
                 </div>
 
                 <div className="border-t border-slate-100 dark:border-neutral-900 pt-3 flex items-center justify-between">
                   <div>
-                    <span className="text-[10px] text-slate-500 dark:text-neutral-450 font-bold uppercase tracking-wider block">Status Submit</span>
+                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-wider block">Status Submit</span>
                     {submission && (() => {
                       const badge = getStatusBadge(isBackendOffline ? 'offline' : (submission.ai_status || submission.status_submit));
                       return (
@@ -1373,8 +1373,8 @@ export default function ReviewWorkspace() {
                     })()}
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-500 dark:text-neutral-450 font-bold uppercase tracking-wider block text-right">Waktu Submit</span>
-                    <span className="text-[10px] text-slate-600 dark:text-neutral-450 font-medium block mt-1 text-right">
+                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-wider block text-right">Waktu Submit</span>
+                    <span className="text-[10px] text-slate-600 dark:text-neutral-400 font-medium block mt-1 text-right">
                       {submission?.waktu_submit ? new Date(submission.waktu_submit).toLocaleString('id-ID', {
                         day: 'numeric',
                         month: 'short',
@@ -1392,7 +1392,7 @@ export default function ReviewWorkspace() {
               <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl p-6 backdrop-blur-md space-y-5">
                 <div>
                   <h3 className="text-xs font-bold text-slate-600 dark:text-neutral-400 uppercase tracking-widest block mb-1">Model AI Penilaian</h3>
-                  <p className="text-[10px] text-slate-500 dark:text-neutral-450 mb-3">Pilih arsitektur jaringan saraf dalam untuk melakukan penilaian.</p>
+                  <p className="text-[10px] text-slate-500 dark:text-neutral-400 mb-3">Pilih arsitektur jaringan saraf dalam untuk melakukan penilaian.</p>
 
                   <select
                     value={selectedModel}
@@ -1485,7 +1485,7 @@ export default function ReviewWorkspace() {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 min-[360px]:grid-cols-3 gap-2.5 sm:gap-4">
                   <div className="bg-slate-50 border border-slate-200 dark:bg-black/45 dark:border-neutral-900 rounded-xl p-2.5 sm:p-3">
-                    <span className="text-[10px] text-slate-500 dark:text-neutral-450 font-bold uppercase tracking-wider block mb-0.5">Skor Bagian</span>
+                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-wider block mb-0.5">Skor Bagian</span>
                     <span className="text-2xl font-extrabold text-slate-800 dark:text-white font-mono">{totalSectionScore}</span>
                     <span className="text-[9px] text-slate-500 dark:text-neutral-500 font-mono block mt-0.5">/ 100</span>
                   </div>
@@ -1497,7 +1497,7 @@ export default function ReviewWorkspace() {
                   </div>
 
                   <div className="bg-slate-50 border border-slate-200 dark:bg-black/45 dark:border-neutral-900 rounded-xl p-2.5 sm:p-3">
-                    <span className="text-[10px] text-slate-500 dark:text-neutral-450 font-bold uppercase tracking-wider block mb-0.5">Nilai Resmi</span>
+                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-wider block mb-0.5">Nilai Resmi</span>
                     <span className="text-2xl font-extrabold text-cyan-600 dark:text-cyan-400 font-mono">{totalSectionScore}</span>
                     <span className="text-[9px] text-cyan-700/80 dark:text-cyan-500/60 font-mono block mt-0.5">Official</span>
                   </div>
@@ -1532,7 +1532,7 @@ export default function ReviewWorkspace() {
 
               <div>
                 <span className="text-xs font-bold text-slate-600 dark:text-neutral-400 uppercase tracking-widest block mb-1">Nilai Akhir Tugas</span>
-                <p className="text-[10px] text-slate-500 dark:text-neutral-450 mb-4">Nilai kumulatif dari seluruh halaman lembar jawaban.</p>
+                <p className="text-[10px] text-slate-500 dark:text-neutral-400 mb-4">Nilai kumulatif dari seluruh halaman lembar jawaban.</p>
 
                 <div className="flex items-baseline gap-2 mb-6">
                   <span className="text-5xl font-extrabold text-cyan-600 dark:text-cyan-400 font-mono">{getOverallScore()}</span>
@@ -1548,7 +1548,7 @@ export default function ReviewWorkspace() {
                     className="w-full flex items-center justify-center gap-2 border border-slate-200 hover:border-slate-350 hover:bg-slate-50 dark:border-neutral-800 dark:hover:border-neutral-700 dark:hover:bg-white/5 text-slate-700 dark:text-neutral-300 py-3 rounded-xl transition-all text-xs font-extrabold tracking-widest cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSaving ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-slate-400 dark:text-neutral-450" />
+                      <Loader2 className="w-4 h-4 animate-spin text-slate-400 dark:text-neutral-400" />
                     ) : (
                       <Save className="w-4 h-4" />
                     )}

@@ -34,7 +34,7 @@ const MODEL_THEMES: Record<string, { gradient: string; border: string; icon: str
     icon: 'text-cyan-500 dark:text-cyan-400',
     bg: 'bg-cyan-500/10',
   },
-  MobilenetV2: {
+  MobileNetV2: {
     gradient: 'from-emerald-500/15 to-teal-500/5',
     border: 'border-emerald-500/25',
     icon: 'text-emerald-500 dark:text-emerald-400',

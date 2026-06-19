@@ -13,6 +13,8 @@ import { PageLoader } from '@/components/ui/loaders';
 import { GlassTable, GlassTableHeader, GlassTableRow, ResponsiveTableWrapper } from '@/components/ui/table';
 import { GlassCard } from '@/components/ui/card';
 
+import { useRequireRole } from '@/app/hooks/useRequireRole';
+
 interface RecentSubmission {
   id: string;
   status_submit: string;
@@ -22,6 +24,7 @@ interface RecentSubmission {
 }
 
 export default function AdminDashboard() {
+  const { isLoading, isAuthorized, userName } = useRequireRole('admin');
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
   const [adminName, setAdminName] = useState('');
@@ -37,40 +40,12 @@ export default function AdminDashboard() {
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   useEffect(() => {
-    const checkRole = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          await supabase.auth.signOut();
-          document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
-          window.location.href = '/login';
-          return;
-        }
-
-        const { data: profile } = await supabase
-          .from('profil_pengguna')
-          .select('role, nama_lengkap')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        const userRole = normalizeRole(profile?.role);
-        if (userRole === 'admin' && profile) {
-          setAdminName(profile.nama_lengkap || 'Admin');
-          setIsChecking(false);
-          fetchDashboardData();
-        } else if (userRole === 'dosen') {
-          router.push('/dosen');
-        } else {
-          router.push('/');
-        }
-      } catch {
-        await supabase.auth.signOut();
-        document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
-        window.location.href = '/login';
-      }
-    };
-    checkRole();
-  }, [router]);
+    if (!isLoading && isAuthorized) {
+      setAdminName(userName || "Administrator EMATHTOCO");
+      setIsChecking(false);
+      fetchDashboardData();
+    }
+  }, [isLoading, isAuthorized, userName]);
 
   const fetchDashboardData = async () => {
     setIsLoadingData(true);

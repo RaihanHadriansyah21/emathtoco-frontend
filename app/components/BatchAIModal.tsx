@@ -8,10 +8,10 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { fadeIn, modalTransition } from '@/styles/motion';
 import type {
-  AIModel,
   BatchAIProgress,
   BatchAIStartResponse,
 } from '@/lib/types/batch-ai';
+import { AI_MODELS, type AIModel } from '@/lib/constants/ai-models';
 
 // ============================================================
 // Types for the modal
@@ -43,7 +43,7 @@ export default function BatchAIModal({
   onToast,
 }: BatchAIModalProps) {
   // --- State ---
-  const [selectedModel, setSelectedModel] = useState<AIModel>('CRNN');
+  const [selectedModel, setSelectedModel] = useState<AIModel>('MobileNetV2');
   const [filterOnlySubmitted, setFilterOnlySubmitted] = useState(true);
   const [filterSkipFinalized, setFilterSkipFinalized] = useState(true);
   const [filterSkipReupload, setFilterSkipReupload] = useState(true);
@@ -76,14 +76,14 @@ export default function BatchAIModal({
 
     const poll = async () => {
       try {
-        const res = await fetch(`/api/batch-ai/status?jobId=${activeJobId}`);
+        const res = await fetch(`/api/legacy-batch-ai/status?jobId=${activeJobId}`);
         const data = await res.json();
 
         if (data.success && data.progress) {
           const prog: BatchAIProgress = data.progress;
           setProgress(prog);
 
-          if (prog.status === 'completed' || prog.status === 'error') {
+          if (prog.status === 'completed' || prog.status === 'failed') {
             // Stop polling
             if (pollIntervalRef.current) {
               clearInterval(pollIntervalRef.current);
@@ -148,7 +148,7 @@ export default function BatchAIModal({
     try {
       const submissionIds = eligibleSubmissions.map(s => s.id);
 
-      const res = await fetch('/api/batch-ai/process', {
+      const res = await fetch('/api/legacy-batch-ai/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -266,7 +266,7 @@ export default function BatchAIModal({
 
                   {isModelDropdownOpen && (
                     <div className="absolute top-full mt-1 left-0 right-0 bg-[#0D0D14] border border-neutral-800 rounded-xl overflow-hidden z-10 shadow-xl">
-                      {(['CRNN', 'DenseNet', 'Inception'] as AIModel[]).map(m => (
+                      {(Object.values(AI_MODELS)).map(m => (
                         <button
                           key={m}
                           onClick={() => { setSelectedModel(m); setIsModelDropdownOpen(false); }}

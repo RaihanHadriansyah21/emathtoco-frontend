@@ -138,61 +138,95 @@ export default function Navbar({
   };
 
   return (
-    <header className={`border-b border-slate-200 dark:border-neutral-900 bg-white/75 dark:bg-[#0A0A0F]/65 backdrop-blur-md sticky top-0 z-50 w-full flex-shrink-0 pt-[env(safe-area-inset-top)] ${
-      isAdminLayout 
-        ? 'pr-4 sm:pr-6 lg:pr-10' 
-        : 'px-4 sm:px-6 lg:px-10'
-    }`}>
+    <header 
+      className={`border-b border-slate-200 dark:border-neutral-900 bg-white/75 dark:bg-[#0A0A0F]/65 backdrop-blur-md sticky top-0 z-50 w-full flex-shrink-0 ${
+        isAdminLayout 
+          ? 'pr-[calc(16px+env(safe-area-inset-right))] pl-[calc(16px+env(safe-area-inset-left))] sm:pr-6 sm:pl-6 lg:pr-10' 
+          : 'pl-[calc(16px+env(safe-area-inset-left))] pr-[calc(16px+env(safe-area-inset-right))] sm:px-6 lg:px-10'
+      }`}
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
       <div className="h-16 flex items-center justify-between">
         {/* Left section: Sidebar Area + Page context */}
         <div className="flex items-center overflow-hidden mr-4">
           {isAdminLayout ? (
-            /* Admin Header Sidebar Container - width matches sidebar exactly, includes border-r */
-            <div className={`flex items-center transition-all duration-300 border-r border-slate-200 dark:border-neutral-900 h-16 mr-4 relative overflow-hidden ${
-              sidebarCollapsed ? 'w-[80px] justify-center px-0' : 'w-[270px] justify-between px-5'
-            }`}>
-              <div className={`flex items-center gap-2.5 w-full ${sidebarCollapsed ? 'justify-center' : 'justify-start'}`}>
-                {/* Logo Area */}
-                <div 
-                  className="relative w-10 h-10 flex items-center justify-center group cursor-pointer flex-shrink-0" 
-                  onClick={sidebarCollapsed ? onToggleSidebar : () => router.push('/')}
-                >
-                  <div className={`bg-white border border-slate-200 dark:border-neutral-750/60 rounded-xl p-1.5 shadow-sm dark:shadow-[0_0_12px_rgba(6,182,212,0.08)] flex items-center justify-center transition-all duration-200 scale-100 opacity-100 ${
-                    sidebarCollapsed ? 'group-hover:scale-0 group-hover:opacity-0' : 'hover:scale-105'
+            <>
+              {/* Desktop Admin Header Sidebar Container */}
+              <div className={`hidden md:flex items-center transition-all duration-300 border-r border-slate-200 dark:border-neutral-900 h-16 mr-4 relative overflow-hidden ${
+                sidebarCollapsed ? 'w-[80px] justify-center px-0' : 'w-[270px] justify-between px-5'
+              }`}>
+                <div className={`flex items-center gap-2.5 w-full ${sidebarCollapsed ? 'justify-center' : 'justify-start'}`}>
+                  {/* Logo Area */}
+                  <div 
+                    className="relative w-10 h-10 flex items-center justify-center group cursor-pointer flex-shrink-0" 
+                    onClick={sidebarCollapsed ? onToggleSidebar : () => router.push('/')}
+                  >
+                    <div className={`bg-white border border-slate-200 dark:border-neutral-750/60 rounded-xl p-1.5 shadow-sm dark:shadow-[0_0_12px_rgba(6,182,212,0.08)] flex items-center justify-center transition-all duration-200 scale-100 opacity-100 ${
+                      sidebarCollapsed ? 'group-hover:scale-0 group-hover:opacity-0' : 'hover:scale-105'
+                    }`}>
+                      <Image
+                        src={Logo}
+                        alt="Logo E-MATHTOCO"
+                        className="h-6 w-auto object-contain"
+                        priority
+                      />
+                    </div>
+                    {sidebarCollapsed && (
+                      <div className="absolute inset-0 flex items-center justify-center text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white transition-all duration-200 scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100">
+                        <Menu className="w-5 h-5" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Brand Text */}
+                  <span className={`text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-slate-950 dark:from-white dark:to-neutral-300 drop-shadow-[0_0_8px_rgba(0,0,0,0.05)] dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.1)] whitespace-nowrap transition-all duration-300 origin-left overflow-hidden inline-block -translate-y-[1px] ${
+                    sidebarCollapsed ? 'opacity-0 max-w-0 translate-x-[-10px]' : 'opacity-100 max-w-[180px] translate-x-0'
                   }`}>
+                    E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-black drop-shadow-[0_0_12px_rgba(6,182,212,0.3)]">TOCO</span>
+                  </span>
+                </div>
+
+                {/* Collapse Button (Fades out and hides off-screen when collapsed) */}
+                <button
+                  onClick={onToggleSidebar}
+                  className={`w-9 h-9 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-neutral-950 border border-transparent hover:border-slate-200 dark:hover:border-neutral-900 rounded-xl text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white transition-all duration-300 cursor-pointer flex-shrink-0 ${
+                    sidebarCollapsed ? 'opacity-0 pointer-events-none absolute right-[-50px]' : 'opacity-100 pointer-events-auto'
+                  }`}
+                  title="Collapse sidebar"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Mobile Admin Header Container */}
+              <div className="flex md:hidden items-center gap-3 overflow-hidden mr-4">
+                {onMenuClick && (
+                  <button
+                    onClick={onMenuClick}
+                    className="p-2 hover:bg-slate-100 dark:hover:bg-neutral-950 border border-transparent hover:border-slate-200 dark:hover:border-neutral-900 rounded-xl text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white transition-all cursor-pointer flex-shrink-0"
+                    title="Open menu"
+                  >
+                    <Menu className="w-5 h-5" />
+                  </button>
+                )}
+                <div
+                  onClick={() => router.push('/')}
+                  className="flex items-center gap-2 cursor-pointer select-none flex-shrink-0"
+                >
+                  <div className="bg-white border border-slate-200 rounded-lg p-1 shadow-sm flex items-center justify-center flex-shrink-0">
                     <Image
                       src={Logo}
                       alt="Logo E-MATHTOCO"
-                      className="h-6 w-auto object-contain"
+                      className="h-5 w-auto object-contain"
                       priority
                     />
                   </div>
-                  {sidebarCollapsed && (
-                    <div className="absolute inset-0 flex items-center justify-center text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white transition-all duration-200 scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100">
-                      <Menu className="w-5 h-5" />
-                    </div>
-                  )}
+                  <span className="text-lg font-bold tracking-wider text-slate-900 dark:text-white">
+                    E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-extrabold">TOCO</span>
+                  </span>
                 </div>
-
-                {/* Brand Text */}
-                <span className={`text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-slate-950 dark:from-white dark:to-neutral-300 drop-shadow-[0_0_8px_rgba(0,0,0,0.05)] dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.1)] whitespace-nowrap transition-all duration-300 origin-left overflow-hidden ${
-                  sidebarCollapsed ? 'opacity-0 max-w-0 translate-x-[-10px]' : 'opacity-100 max-w-[180px] translate-x-0'
-                }`}>
-                  E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-black drop-shadow-[0_0_12px_rgba(6,182,212,0.3)]">TOCO</span>
-                </span>
               </div>
-
-              {/* Collapse Button (Fades out and hides off-screen when collapsed) */}
-              <button
-                onClick={onToggleSidebar}
-                className={`p-2 hover:bg-slate-100 dark:hover:bg-neutral-950 border border-transparent hover:border-slate-200 dark:hover:border-neutral-900 rounded-xl text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white transition-all duration-300 cursor-pointer flex-shrink-0 ${
-                  sidebarCollapsed ? 'opacity-0 pointer-events-none absolute right-[-50px]' : 'opacity-100 pointer-events-auto'
-                }`}
-                title="Collapse sidebar"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-            </div>
+            </>
           ) : (
             /* Original Left Section (Mahasiswa/Dosen/Unauthenticated Layouts) */
             <div className="flex items-center gap-3 md:gap-4 overflow-hidden mr-4">
@@ -259,10 +293,10 @@ export default function Navbar({
           {mounted && (
             <button
               onClick={toggleTheme}
-              className="p-2 sm:p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-600 hover:text-slate-800 dark:bg-black/40 dark:border-neutral-800 dark:text-neutral-400 dark:hover:text-white dark:hover:border-cyan-500/40 transition-all duration-300 cursor-pointer flex-shrink-0"
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-600 hover:text-slate-800 dark:bg-black/40 dark:border-neutral-800 dark:text-neutral-400 dark:hover:text-white dark:hover:border-cyan-500/40 transition-all duration-300 cursor-pointer flex-shrink-0"
               title={currentTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
-              {currentTheme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-600" />}
+              {currentTheme === 'dark' ? <Sun className="w-[18px] h-[18px] text-amber-400" /> : <Moon className="w-[18px] h-[18px] text-indigo-600" />}
             </button>
           )}
 
@@ -271,7 +305,7 @@ export default function Navbar({
             {/* Trigger Button */}
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex items-center gap-1.5 sm:gap-2.5 px-2 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-100 border border-slate-250 hover:border-slate-350 dark:bg-black/40 dark:border-neutral-800 dark:hover:border-cyan-500/40 transition-all duration-300 cursor-pointer select-none"
+              className="h-10 flex items-center gap-1.5 sm:gap-2.5 px-2.5 sm:px-3 rounded-xl bg-slate-100 border border-slate-250 hover:border-slate-350 dark:bg-black/40 dark:border-neutral-800 dark:hover:border-cyan-500/40 transition-all duration-300 cursor-pointer select-none"
             >
               {/* Avatar circular */}
               {avatarUrl && !imageError ? (

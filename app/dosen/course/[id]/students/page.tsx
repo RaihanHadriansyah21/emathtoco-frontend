@@ -627,7 +627,7 @@ export default function LecturerStudentRoster() {
                                             </td>
 
                                             {/* Date submitted */}
-                                            <td className="py-4 px-6 text-xs text-slate-550 dark:text-neutral-450 font-medium whitespace-nowrap">
+                                            <td className="py-4 px-6 text-xs text-slate-500 dark:text-neutral-400 font-medium whitespace-nowrap">
                                                 {student.submission ? formatDate(student.submission.waktu_submit) : '-'}
                                             </td>
 
@@ -635,7 +635,7 @@ export default function LecturerStudentRoster() {
                                             <td className="py-4 px-6 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                                                 <button
                                                     onClick={() => handleOpenModal(student)}
-                                                    className="inline-flex items-center bg-gradient-to-r from-slate-100 to-slate-200 dark:from-neutral-950 dark:to-neutral-900 border border-slate-200 dark:border-neutral-800 text-slate-800 dark:text-neutral-350 px-3.5 py-2 rounded-xl text-xs font-bold tracking-wider hover:border-cyan-500/40 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all cursor-pointer"
+                                                    className="inline-flex items-center bg-gradient-to-r from-slate-100 to-slate-200 dark:from-neutral-950 dark:to-neutral-900 border border-slate-200 dark:border-neutral-800 text-slate-800 dark:text-neutral-300 px-3.5 py-2 rounded-xl text-xs font-bold tracking-wider hover:border-cyan-500/40 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all cursor-pointer"
                                                 >
                                                     <span>DETAIL</span>
                                                 </button>

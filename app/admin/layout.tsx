@@ -5,8 +5,11 @@ import Navbar from '../components/Navbar';
 import AdminSidebar from '../components/AdminSidebar';
 import { X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRequireRole } from '@/app/hooks/useRequireRole';
+import { PageLoader } from '@/components/ui/loaders';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const { isLoading, isAuthorized } = useRequireRole('admin');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -27,6 +30,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     localStorage.setItem('sidebarCollapsed', String(nextState));
   };
 
+  if (isLoading || !isAuthorized) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] flex items-center justify-center font-sans">
+        <PageLoader message="Memverifikasi akses admin..." />
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen overflow-hidden bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] flex flex-col">
       <Navbar 
@@ -46,6 +57,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {/* Mobile Sidebar Overlay */}
           {mobileSidebarOpen && (
             <motion.div 
+              key="mobile-sidebar-overlay"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -59,11 +71,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {/* Mobile Sidebar Drawer */}
           {mobileSidebarOpen && (
             <motion.div 
+              key="mobile-sidebar-drawer"
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 w-[260px] bg-slate-50 dark:bg-[#070710] border-r border-slate-200 dark:border-neutral-900 z-50 flex flex-col h-full shadow-2xl"
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              className="fixed inset-y-0 left-0 w-[260px] bg-slate-50 dark:bg-[#070710] border-r border-slate-200 dark:border-neutral-900 z-50 flex flex-col h-full shadow-2xl md:hidden"
             >
               {/* Mobile Sidebar Header */}
               <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200 dark:border-neutral-900 bg-white dark:bg-black/20 flex-shrink-0">

@@ -3,8 +3,8 @@
 // Shared between frontend components and API routes
 // ============================================================
 
-/** Valid AI model identifiers — matches backend model directory names */
-export type AIModel = 'DenseNet121' | 'InceptionV3' | 'MobilenetV2' | (string & {});
+import { type AIModel } from '../constants/ai-models';
+export type { AIModel };
 
 /**
  * Request payload for POST /predict (future integration).
@@ -51,7 +51,7 @@ export interface BatchAIError {
 /** Progress state returned by the status polling endpoint */
 export interface BatchAIProgress {
   jobId: string;
-  status: 'idle' | 'processing' | 'completed' | 'error';
+  status: 'pending' | 'processing' | 'completed' | 'failed';
   model: AIModel;
   currentSection: SectionCode | null;
   processedSheetsInSection: number;

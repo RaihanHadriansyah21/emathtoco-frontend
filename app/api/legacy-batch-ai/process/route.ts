@@ -1,6 +1,6 @@
 // ============================================================
-// EMATHTOCO — Batch AI Process API Route
-// POST /api/batch-ai/process
+// EMATHTOCO — Legacy Batch AI Process API Route (Simulation)
+// POST /api/legacy-batch-ai/process
 //
 // Section-centric orchestration:
 // For each of 24 sections, loads the model once, processes
@@ -10,10 +10,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createJob, updateJob } from '@/lib/batch-ai-store';
+import { AI_MODELS, type AIModel } from '@/lib/constants/ai-models';
 import {
   ALL_SECTION_CODES,
   getMaxScoreForSection,
-  type AIModel,
   type BatchAIProgress,
   type BatchAIError,
   type SectionCode,
@@ -29,7 +29,7 @@ function createServerSupabase() {
 
 /**
  * Simulate an AI prediction for a single answer sheet section.
- * In production, this would call the actual CRNN/DenseNet/Inception
+ * In production, this would call the actual MobileNetV2/DenseNet121/InceptionV3
  * inference endpoint with the specific section model.
  */
 function simulateAIPrediction(
@@ -60,8 +60,8 @@ export async function POST(request: NextRequest) {
       submissionIds: string[];
     };
 
-    // Validate inputs
-    if (!model || !['CRNN', 'DenseNet', 'Inception'].includes(model)) {
+    // Validate inputs using canonical standard
+    if (!model || !Object.values(AI_MODELS).includes(model as any)) {
       return NextResponse.json(
         { success: false, message: 'Model AI tidak valid.' },
         { status: 400 }
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     processBatchAsync(jobId, model, submissionIds).catch(err => {
       console.error('[BatchAI] Fatal processing error:', err);
       updateJob(jobId, {
-        status: 'error',
+        status: 'failed',
         completedAt: new Date().toISOString(),
       });
     });
@@ -135,15 +135,6 @@ export async function POST(request: NextRequest) {
 /**
  * Core section-centric batch processing loop.
  * Runs asynchronously after the HTTP response is returned.
- *
- * Processing order:
- * FOR EACH section (S-1A, S-1B, ... S-4F):
- *   → "Load" the section-specific model
- *   → Fetch all lembar_jawaban matching this section across all target submissions
- *   → Run prediction on each sheet
- *   → Save results back to database
- *   → "Unload" model
- *   → Move to next section
  */
 async function processBatchAsync(
   jobId: string,
@@ -166,7 +157,7 @@ async function processBatchAsync(
     });
 
     // Simulate "loading" the section-specific model
-    // e.g., loading CRNN-S-1A model weights
+    // e.g., loading MobileNetV2-S-1A model weights
     await delay(80);
 
     // Fetch all lembar_jawaban for this section across all target submissions
@@ -202,7 +193,7 @@ async function processBatchAsync(
       totalSheetsInSection: sheets.length,
     });
 
-    // Process each sheet sequentially (controlled, no parallel chaos)
+    // Process each sheet sequentially
     for (let sheetIdx = 0; sheetIdx < sheets.length; sheetIdx++) {
       const sheet = sheets[sheetIdx];
 
@@ -302,9 +293,9 @@ async function processBatchAsync(
     }
   }
 
-  // Mark job as completed
+  // Mark job as completed - Fixes completed vs failed bug
   updateJob(jobId, {
-    status: allErrors.length > 0 ? 'completed' : 'completed',
+    status: allErrors.length > 0 ? 'failed' : 'completed',
     completedAt: new Date().toISOString(),
     processedSubmissions: processedSubmissionSet.size,
     errors: allErrors,

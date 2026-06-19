@@ -1,6 +1,6 @@
 // ============================================================
-// EMATHTOCO — Batch AI Status Polling API Route
-// GET /api/batch-ai/status?jobId=xxx
+// EMATHTOCO — Legacy Batch AI Status Polling API Route
+// GET /api/legacy-batch-ai/status?jobId=xxx
 //
 // Lightweight endpoint for the frontend to poll processing
 // progress from the in-memory job store.
