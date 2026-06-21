@@ -12,6 +12,8 @@ import type {
   BatchAIStartResponse,
 } from '@/lib/types/batch-ai';
 import { AI_MODELS, type AIModel } from '@/lib/constants/ai-models';
+import { apiPost } from '@/lib/api-client';
+import { supabase } from '@/lib/supabase';
 
 // ============================================================
 // Types for the modal
@@ -68,22 +70,66 @@ export default function BatchAIModal({
   const eligibleCount = eligibleSubmissions.length;
 
   // --- Polling logic ---
-  const startPolling = useCallback((activeJobId: string) => {
+  const startPolling = useCallback((submissionIds: string[]) => {
     // Clear any existing interval
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current);
     }
 
+    const startTime = new Date().toISOString();
+
     const poll = async () => {
       try {
-        const res = await fetch(`/api/legacy-batch-ai/status?jobId=${activeJobId}`);
-        const data = await res.json();
+        const { data, error } = await supabase
+          .from('pengumpulan_tugas')
+          .select('id, ai_status, model_ai, status_submit')
+          .in('id', submissionIds);
 
-        if (data.success && data.progress) {
-          const prog: BatchAIProgress = data.progress;
+        if (error) {
+          console.error('[BatchAI] Supabase poll error:', error);
+          return;
+        }
+
+        if (data) {
+          const totalSubmissions = submissionIds.length;
+          
+          // count completed/failed/reviewed/finalized
+          const processedSubmissions = data.filter(d => 
+            ['completed', 'failed', 'reviewed', 'finalized'].includes(d.ai_status || '')
+          ).length;
+          
+          const failedSubmissions = data.filter(d => d.ai_status === 'failed');
+          
+          // find active processing submission
+          const activeSub = data.find(d => d.ai_status === 'processing');
+          const currentSectionIndex = activeSub 
+            ? submissionIds.indexOf(activeSub.id) + 1 
+            : (processedSubmissions < totalSubmissions ? processedSubmissions + 1 : totalSubmissions);
+
+          const prog: BatchAIProgress = {
+            jobId: 'batch-job',
+            status: processedSubmissions === totalSubmissions ? 'completed' : 'processing',
+            model: selectedModel,
+            currentSection: `Mahasiswa #${currentSectionIndex}` as any,
+            processedSheetsInSection: processedSubmissions === totalSubmissions ? 24 : 0,
+            totalSheetsInSection: 24,
+            processedSections: processedSubmissions,
+            totalSections: totalSubmissions,
+            totalSubmissions: totalSubmissions,
+            processedSubmissions: processedSubmissions,
+            errors: failedSubmissions.map(d => ({
+              submissionId: d.id,
+              sectionCode: 'S-1A',
+              sheetId: 'ALL',
+              message: 'Proses AI gagal atau file tidak ditemukan di storage.'
+            })),
+            startedAt: startTime,
+            completedAt: processedSubmissions === totalSubmissions ? new Date().toISOString() : null,
+          };
+
           setProgress(prog);
 
-          if (prog.status === 'completed' || prog.status === 'failed') {
+          if (processedSubmissions === totalSubmissions) {
             // Stop polling
             if (pollIntervalRef.current) {
               clearInterval(pollIntervalRef.current);
@@ -92,17 +138,17 @@ export default function BatchAIModal({
             setPhase('completed');
 
             // Notify parent
-            if (prog.errors.length > 0) {
+            if (failedSubmissions.length > 0) {
               onToast(
                 'warning',
                 'Batch AI Selesai (Sebagian)',
-                `${prog.processedSubmissions} tugas diproses, ${prog.errors.length} error.`
+                `${processedSubmissions - failedSubmissions.length} tugas diproses, ${failedSubmissions.length} error.`
               );
             } else {
               onToast(
                 'success',
                 'Batch AI Selesai',
-                `${prog.processedSubmissions} tugas berhasil diproses dengan ${prog.model}.`
+                `${processedSubmissions} tugas berhasil diproses dengan ${selectedModel}.`
               );
             }
 
@@ -114,10 +160,10 @@ export default function BatchAIModal({
       }
     };
 
-    // Poll immediately, then every 800ms
+    // Poll immediately, then every 1000ms
     poll();
-    pollIntervalRef.current = setInterval(poll, 800);
-  }, [onComplete, onToast]);
+    pollIntervalRef.current = setInterval(poll, 1000);
+  }, [selectedModel, onComplete, onToast]);
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -148,26 +194,48 @@ export default function BatchAIModal({
     try {
       const submissionIds = eligibleSubmissions.map(s => s.id);
 
-      const res = await fetch('/api/legacy-batch-ai/process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: selectedModel,
-          submissionIds,
-        }),
+      const res = await apiPost('/predict/batch', {
+        submission_ids: submissionIds,
+        model: selectedModel,
       });
 
-      const data: BatchAIStartResponse = await res.json();
-
-      if (!data.success) {
-        onToast('error', 'Gagal Memulai Batch', data.message);
+      if (!res.ok) {
+        let errMsg = 'Terjadi kesalahan koneksi ke server.';
+        try {
+          const errJson = await res.json();
+          if (errJson && errJson.detail) errMsg = errJson.detail;
+        } catch (_) {}
+        onToast('error', 'Gagal Memulai Batch', errMsg);
         setIsStarting(false);
         return;
       }
 
-      setJobId(data.jobId);
+      const data = await res.json();
+
+      if (!data.success) {
+        onToast('error', 'Gagal Memulai Batch', data.message || 'Gagal memulai batch.');
+        setIsStarting(false);
+        return;
+      }
+
+      setJobId('batch-job');
       setPhase('processing');
-      startPolling(data.jobId);
+      setProgress({
+        jobId: 'batch-job',
+        status: 'processing',
+        model: selectedModel,
+        currentSection: `Mahasiswa #1` as any,
+        processedSheetsInSection: 0,
+        totalSheetsInSection: 24,
+        processedSections: 0,
+        totalSections: submissionIds.length,
+        totalSubmissions: submissionIds.length,
+        processedSubmissions: 0,
+        errors: [],
+        startedAt: new Date().toISOString(),
+        completedAt: null,
+      });
+      startPolling(submissionIds);
 
     } catch (err) {
       console.error('[BatchAI] Start error:', err);

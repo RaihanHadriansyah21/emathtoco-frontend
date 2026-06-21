@@ -634,7 +634,7 @@ export default function LecturerStudentRoster() {
                                             {/* Final Score */}
                                             <td className="py-4 px-6 text-center whitespace-nowrap">
                                                 <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 text-sm font-mono font-bold ${student.submission?.nilai_akhir !== null ? 'text-purple-600 dark:text-purple-400' : 'text-slate-400 dark:text-neutral-600'}`}>
-                                                    {student.submission?.nilai_akhir !== null ? student.submission?.nilai_akhir : '-'}
+                                                    {student.submission?.nilai_akhir !== null ? `${student.submission?.nilai_akhir} / 100` : '-'}
                                                 </div>
                                             </td>
 
@@ -781,7 +781,7 @@ export default function LecturerStudentRoster() {
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <Award className="w-4 h-4 text-purple-400" />
-                                                    <span>Nilai Total AI: <strong className="font-extrabold text-purple-400 font-mono text-sm">{predictionDetails.nilai_akhir !== null ? predictionDetails.nilai_akhir : '-'}</strong></span>
+                                                    <span>Nilai Total AI: <strong className="font-extrabold text-purple-400 font-mono text-sm">{predictionDetails.nilai_akhir !== null ? `${predictionDetails.nilai_akhir} / 100` : '-'}</strong></span>
                                                 </div>
                                             </div>
 
@@ -797,7 +797,7 @@ export default function LecturerStudentRoster() {
                                                             <div className="text-[10px] font-mono font-bold text-slate-400 dark:text-neutral-500">{cleanLabel}</div>
                                                             <div className="text-lg font-extrabold text-purple-600 dark:text-purple-400 font-mono my-0.5">{sec.predicted_score}</div>
                                                             <div className="text-[9px] font-mono text-slate-500 dark:text-neutral-550 leading-tight">
-                                                                Conf: {Math.round(sec.confidence * 100)}%
+                                                                Keyakinan: {Math.round(sec.confidence * 100)}% (uncalibrated)
                                                             </div>
                                                         </div>
                                                     );

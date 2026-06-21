@@ -202,7 +202,7 @@ export default function LecturerDashboard() {
                     <GlassCard
                       key={course.id}
                       onClick={() => router.push(`/dosen/course/${course.id}`)}
-                      accentColor="from-indigo-400 to-purple-500"
+                      accentColor="from-cyan-500 via-blue-500 to-indigo-600"
                       className="group flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-8 cursor-pointer"
                     >
                       {/* Left: Info */}

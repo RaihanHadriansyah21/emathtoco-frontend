@@ -44,46 +44,32 @@ export default function AuditDebugPage() {
     try {
       // 1. Check Schema
       const schemaRes = await apiGet('/audit/schema-check');
-      let currentSchema: 'legacy' | 'enterprise' = 'legacy';
+      let currentSchema: 'legacy' | 'enterprise' = 'enterprise';
       if (schemaRes.ok) {
         const schemaData = await schemaRes.json();
         setSchemaVersion(schemaData.schema_version);
         setColumnsFound(schemaData.columns_found);
         currentSchema = schemaData.schema_version;
       } else {
-        setSchemaVersion('legacy');
-        setColumnsFound(['id', 'actor_id', 'actor_role', 'action_type', 'target_type', 'target_id', 'description', 'created_at']);
+        setSchemaVersion('enterprise');
+        setColumnsFound(['id', 'user_id', 'user_name', 'role', 'action', 'target', 'detail', 'created_at']);
       }
 
-      // 2. Fetch Stats based on schema
+      // 2. Fetch Stats based on enterprise schema
       const { count: total } = await supabase.from('audit_log').select('*', { count: 'exact', head: true });
       setTotalLogsCount(total || 0);
 
-      if (currentSchema === 'enterprise') {
-        const { count: logins } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
-          .or('action.in.("ADMIN_LOGIN","LECTURER_LOGIN","STUDENT_LOGIN"),action_type.in.("ADMIN_LOGIN","LECTURER_LOGIN","STUDENT_LOGIN")');
-        setTotalLoginCount(logins || 0);
+      const { count: logins } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
+        .or('action.in.("ADMIN_LOGIN","LECTURER_LOGIN","STUDENT_LOGIN")');
+      setTotalLoginCount(logins || 0);
 
-        const { count: aiRuns } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
-          .or('action.in.("AI_PROCESS_STARTED","AI_PROCESS_COMPLETED","AI_PROCESS_FAILED"),action_type.in.("AI_PROCESS_STARTED","AI_PROCESS_COMPLETED","AI_PROCESS_FAILED")');
-        setTotalAIRunCount(aiRuns || 0);
+      const { count: aiRuns } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
+        .or('action.in.("AI_PROCESS_STARTED","AI_PROCESS_COMPLETED","AI_PROCESS_FAILED")');
+      setTotalAIRunCount(aiRuns || 0);
 
-        const { count: finalized } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
-          .or('action.eq."FINAL_SCORE_SUBMITTED",action_type.eq."FINAL_SCORE_SUBMITTED"');
-        setTotalFinalizedCount(finalized || 0);
-      } else {
-        const { count: logins } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
-          .in('action_type', ['ADMIN_LOGIN', 'LECTURER_LOGIN', 'STUDENT_LOGIN']);
-        setTotalLoginCount(logins || 0);
-
-        const { count: aiRuns } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
-          .in('action_type', ['AI_PROCESS_STARTED', 'AI_PROCESS_COMPLETED', 'AI_PROCESS_FAILED']);
-        setTotalAIRunCount(aiRuns || 0);
-
-        const { count: finalized } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
-          .eq('action_type', 'FINAL_SCORE_SUBMITTED');
-        setTotalFinalizedCount(finalized || 0);
-      }
+      const { count: finalized } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
+        .eq('action', 'FINAL_SCORE_SUBMITTED');
+      setTotalFinalizedCount(finalized || 0);
     } catch (err) {
       console.error('Error fetching debug schema details:', err);
     } finally {

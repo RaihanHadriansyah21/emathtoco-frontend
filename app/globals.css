@@ -2,6 +2,33 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Bulletproof spinner animation keyframes and class fallback */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite !important;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
+}
+
 /* Apply smooth transitions across color variables, backgrounds, and borders for high-fidelity theme switching */
 body, header, main, table, tr, th, td, div, button, input, textarea, select, span, p, h1, h2, h3, h4, h5, h6, option {
   transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, box-shadow;

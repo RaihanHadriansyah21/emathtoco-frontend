@@ -281,43 +281,7 @@ export default function LecturerCoursePortal() {
       toast.info('Info', 'Tidak ada pengumpulan tugas dengan status Menunggu AI.');
       return;
     }
-
-    // Fetch available models from backend
-    setIsLoadingModels(true);
-    setSelectedBatchModel(null);
-    try {
-      // Fetch settings first to get the active model
-      const settingsRes = await apiGet('/settings');
-      let defaultModel = null;
-      if (settingsRes.ok) {
-        const settings = await settingsRes.json();
-        if (settings.active_model) {
-          defaultModel = settings.active_model;
-        }
-      }
-
-      const res = await apiGet('/ai-models');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.models) {
-          const modelsList = data.models.map((m: { name: string }) => m.name);
-          setAvailableModels(modelsList);
-          // Pre-select the global active model if it exists in the list
-          if (defaultModel && modelsList.includes(defaultModel)) {
-            setSelectedBatchModel(defaultModel);
-          } else {
-            setSelectedBatchModel(modelsList[0] || 'MobileNetV2');
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch AI models:', err);
-      toast.error('Gagal', 'Tidak dapat memuat daftar model AI dari backend.');
-      setIsLoadingModels(false);
-      return;
-    }
-    setIsLoadingModels(false);
-    setShowModelSelectModal(true);
+    setShowBatchModal(true);
   };
 
   // Actually run batch after model is selected
@@ -785,7 +749,7 @@ export default function LecturerCoursePortal() {
                           </td>
                           <td className="py-3.5 px-5 text-center whitespace-nowrap">
                             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 text-sm font-mono font-bold text-purple-600 dark:text-purple-400">
-                              {sub.nilai_akhir !== null ? sub.nilai_akhir : '-'}
+                              {sub.nilai_akhir !== null ? `${sub.nilai_akhir} / 100` : '-'}
                             </div>
                           </td>
                           <td className="py-3.5 px-5 whitespace-nowrap">
@@ -850,7 +814,7 @@ export default function LecturerCoursePortal() {
                       <div className="space-y-1 mt-1">
                         <span className="text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-widest text-[9px]">Nilai AI</span>
                         <div className="font-mono font-bold text-purple-600 dark:text-purple-400">
-                          {sub.nilai_akhir !== null ? sub.nilai_akhir : '-'}
+                          {sub.nilai_akhir !== null ? `${sub.nilai_akhir} / 100` : '-'}
                         </div>
                       </div>
                       <div className="space-y-1 mt-1">

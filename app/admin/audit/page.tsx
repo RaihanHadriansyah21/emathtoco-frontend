@@ -139,41 +139,20 @@ export default function AuditLogPage() {
         .from('audit_log')
         .select('*', { count: 'exact' });
 
-      if (schemaVersion === 'enterprise') {
-        // Apply action filter safely on both old and new columns
-        if (actionFilter !== 'all') {
-          queryBuilder = queryBuilder.or(`action.eq."${actionFilter}",action_type.eq."${actionFilter}"`);
-        }
+      // Apply action filter safely on new columns
+      if (actionFilter !== 'all') {
+        queryBuilder = queryBuilder.eq('action', actionFilter);
+      }
 
-        // Apply text search term (server-side filtering across fields)
-        if (debouncedSearchQuery.trim()) {
-          const queryTerm = `%${debouncedSearchQuery.trim()}%`;
-          queryBuilder = queryBuilder.or(
-            `user_name.ilike."${queryTerm}",` +
-            `role.ilike."${queryTerm}",` +
-            `action.ilike."${queryTerm}",` +
-            `target.ilike."${queryTerm}",` +
-            `description.ilike."${queryTerm}",` +
-            `actor_role.ilike."${queryTerm}",` +
-            `action_type.ilike."${queryTerm}",` +
-            `target_type.ilike."${queryTerm}"`
-          );
-        }
-      } else {
-        // LEGACY SCHEMA FALLBACK
-        if (actionFilter !== 'all') {
-          queryBuilder = queryBuilder.eq('action_type', actionFilter);
-        }
-
-        if (debouncedSearchQuery.trim()) {
-          const queryTerm = `%${debouncedSearchQuery.trim()}%`;
-          queryBuilder = queryBuilder.or(
-            `description.ilike."${queryTerm}",` +
-            `actor_role.ilike."${queryTerm}",` +
-            `action_type.ilike."${queryTerm}",` +
-            `target_type.ilike."${queryTerm}"`
-          );
-        }
+      // Apply text search term (server-side filtering across fields)
+      if (debouncedSearchQuery.trim()) {
+        const queryTerm = `%${debouncedSearchQuery.trim()}%`;
+        queryBuilder = queryBuilder.or(
+          `user_name.ilike."${queryTerm}",` +
+          `role.ilike."${queryTerm}",` +
+          `action.ilike."${queryTerm}",` +
+          `target.ilike."${queryTerm}"`
+        );
       }
 
       const { data, count, error } = await queryBuilder
@@ -205,44 +184,25 @@ export default function AuditLogPage() {
       const { count: total } = await supabase.from('audit_log').select('*', { count: 'exact', head: true });
       setTotalLogsCount(total || 0);
 
-      if (schemaVersion === 'enterprise') {
-        // 2. Total logins count (admin + lecturer + student logins)
-        const { count: logins } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
-          .or('action.in.("ADMIN_LOGIN","LECTURER_LOGIN","STUDENT_LOGIN"),action_type.in.("ADMIN_LOGIN","LECTURER_LOGIN","STUDENT_LOGIN")');
-        setTotalLoginCount(logins || 0);
+      // 2. Total logins count (admin + lecturer + student logins)
+      const { count: logins } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
+        .or('action.in.("ADMIN_LOGIN","LECTURER_LOGIN","STUDENT_LOGIN")');
+      setTotalLoginCount(logins || 0);
 
-        // 3. Total AI Run count (started + completed + failed)
-        const { count: aiRuns } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
-          .or('action.in.("AI_PROCESS_STARTED","AI_PROCESS_COMPLETED","AI_PROCESS_FAILED"),action_type.in.("AI_PROCESS_STARTED","AI_PROCESS_COMPLETED","AI_PROCESS_FAILED")');
-        setTotalAIRunCount(aiRuns || 0);
+      // 3. Total AI Run count (started + completed + failed)
+      const { count: aiRuns } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
+        .or('action.in.("AI_PROCESS_STARTED","AI_PROCESS_COMPLETED","AI_PROCESS_FAILED")');
+      setTotalAIRunCount(aiRuns || 0);
 
-        // 4. Total Finalisasi count
-        const { count: finalized } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
-          .or('action.eq."FINAL_SCORE_SUBMITTED",action_type.eq."FINAL_SCORE_SUBMITTED"');
-        setTotalFinalizedCount(finalized || 0);
+      // 4. Total Finalisasi count
+      const { count: finalized } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
+        .eq('action', 'FINAL_SCORE_SUBMITTED');
+      setTotalFinalizedCount(finalized || 0);
 
-        // 5. Total Reset count
-        const { count: resets } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
-          .or('action.eq."SYSTEM_RESET",action_type.eq."SYSTEM_RESET"');
-        setTotalResetCount(resets || 0);
-      } else {
-        // LEGACY SCHEMA FALLBACK
-        const { count: logins } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
-          .in('action_type', ['ADMIN_LOGIN', 'LECTURER_LOGIN', 'STUDENT_LOGIN']);
-        setTotalLoginCount(logins || 0);
-
-        const { count: aiRuns } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
-          .in('action_type', ['AI_PROCESS_STARTED', 'AI_PROCESS_COMPLETED', 'AI_PROCESS_FAILED']);
-        setTotalAIRunCount(aiRuns || 0);
-
-        const { count: finalized } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
-          .eq('action_type', 'FINAL_SCORE_SUBMITTED');
-        setTotalFinalizedCount(finalized || 0);
-
-        const { count: resets } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
-          .eq('action_type', 'SYSTEM_RESET');
-        setTotalResetCount(resets || 0);
-      }
+      // 5. Total Reset count
+      const { count: resets } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
+        .eq('action', 'SYSTEM_RESET');
+      setTotalResetCount(resets || 0);
     } catch (err) {
       console.error('Error fetching audit statistics:', err);
     }

@@ -1219,7 +1219,7 @@ export default function ReviewWorkspace() {
                                   <label className="block text-[10px] font-bold text-slate-700 dark:text-neutral-400 uppercase tracking-wider mb-1">Hasil AI</label>
                                   <div className="w-full bg-slate-100 border border-slate-300 dark:bg-neutral-950/50 dark:border-neutral-900 rounded-xl py-2 px-3 text-slate-800 dark:text-neutral-300 text-xs font-mono font-bold leading-normal">
                                     <div>Nilai AI : {isAIProcessing ? '⏳' : (slot.aiScore !== null ? slot.aiScore : '-')}</div>
-                                    <div>Confidence : {isAIProcessing ? '⏳' : (slot.confidence !== null ? `${Math.round(slot.confidence * 100)}%` : '-')}</div>
+                                    <div>Keyakinan (tidak terkalibrasi) : {isAIProcessing ? '⏳' : (slot.confidence !== null ? `${Math.round(slot.confidence * 100)}%` : '-')}</div>
                                   </div>
                                 </div>
 

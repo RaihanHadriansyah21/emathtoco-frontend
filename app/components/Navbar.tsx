@@ -141,7 +141,7 @@ export default function Navbar({
     <header 
       className={`border-b border-slate-200 dark:border-neutral-900 bg-white/75 dark:bg-[#0A0A0F]/65 backdrop-blur-md sticky top-0 z-50 w-full flex-shrink-0 ${
         isAdminLayout 
-          ? 'pr-[calc(16px+env(safe-area-inset-right))] pl-[calc(16px+env(safe-area-inset-left))] sm:pr-6 sm:pl-6 lg:pr-10' 
+          ? 'pr-[calc(16px+env(safe-area-inset-right))] pl-[calc(16px+env(safe-area-inset-left))] sm:pr-6 sm:pl-6 md:pl-0 lg:pr-10' 
           : 'pl-[calc(16px+env(safe-area-inset-left))] pr-[calc(16px+env(safe-area-inset-right))] sm:px-6 lg:px-10'
       }`}
       style={{ paddingTop: 'env(safe-area-inset-top)' }}

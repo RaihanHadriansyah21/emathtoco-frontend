@@ -46,7 +46,14 @@ export function GlassCard({
       } ${className}`}
     >
       {accentColor && (
-        <div className={`absolute top-0 left-0 right-0 h-1.5 rounded-t-2xl bg-gradient-to-r ${accentColor}`} />
+        <>
+          {/* Premium Glowing Ambient Backing */}
+          <div className={`absolute top-0 left-6 right-6 h-[4px] bg-gradient-to-r ${accentColor} opacity-20 blur-[3px] rounded-full pointer-events-none`} />
+          {/* Sleek Inset Accent Line */}
+          <div className="absolute top-0 left-6 right-6 h-[2px] pointer-events-none">
+            <div className={`w-full h-full rounded-full bg-gradient-to-r ${accentColor} opacity-80`} />
+          </div>
+        </>
       )}
       {children}
     </CardComponent>

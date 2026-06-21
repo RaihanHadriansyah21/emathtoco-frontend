@@ -17,16 +17,13 @@ const SplineScene = dynamic(
 export default function LoginAIScene() {
     const [isLoading, setIsLoading] = useState(true);
     const [hasError, setHasError] = useState(false);
+    const [isSplineReady, setIsSplineReady] = useState(false);
 
     // 21st.dev humanoid robot scene (chrome/black full-body robot)
     const splineSceneUrl = 'https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode';
 
     // ═══════════════════════════════════════════════════════
-    // LOADING TIMEOUT SAFEGUARD
-    // Automatically transitions to the static fallback if the WebGL
-    // render loop gets stuck, fails context creation, or fails to
-    // complete onload asset compilation within 20 seconds.
-    // CDN-hosted scenes are larger and need more time to download.
+    // LOADING & CONNECTIVITY SAFEGUARD
     // ═══════════════════════════════════════════════════════
     useEffect(() => {
         if (typeof window !== 'undefined' && window.innerWidth < 768) {
@@ -35,14 +32,47 @@ export default function LoginAIScene() {
             return;
         }
 
+        let isMounted = true;
+
+        const checkSplineConnectivity = async () => {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 4000); // 4-second timeout limit
+
+                // Try to head-request the Spline CDN
+                await fetch(splineSceneUrl, {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (isMounted) {
+                    setIsSplineReady(true);
+                }
+            } catch (err) {
+                console.warn('Spline CDN is unreachable or client is offline. Gracefully falling back to static view.', err);
+                if (isMounted) {
+                    setHasError(true);
+                    setIsLoading(false);
+                }
+            }
+        };
+
+        checkSplineConnectivity();
+
         const safeguardTimer = setTimeout(() => {
-            if (isLoading) {
+            if (isMounted && isLoading) {
                 console.warn('Spline load timed out (20s safeguard). Falling back to premium static view.');
                 setHasError(true);
             }
         }, 20000);
 
-        return () => clearTimeout(safeguardTimer);
+        return () => {
+            isMounted = false;
+            clearTimeout(safeguardTimer);
+        };
     }, [isLoading]);
 
     return (
@@ -59,39 +89,39 @@ export default function LoginAIScene() {
                     // STATIC FALLBACK STATE
                     // ═══════════════════════════════════════════════════════
                     <motion.div
-                        key="fallback"
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.5 }}
-                        className="relative z-10 flex flex-col items-center justify-center p-8 text-center max-w-sm"
-                    >
-                        <div className="relative group mb-6">
-                            {/* Glowing effect behind logo */}
-                            <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 rounded-2xl blur-xl opacity-30 group-hover:opacity-50 transition-opacity duration-500 pointer-events-none" />
-                            <div className="relative bg-[#0A0A0F]/90 border border-neutral-800/80 backdrop-blur-md rounded-2xl p-5 shadow-2xl">
-                                <Image
-                                    src={Logo}
-                                    alt="Logo E-MATHTOCO"
-                                    className="h-16 w-auto object-contain"
-                                    priority
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 mb-2 justify-center">
-                            <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
-                            <span className="text-neutral-400 text-xs font-bold uppercase tracking-[0.2em]">E-MATHTOCO AI</span>
-                        </div>
-                        
-                        <h2 className="text-xl font-extrabold text-white tracking-wide mb-3">
-                            AI Assessment Assistant
-                        </h2>
-                        
-                        <p className="text-neutral-500 text-sm leading-relaxed">
-                            Digital grading assistant powered by customized Deep Learning networks to grade handwritten essays automatically.
-                        </p>
-                    </motion.div>
+                         key="fallback"
+                         initial={{ opacity: 0, scale: 0.95 }}
+                         animate={{ opacity: 1, scale: 1 }}
+                         exit={{ opacity: 0, scale: 0.95 }}
+                         transition={{ duration: 0.5 }}
+                         className="relative z-10 flex flex-col items-center justify-center p-8 text-center max-w-sm"
+                     >
+                         <div className="relative group mb-6">
+                             {/* Glowing effect behind logo */}
+                             <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 rounded-2xl blur-xl opacity-30 group-hover:opacity-50 transition-opacity duration-500 pointer-events-none" />
+                             <div className="relative bg-[#0A0A0F]/90 border border-neutral-800/80 backdrop-blur-md rounded-2xl p-5 shadow-2xl">
+                                 <Image
+                                     src={Logo}
+                                     alt="Logo E-MATHTOCO"
+                                     className="h-16 w-auto object-contain"
+                                     priority
+                                 />
+                             </div>
+                         </div>
+ 
+                         <div className="flex items-center gap-2 mb-2 justify-center">
+                             <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
+                             <span className="text-neutral-400 text-xs font-bold uppercase tracking-[0.2em]">E-MATHTOCO AI</span>
+                         </div>
+                         
+                         <h2 className="text-xl font-extrabold text-white tracking-wide mb-3">
+                             AI Assessment Assistant
+                         </h2>
+                         
+                         <p className="text-neutral-500 text-sm leading-relaxed">
+                             Digital grading assistant powered by customized Deep Learning networks to grade handwritten essays automatically.
+                         </p>
+                     </motion.div>
                 ) : (
                     // ═══════════════════════════════════════════════════════
                     // ACTIVE SPLINE / LOADING SCENE
@@ -111,11 +141,18 @@ export default function LoginAIScene() {
                             </div>
                         )}
 
-                        <SplineScene
-                            scene={splineSceneUrl}
-                            className="w-full h-full"
-                            onLoad={() => setIsLoading(false)}
-                        />
+                        {isSplineReady && (
+                            <SplineScene
+                                scene={splineSceneUrl}
+                                className="w-full h-full"
+                                onLoad={() => setIsLoading(false)}
+                                onError={(err) => {
+                                    console.error('[LoginAIScene] Spline loading error:', err);
+                                    setHasError(true);
+                                    setIsLoading(false);
+                                }}
+                            />
+                        )}
                     </div>
                 )}
             </AnimatePresence>

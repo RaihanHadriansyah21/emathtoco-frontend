@@ -30,9 +30,37 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                     if (user && !error) {
                         document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${session.expires_in}; SameSite=Lax`;
                         
+                        // Fetch role from profile table for route-level defense-in-depth
+                        const { data: profile } = await supabase
+                            .from('profil_pengguna')
+                            .select('role')
+                            .eq('id', user.id)
+                            .maybeSingle();
+
+                        const role = profile?.role || 'mahasiswa';
                         const currentPath = pathnameRef.current;
+
+                        // Guard routes based on user role
+                        if (role === 'mahasiswa') {
+                            if (currentPath.startsWith('/dosen') || currentPath.startsWith('/admin')) {
+                                router.replace('/');
+                                return;
+                            }
+                        } else if (role === 'dosen') {
+                            if (currentPath.startsWith('/admin')) {
+                                router.replace('/dosen');
+                                return;
+                            }
+                        }
+
                         if (currentPath.startsWith('/login') || currentPath.startsWith('/register') || currentPath.startsWith('/forgot-password')) {
-                            router.replace('/');
+                            if (role === 'dosen') {
+                                router.replace('/dosen');
+                            } else if (role === 'admin') {
+                                router.replace('/admin');
+                            } else {
+                                router.replace('/');
+                            }
                         }
                     } else {
                         handleSignOut();
