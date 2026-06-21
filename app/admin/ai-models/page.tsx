@@ -55,7 +55,7 @@ function getModelTheme(name: string) {
 
 export default function AIModelInventoryPage() {
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
+  const [isChecking, setIsChecking] = useState(false);
   const [models, setModels] = useState<ModelStat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -162,28 +162,29 @@ export default function AIModelInventoryPage() {
   };
 
   useEffect(() => {
-    const checkAdmin = async () => {
+    const fetchSession = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { router.push('/login'); return; }
-        const { data: profile } = await supabase.from('profil_pengguna').select('role, nama_lengkap').eq('id', user.id).maybeSingle();
-        if (normalizeRole(profile?.role) !== 'admin') { router.push('/'); return; }
-        
-        setAdminId(user.id);
-        if (profile?.nama_lengkap) {
-          setAdminName(profile.nama_lengkap);
+        if (user) {
+          setAdminId(user.id);
+          const { data: profile } = await supabase.from('profil_pengguna').select('nama_lengkap, role').eq('id', user.id).maybeSingle();
+          if (profile?.nama_lengkap) {
+            setAdminName(profile.nama_lengkap);
+          }
+          if (profile?.role) {
+            setAdminRole(normalizeRole(profile.role));
+          }
         }
-        setAdminRole(normalizeRole(profile?.role));
-        
-        setIsChecking(false);
-        fetchModelsFromDB();
-        loadBackendModels();
-        loadModelsInfo();
-        loadActiveModelFromDB();
-      } catch { router.push('/'); }
+      } catch (err) {
+        console.error('Error fetching admin session details:', err);
+      }
     };
-    checkAdmin();
-  }, [router]);
+    fetchSession();
+    fetchModelsFromDB();
+    loadBackendModels();
+    loadModelsInfo();
+    loadActiveModelFromDB();
+  }, []);
 
   const fetchModelsFromDB = async () => {
     setIsLoading(true);

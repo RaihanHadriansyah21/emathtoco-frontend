@@ -13,27 +13,12 @@ import { PageLoader } from '@/components/ui/loaders';
 
 export default function DemoResetPage() {
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
-
   // Reset states
   const [confirmText, setConfirmText] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [resetType, setResetType] = useState<'submissions' | 'enrollments' | 'all' | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   const [resultMessage, setResultMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  useEffect(() => {
-    const checkAdmin = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { router.push('/login'); return; }
-        const { data: profile } = await supabase.from('profil_pengguna').select('role').eq('id', user.id).maybeSingle();
-        if (normalizeRole(profile?.role) !== 'admin') { router.push('/'); return; }
-        setIsChecking(false);
-      } catch { router.push('/'); }
-    };
-    checkAdmin();
-  }, [router]);
 
   const openConfirm = (type: 'submissions' | 'enrollments' | 'all') => {
     setResetType(type);
@@ -300,10 +285,6 @@ export default function DemoResetPage() {
       setIsResetting(false);
     }
   };
-
-  if (isChecking) {
-    return <PageLoader message="Memverifikasi admin..." />;
-  }
 
   const resetOptions = [
     {

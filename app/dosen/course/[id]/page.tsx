@@ -14,6 +14,8 @@ import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import { apiGet, apiPost } from '@/lib/api-client';
 
+import { useAuth } from '@/app/components/AuthGate';
+
 interface StudentProfile {
   nama_lengkap: string;
   kelas: string;
@@ -47,6 +49,7 @@ export default function LecturerCoursePortal() {
   const router = useRouter();
   const params = useParams();
   const courseId = params.id as string;
+  const { user } = useAuth();
   
   // Auth state
   const [isChecking, setIsChecking] = useState(true);
@@ -101,34 +104,11 @@ export default function LecturerCoursePortal() {
   }, []);
 
   useEffect(() => {
+    if (!user) return;
+
     const verifyAccess = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          await supabase.auth.signOut();
-          document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
-          router.push('/login');
-          return;
-        }
-
-        // Fetch user profile and verify role is lecturer
-        const { data: profile } = await supabase
-          .from('profil_pengguna')
-          .select('nama_lengkap, role')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        const userRole = normalizeRole(profile?.role);
-        if (!profile || userRole !== 'dosen') {
-          if (profile?.role === 'admin') {
-            router.push('/admin');
-          } else {
-            router.push('/');
-          }
-          return;
-        }
-
-        setLecturerName(profile.nama_lengkap);
+        setLecturerName(user.nama_lengkap);
 
         // Authorization check: Verify lecturer is assigned to this course
         const { data: assignmentCheck, error: checkErr } = await supabase
@@ -142,6 +122,7 @@ export default function LecturerCoursePortal() {
           console.warn(`[Access Denied] Lecturer ${user.id} is not assigned to course ${courseId}`);
           setIsAccessDenied(true);
           setIsChecking(false);
+          setIsLoadingData(false);
           return;
         }
 
@@ -178,13 +159,13 @@ export default function LecturerCoursePortal() {
         fetchSubmissions();
       } catch (err) {
         console.error('Dosen verification error:', err);
-        await supabase.auth.signOut();
-        document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
-        router.push('/login');
+        setErrorMsg('Terjadi kesalahan saat memeriksa akses kelas.');
+        setIsChecking(false);
+        setIsLoadingData(false);
       }
     };
     verifyAccess();
-  }, [router, courseId]);
+  }, [user, courseId]);
  
   // Polling logic when any submission is 'processing' (BUG 2 fix)
   useEffect(() => {

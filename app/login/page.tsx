@@ -8,6 +8,9 @@ import Logo from '../Emathtoco.png';
 import { GraduationCap, BookOpen, ArrowRight, Loader2, Sparkles, ArrowLeft, LogIn } from 'lucide-react';
 import LoginAIScene from '@/components/ui/login-ai-scene';
 import { motion, AnimatePresence } from 'framer-motion';
+import PageTransition from '@/components/ui/PageTransition';
+import TextType from '@/components/ui/TextType';
+import ShinyText from '@/components/ui/ShinyText';
 
 export default function LoginSelectionPage() {
     const router = useRouter();
@@ -53,7 +56,8 @@ export default function LoginSelectionPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#060814] via-[#020205] to-[#000000] relative overflow-hidden font-sans">
+        <PageTransition>
+            <div className="min-h-screen bg-gradient-to-br from-[#060814] via-[#020205] to-[#000000] relative overflow-hidden font-sans">
             {/* ═══════════════════════════════════════════════════════ */}
             {/* BACKGROUND AMBIENT GLOWS                              */}
             {/* ═══════════════════════════════════════════════════════ */}
@@ -73,8 +77,17 @@ export default function LoginSelectionPage() {
             >
                 {/* Left: Brand Text Only */}
                 <div className="flex items-center">
-                    <span className="text-white text-sm font-bold tracking-wider">
-                        E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-bold">TOCO</span>
+                    <span className="text-sm font-bold tracking-wider flex items-center gap-0">
+                        <ShinyText
+                            text="E-MATH"
+                            color="#a3a3a3"
+                            shineColor="#ffffff"
+                            speed={3}
+                            className="font-bold"
+                        />
+                        <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-bold">
+                            TOCO
+                        </span>
                     </span>
                 </div>
 
@@ -170,8 +183,17 @@ export default function LoginSelectionPage() {
                                     </motion.div>
 
                                     {/* Title */}
-                                    <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-wider text-white leading-[1.1]">
-                                        E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent">TOCO</span>
+                                    <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-wider leading-[1.1] flex flex-wrap items-center">
+                                        <ShinyText
+                                            text="E-MATH"
+                                            color="#a3a3a3"
+                                            shineColor="#ffffff"
+                                            speed={3.5}
+                                            className="font-extrabold"
+                                        />
+                                        <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent">
+                                            TOCO
+                                        </span>
                                     </h1>
 
                                     {/* Subtitle */}
@@ -185,8 +207,18 @@ export default function LoginSelectionPage() {
                                     <div className="w-16 h-[2px] bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full mt-6 mb-6"></div>
 
                                     {/* Description */}
-                                    <p className="text-neutral-500 text-sm sm:text-base leading-relaxed max-w-md">
-                                        Sistem berbasis kecerdasan buatan untuk mengoreksi dan menilai lembar jawaban matematika essay secara <span className="text-neutral-400 font-medium">instan</span>, <span className="text-neutral-400 font-medium">objektif</span>, dan <span className="text-neutral-400 font-medium">otomatis</span>.
+                                    <p className="text-neutral-500 text-sm sm:text-base leading-relaxed max-w-md min-h-[72px] sm:min-h-[48px]">
+                                        Sistem berbasis kecerdasan buatan untuk mengoreksi dan menilai lembar jawaban matematika essay secara{' '}
+                                        <TextType
+                                            text={['instan.', 'objektif.', 'otomatis.']}
+                                            as="span"
+                                            typingSpeed={75}
+                                            deletingSpeed={45}
+                                            pauseDuration={1800}
+                                            className="text-cyan-400 font-semibold"
+                                            showCursor={true}
+                                            cursorCharacter="|"
+                                        />
                                     </p>
 
                                     {/* Mobile-only login button */}
@@ -243,8 +275,17 @@ export default function LoginSelectionPage() {
                                             priority
                                         />
                                     </div>
-                                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-wider text-white">
-                                        E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-extrabold">TOCO</span>
+                                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-wider flex items-center justify-center">
+                                        <ShinyText
+                                            text="E-MATH"
+                                            color="#a3a3a3"
+                                            shineColor="#ffffff"
+                                            speed={3}
+                                            className="font-extrabold"
+                                        />
+                                        <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-extrabold">
+                                            TOCO
+                                        </span>
                                     </h1>
                                     <p className="text-neutral-400 text-xs uppercase tracking-[0.2em] mt-2">Essay Mathematics Auto Correction</p>
                                     <p className="text-neutral-500 text-sm mt-4">Pilih jenis akun untuk masuk ke sistem</p>
@@ -304,5 +345,6 @@ export default function LoginSelectionPage() {
                 </AnimatePresence>
             </div>
         </div>
-    );
+    </PageTransition>
+);
 }

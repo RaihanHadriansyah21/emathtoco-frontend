@@ -7,6 +7,7 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -17,9 +18,12 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: .5;
   }
@@ -29,19 +33,28 @@
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
 }
 
-/* Apply smooth transitions across color variables, backgrounds, and borders for high-fidelity theme switching */
-body, header, main, table, tr, th, td, div, button, input, textarea, select, span, p, h1, h2, h3, h4, h5, h6, option {
-  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, box-shadow;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 200ms;
+/* Apply smooth transitions across color variables, backgrounds, and borders ONLY during theme switching */
+.theme-transitioning,
+.theme-transitioning *,
+.theme-transitioning *::before,
+.theme-transitioning *::after {
+  transition: background-color 600ms cubic-bezier(0.4, 0, 0.2, 1),
+              color 600ms cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 600ms cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 600ms cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 600ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition-delay: 0s !important;
 }
 
 
 @keyframes float-blue {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translate(0, 0) scale(1);
     opacity: 0.8;
   }
+
   50% {
     transform: translate(60px, -40px) scale(1.15);
     opacity: 1;
@@ -49,10 +62,13 @@ body, header, main, table, tr, th, td, div, button, input, textarea, select, spa
 }
 
 @keyframes float-purple {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translate(0, 0) scale(1);
     opacity: 0.7;
   }
+
   50% {
     transform: translate(-50px, 50px) scale(1.1);
     opacity: 0.9;
@@ -73,6 +89,7 @@ body, header, main, table, tr, th, td, div, button, input, textarea, select, spa
     opacity: 0;
     transform: translate(-72%, -62%) scale(0.5);
   }
+
   100% {
     opacity: 1;
     transform: translate(-50%, -40%) scale(1);
@@ -87,10 +104,12 @@ body, header, main, table, tr, th, td, div, button, input, textarea, select, spa
   0% {
     transform: scale(1);
   }
+
   50% {
     transform: scale(1.08);
     box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
   }
+
   100% {
     transform: scale(1);
   }
@@ -104,12 +123,17 @@ body, header, main, table, tr, th, td, div, button, input, textarea, select, spa
 
 /* Standard Properties (Firefox only) */
 @supports not selector(::-webkit-scrollbar) {
-  html, body, * {
+
+  html,
+  body,
+  * {
     scrollbar-width: thin;
     scrollbar-color: #0891b2 #f1f5f9;
   }
 
-  html.dark, .dark, .dark * {
+  html.dark,
+  .dark,
+  .dark * {
     scrollbar-color: #0e7490 #020205;
   }
 }
@@ -299,8 +323,9 @@ html.dark::-webkit-scrollbar-thumb:hover,
 /* =================================================═ */
 
 @media (max-width: 767px) {
+
   /* Disable backdrop filter on mobile to resolve iOS Safari hit-testing/click-interception bugs on inputs, and reclaim rendering GPU cycles */
-  .glass-card, 
+  .glass-card,
   .dark .dark\:glass-card,
   .glass-panel {
     backdrop-filter: none !important;
@@ -308,9 +333,9 @@ html.dark::-webkit-scrollbar-thumb:hover,
     background: rgba(10, 10, 15, 0.94) !important;
     box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.2) !important;
   }
-  
+
   /* Disable expensive translate/scale effects on hover for touch devices */
-  .glass-card:hover, 
+  .glass-card:hover,
   .dark .dark\:glass-card:hover,
   .btn-primary:hover,
   .btn-glass:hover,
@@ -327,7 +352,9 @@ html.dark::-webkit-scrollbar-thumb:hover,
   }
 
   /* Prevent iOS Safari auto-zoom on input focus by forcing 16px font-size on mobile viewports */
-  input, select, textarea {
+  input,
+  select,
+  textarea {
     font-size: 16px !important;
   }
 
@@ -339,7 +366,10 @@ html.dark::-webkit-scrollbar-thumb:hover,
 
 /* Standard accessibility preference mapping for reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after {
+
+  *,
+  ::before,
+  ::after {
     animation-delay: -1ms !important;
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
@@ -347,5 +377,14 @@ html.dark::-webkit-scrollbar-thumb:hover,
     scroll-behavior: auto !important;
     transition-duration: 0s !important;
     transition-delay: 0s !important;
+  }
+}
+
+@keyframes shiny-text-sweep {
+  0% {
+    background-position: 200% center;
+  }
+  100% {
+    background-position: -200% center;
   }
 }

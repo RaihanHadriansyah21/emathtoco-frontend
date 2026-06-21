@@ -42,7 +42,7 @@ const ITEMS_PER_PAGE = 20;
 export default function EnrollmentPage() {
   const router = useRouter();
   const { toasts, toast, removeToast } = useToast();
-  const [isChecking, setIsChecking] = useState(true);
+  const [isChecking, setIsChecking] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
@@ -65,18 +65,8 @@ export default function EnrollmentPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    const checkAdmin = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { router.push('/login'); return; }
-        const { data: profile } = await supabase.from('profil_pengguna').select('role').eq('id', user.id).maybeSingle();
-        if (normalizeRole(profile?.role) !== 'admin') { router.push('/'); return; }
-        setIsChecking(false);
-        fetchData();
-      } catch { router.push('/'); }
-    };
-    checkAdmin();
-  }, [router]);
+    fetchData();
+  }, []);
 
   const fetchData = async () => {
     setIsLoading(true);

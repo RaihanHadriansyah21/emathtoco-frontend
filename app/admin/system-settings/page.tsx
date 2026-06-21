@@ -9,10 +9,11 @@ import { useTheme } from 'next-themes';
 import { apiGet, apiPost } from '@/lib/api-client';
 import PageTransition from '@/components/ui/PageTransition';
 import { PageLoader } from '@/components/ui/loaders';
+import { useAuth } from '@/app/components/AuthGate';
 
 export default function SystemSettingsPage() {
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
+  const { user } = useAuth();
   const [dbConnected, setDbConnected] = useState<boolean | null>(null);
   const { theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -76,26 +77,14 @@ export default function SystemSettingsPage() {
   };
 
   useEffect(() => {
-    const checkAdmin = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { router.push('/login'); return; }
-        const { data: profile } = await supabase.from('profil_pengguna').select('role, nama_lengkap').eq('id', user.id).maybeSingle();
-        if (normalizeRole(profile?.role) !== 'admin') { router.push('/'); return; }
-        
-        setAdminId(user.id);
-        if (profile?.nama_lengkap) {
-          setAdminName(profile.nama_lengkap);
-        }
-        setAdminRole(normalizeRole(profile?.role));
-        
-        setIsChecking(false);
-        checkDbConnection();
-        loadSettingsFromDB();
-      } catch { router.push('/'); }
-    };
-    checkAdmin();
-  }, [router]);
+    if (user) {
+      setAdminId(user.id);
+      setAdminName(user.nama_lengkap);
+      setAdminRole(normalizeRole(user.role));
+      checkDbConnection();
+      loadSettingsFromDB();
+    }
+  }, [user]);
 
   const checkDbConnection = async () => {
     try {
@@ -105,10 +94,6 @@ export default function SystemSettingsPage() {
       setDbConnected(false);
     }
   };
-
-  if (isChecking) {
-    return <PageLoader message="Memverifikasi admin..." />;
-  }
 
   const currentTheme = mounted ? (theme === 'system' ? resolvedTheme : theme) : 'dark';
 

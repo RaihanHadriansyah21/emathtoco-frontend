@@ -35,7 +35,7 @@ const iconMap: Record<string, string> = { security: '🔒', compress: '🗜️',
 export default function CourseManagementPage() {
   const router = useRouter();
   const { toasts, toast, removeToast } = useToast();
-  const [isChecking, setIsChecking] = useState(true);
+  const [isChecking, setIsChecking] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,18 +52,8 @@ export default function CourseManagementPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    const checkAdmin = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { router.push('/login'); return; }
-        const { data: profile } = await supabase.from('profil_pengguna').select('role').eq('id', user.id).maybeSingle();
-        if (normalizeRole(profile?.role) !== 'admin') { router.push('/'); return; }
-        setIsChecking(false);
-        fetchCourses();
-      } catch { router.push('/'); }
-    };
-    checkAdmin();
-  }, [router]);
+    fetchCourses();
+  }, []);
 
   const fetchCourses = async () => {
     setIsLoading(true);

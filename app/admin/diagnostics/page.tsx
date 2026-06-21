@@ -4,6 +4,7 @@ import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, UploadCloud, ImageIcon, RefreshCw, AlertCircle, Sparkles, ZoomIn, Info } from 'lucide-react';
 import Navbar from '../../components/Navbar';
+import PageTransition from '@/components/ui/PageTransition';
 
 interface DiagnosticResult {
     originalName: string;
@@ -179,7 +180,8 @@ export default function ImageDiagnostics() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-24 relative overflow-hidden flex flex-col">
+        <PageTransition>
+            <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-24 relative overflow-hidden flex flex-col">
             {/* Elegant Background Glows */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
                 <div className="absolute top-[10%] left-[15%] w-[450px] h-[450px] bg-cyan-500/5 dark:bg-cyan-500/12 rounded-full blur-[120px]"></div>
@@ -345,5 +347,6 @@ export default function ImageDiagnostics() {
                 )}
             </main>
         </div>
-    );
+    </PageTransition>
+  );
 }

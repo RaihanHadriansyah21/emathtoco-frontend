@@ -9,10 +9,11 @@ import {
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import { apiGet } from '@/lib/api-client';
+import PageTransition from '@/components/ui/PageTransition';
 
 export default function AuditDebugPage() {
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
+  const [isChecking, setIsChecking] = useState(false);
   
   // Debug State
   const [schemaVersion, setSchemaVersion] = useState<'legacy' | 'enterprise' | null>(null);
@@ -24,20 +25,6 @@ export default function AuditDebugPage() {
   const [totalLoginCount, setTotalLoginCount] = useState(0);
   const [totalAIRunCount, setTotalAIRunCount] = useState(0);
   const [totalFinalizedCount, setTotalFinalizedCount] = useState(0);
-
-  // Auth Guard
-  useEffect(() => {
-    const checkAdmin = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { router.push('/login'); return; }
-        const { data: profile } = await supabase.from('profil_pengguna').select('role').eq('id', user.id).maybeSingle();
-        if (normalizeRole(profile?.role) !== 'admin') { router.push('/'); return; }
-        setIsChecking(false);
-      } catch { router.push('/'); }
-    };
-    checkAdmin();
-  }, [router]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -78,21 +65,12 @@ export default function AuditDebugPage() {
   };
 
   useEffect(() => {
-    if (!isChecking) {
-      fetchData();
-    }
-  }, [isChecking]);
-
-  if (isChecking) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
-      </div>
-    );
-  }
+    fetchData();
+  }, []);
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto w-full space-y-8">
+    <PageTransition>
+      <div className="p-6 lg:p-8 max-w-5xl mx-auto w-full space-y-8">
       {/* Back to Audit Log */}
       <button 
         onClick={() => router.push('/admin/audit')}
@@ -220,6 +198,7 @@ export default function AuditDebugPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </PageTransition>
   );
 }

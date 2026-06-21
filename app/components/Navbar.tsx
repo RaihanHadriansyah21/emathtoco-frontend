@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, ChevronDown, User, Settings, LogOut, Sun, Moon, Menu, ChevronLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
+import { useAuth } from './AuthGate';
 import { useTheme } from 'next-themes';
 import Image from 'next/image';
 import Logo from '../Emathtoco.png';
+import { AnimatedThemeToggle } from '@/components/ui/animated-theme-toggle';
 
 interface NavbarProps {
   showBack?: boolean;
@@ -51,6 +53,7 @@ export default function Navbar({
   onToggleSidebar,
 }: NavbarProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const [userEmail, setUserEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState('mahasiswa');
@@ -65,6 +68,16 @@ export default function Navbar({
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    if (user) {
+      setUserEmail(user.email);
+      setFullName(user.nama_lengkap);
+      setRole(user.role);
+      setAvatarUrl(user.foto_profil_url);
+      setImageError(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
     const handleAvatarUpdate = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (customEvent.detail !== undefined) {
@@ -76,37 +89,6 @@ export default function Navbar({
     return () => {
       window.removeEventListener('avatar-update', handleAvatarUpdate);
     };
-  }, []);
-
-  useEffect(() => {
-    const getNavbarData = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          setUserEmail(user.email || '');
-
-          const { data: profile } = await supabase
-            .from('profil_pengguna')
-            .select('nama_lengkap, role, foto_profil_url')
-            .eq('id', user.id)
-            .maybeSingle();
-
-          if (profile?.nama_lengkap) {
-            setFullName(profile.nama_lengkap);
-          }
-          if (profile?.role) {
-            setRole(profile.role);
-          }
-          if (profile?.foto_profil_url) {
-            setAvatarUrl(profile.foto_profil_url);
-            setImageError(false);
-          }
-        }
-      } catch (err) {
-        console.error('Navbar data fetch error:', err);
-      }
-    };
-    getNavbarData();
   }, []);
 
   useEffect(() => {
@@ -290,15 +272,7 @@ export default function Navbar({
         {/* Right section: Theme Toggle + Profile Dropdown */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Theme Toggle Button */}
-          {mounted && (
-            <button
-              onClick={toggleTheme}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-600 hover:text-slate-800 dark:bg-black/40 dark:border-neutral-800 dark:text-neutral-400 dark:hover:text-white dark:hover:border-cyan-500/40 transition-all duration-300 cursor-pointer flex-shrink-0"
-              title={currentTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            >
-              {currentTheme === 'dark' ? <Sun className="w-[18px] h-[18px] text-amber-400" /> : <Moon className="w-[18px] h-[18px] text-indigo-600" />}
-            </button>
-          )}
+          <AnimatedThemeToggle className="w-10 h-10 rounded-xl border border-slate-250 hover:border-slate-350 dark:border-neutral-800 text-slate-650 hover:text-slate-800 dark:text-neutral-450 dark:hover:text-white dark:hover:border-cyan-500/40 transition-all flex items-center justify-center" />
 
           {/* Profile Dropdown */}
           <div className="relative flex-shrink-0" ref={dropdownRef}>

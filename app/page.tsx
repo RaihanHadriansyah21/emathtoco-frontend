@@ -9,6 +9,8 @@ import { normalizeRole } from '@/lib/utils';
 import PageTransition from '@/components/ui/PageTransition';
 import { GlassCard } from '@/components/ui/card';
 
+import { useAuth } from './components/AuthGate';
+
 interface MataKuliah {
   id: string;
   nama_matkul: string;
@@ -33,6 +35,7 @@ const getCourseIcon = (iconName: string): string => {
 export default function StudentDashboard() {
   console.log("[HOME] COMPONENT RENDER");
   const router = useRouter();
+  const { user, loading } = useAuth();
   const [userEmail, setUserEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [courses, setCourses] = useState<MataKuliah[]>([]);
@@ -41,133 +44,87 @@ export default function StudentDashboard() {
   const [reuploadWarnings, setReuploadWarnings] = useState<Record<string, { count: number; firstSlot: string }>>({});
 
   useEffect(() => {
+    if (loading || !user) return;
+    if (normalizeRole(user.role) !== 'mahasiswa') return;
+
     // Ambil data user yang sedang login aktif dari session Supabase
     const getDashboardData = async () => {
       console.log("[HOME] auth check start");
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        console.log("[HOME] auth check user retrieved:", user?.id);
-        if (user) {
-          setUserEmail(user.email || '');
+        setUserEmail(user.email);
+        setFullName(user.nama_lengkap);
 
-          console.log("[HOME] fetch profile start");
-          // Fetch profile data
-          const { data: profile, error } = await supabase
-            .from('profil_pengguna')
-            .select('nama_lengkap, role')
-            .eq('id', user.id)
-            .maybeSingle();
+        console.log("[HOME] fetch enrollment start");
+        // Fetch enrolled course IDs from mahasiswa_mata_kuliah
+        const { data: enrollmentData, error: enrollmentError } = await supabase
+          .from('mahasiswa_mata_kuliah')
+          .select('mata_kuliah_id')
+          .eq('mahasiswa_id', user.id);
 
-          console.log("AUTH USER:", user);
-          console.log("PROFILE:", profile);
-          console.log("PROFILE ERROR:", error);
+        if (enrollmentError) {
+          throw enrollmentError;
+        }
 
-          if (error) {
-            console.error("Gagal mengambil profil pengguna:", error);
-            setCourseError("Gagal memuat profil pengguna dari server database.");
-            setIsLoadingCourses(false);
-            return;
-          }
+        const enrolledCourseIds = (enrollmentData || []).map(e => e.mata_kuliah_id);
 
-          if (profile) {
-            setFullName(profile.nama_lengkap || 'User');
-            
-            // Redirect based on role
-            const userRole = normalizeRole(profile.role || 'mahasiswa');
-            if (userRole === 'dosen') {
-              console.log("[HOME] router push to /dosen");
-              router.push('/dosen');
-              return;
-            } else if (userRole === 'admin') {
-              console.log("[HOME] router push to /admin");
-              router.push('/admin');
-              return;
-            }
-          } else {
-            console.log("[HOME] router push to /complete-profile");
-            router.push('/complete-profile');
-            return;
-          }
+        if (enrolledCourseIds.length === 0) {
+          setCourses([]);
+          setIsLoadingCourses(false);
+          return;
+        }
 
-          console.log("[HOME] fetch enrollment start");
-          // Fetch enrolled course IDs from mahasiswa_mata_kuliah
-          const { data: enrollmentData, error: enrollmentError } = await supabase
-            .from('mahasiswa_mata_kuliah')
-            .select('mata_kuliah_id')
-            .eq('mahasiswa_id', user.id);
+        console.log("[HOME] fetch courses start");
+        // Fetch courses matching the enrolled IDs
+        const { data: coursesData, error: coursesError } = await supabase
+          .from('mata_kuliah')
+          .select('*')
+          .in('id', enrolledCourseIds);
 
-          if (enrollmentError) {
-            throw enrollmentError;
-          }
+        if (coursesError) {
+          throw coursesError;
+        }
 
-          const enrolledCourseIds = (enrollmentData || []).map(e => e.mata_kuliah_id);
+        setCourses(coursesData || []);
 
-          if (enrolledCourseIds.length === 0) {
-            setCourses([]);
-            setIsLoadingCourses(false);
-            return;
-          }
+        console.log("[HOME] fetch warnings start");
+        // Check for reupload warnings (lembar_jawaban with status = 'reupload_required')
+        const { data: submissions, error: subsError } = await supabase
+          .from('pengumpulan_tugas')
+          .select('id, mata_kuliah_id')
+          .eq('mahasiswa_id', user.id);
 
-          console.log("[HOME] fetch courses start");
-          // Fetch courses matching the enrolled IDs
-          const { data: coursesData, error: coursesError } = await supabase
-            .from('mata_kuliah')
-            .select('*')
-            .in('id', enrolledCourseIds);
+        if (subsError) {
+           throw subsError;
+        }
 
-          if (coursesError) {
-            throw coursesError;
-          }
+        if (submissions && submissions.length > 0) {
+           const subIds = submissions.map(s => s.id);
+           
+           const { data: sheets, error: sheetsError } = await supabase
+             .from('lembar_jawaban')
+             .select('pengumpulan_tugas_id, status, section_code')
+             .in('pengumpulan_tugas_id', subIds)
+             .eq('status', 'reupload_required');
 
-          setCourses(coursesData || []);
+           if (sheetsError) {
+             throw sheetsError;
+           }
 
-          console.log("[HOME] fetch warnings start");
-          // Check for reupload warnings (lembar_jawaban with status = 'reupload_required')
-          const { data: submissions, error: subsError } = await supabase
-            .from('pengumpulan_tugas')
-            .select('id, mata_kuliah_id')
-            .eq('mahasiswa_id', user.id);
-
-          if (subsError) {
-             throw subsError;
-          }
-
-          if (submissions && submissions.length > 0) {
-             const subIds = submissions.map(s => s.id);
-             
-             const { data: sheets, error: sheetsError } = await supabase
-               .from('lembar_jawaban')
-               .select('pengumpulan_tugas_id, status, section_code')
-               .in('pengumpulan_tugas_id', subIds)
-               .eq('status', 'reupload_required');
-
-             if (sheetsError) {
-               throw sheetsError;
-             }
-
-             const warningCounts: Record<string, { count: number; firstSlot: string }> = {};
-             
-             sheets?.forEach(sheet => {
-                const sub = submissions.find(s => s.id === sheet.pengumpulan_tugas_id);
-                if (sub) {
-                  const courseId = sub.mata_kuliah_id;
-                  const slot = sheet.section_code ? sheet.section_code.replace('S-', '').toLowerCase() : '1a';
-                  if (!warningCounts[courseId]) {
-                    warningCounts[courseId] = { count: 0, firstSlot: slot };
-                  }
-                  warningCounts[courseId].count += 1;
+           const warningCounts: Record<string, { count: number; firstSlot: string }> = {};
+           
+           sheets?.forEach(sheet => {
+              const sub = submissions.find(s => s.id === sheet.pengumpulan_tugas_id);
+              if (sub) {
+                const courseId = sub.mata_kuliah_id;
+                const slot = sheet.section_code ? sheet.section_code.replace('S-', '').toLowerCase() : '1a';
+                if (!warningCounts[courseId]) {
+                  warningCounts[courseId] = { count: 0, firstSlot: slot };
                 }
-             });
+                warningCounts[courseId].count += 1;
+              }
+           });
 
-             setReuploadWarnings(warningCounts);
-          }
-
-        } else {
-          console.log("[HOME] user is null, cleaning session and pushing to /login");
-          // Bersihkan sesi dan cookie untuk menghindari loop redirect dengan middleware
-          await supabase.auth.signOut();
-          document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
-          window.location.href = '/login';
+           setReuploadWarnings(warningCounts);
         }
       } catch (err) {
         console.error('Gagal mengambil data beranda:', err);
@@ -177,7 +134,7 @@ export default function StudentDashboard() {
       }
     };
     getDashboardData();
-  }, [router]);
+  }, [user, loading, router]);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans relative overflow-hidden">

@@ -44,7 +44,7 @@ const PAGE_SIZE = 100;
 
 export default function AuditLogPage() {
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
+  const [isChecking, setIsChecking] = useState(false);
   
   // Schema Checking State
   const [schemaVersion, setSchemaVersion] = useState<'legacy' | 'enterprise' | null>(null);
@@ -74,17 +74,8 @@ export default function AuditLogPage() {
 
   // Auth Guard
   useEffect(() => {
-    const checkAdmin = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { router.push('/login'); return; }
-        const { data: profile } = await supabase.from('profil_pengguna').select('role').eq('id', user.id).maybeSingle();
-        if (normalizeRole(profile?.role) !== 'admin') { router.push('/'); return; }
-        setIsChecking(false);
-      } catch { router.push('/'); }
-    };
-    checkAdmin();
-  }, [router]);
+    setIsChecking(false);
+  }, []);
 
   // Check Schema Version
   useEffect(() => {

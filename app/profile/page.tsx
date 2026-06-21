@@ -6,6 +6,8 @@ import { User, IdCard, GraduationCap, Edit3, Save, X, Loader2, Camera, CheckCirc
 import Navbar from '../components/Navbar';
 import { supabase } from '@/lib/supabase';
 import Cropper from 'react-easy-crop';
+import { useAuth } from '../components/AuthGate';
+import PageTransition from '@/components/ui/PageTransition';
 
 const getInitials = (name: string) => {
     if (!name) return 'U';
@@ -72,6 +74,7 @@ const getCroppedImg = (
 
 export default function ProfilePage() {
     const router = useRouter();
+    const { user, loading, refresh } = useAuth();
     const [userId, setUserId] = useState<string | null>(null);
     const [email, setEmail] = useState('');
     const [role, setRole] = useState('mahasiswa');
@@ -208,6 +211,9 @@ export default function ProfilePage() {
 
             console.log("DB update successful!");
 
+            // Sync with global auth context
+            await refresh();
+
             // 5. Dispatch sync event
             window.dispatchEvent(new CustomEvent('avatar-update', { detail: publicUrl }));
             setFotoProfilUrl(publicUrl);
@@ -270,6 +276,9 @@ export default function ProfilePage() {
 
             console.log("DB update successful!");
 
+            // Sync with global auth context
+            await refresh();
+
             // 3. Dispatch sync event
             window.dispatchEvent(new CustomEvent('avatar-update', { detail: null }));
             setFotoProfilUrl(null);
@@ -298,15 +307,12 @@ export default function ProfilePage() {
     }, []);
 
     useEffect(() => {
+        if (loading || !user) return;
+
         const fetchUserProfile = async () => {
             try {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (!user) {
-                    window.location.href = '/login';
-                    return;
-                }
                 setUserId(user.id);
-                setEmail(user.email || '');
+                setEmail(user.email);
 
                 const { data: profile } = await supabase
                     .from('profil_pengguna')
@@ -343,7 +349,7 @@ export default function ProfilePage() {
         };
 
         fetchUserProfile();
-    }, [router]);
+    }, [user, loading, router]);
 
     const handleCancel = () => {
         setNamaLengkap(origNama);
@@ -381,6 +387,9 @@ export default function ProfilePage() {
                 throw error;
             }
 
+            // Sync with global auth context
+            await refresh();
+
             setSuccessMessage('Perubahan profil berhasil disimpan!');
             setOrigNama(namaLengkap.trim());
             setOrigNim(nimNip.trim());
@@ -409,7 +418,8 @@ export default function ProfilePage() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 text-slate-800 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] dark:text-neutral-300 font-sans pb-12 relative overflow-hidden">
+        <PageTransition>
+            <div className="min-h-screen bg-slate-50 text-slate-800 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] dark:text-neutral-300 font-sans pb-12 relative overflow-hidden">
             {/* Elegant Background Glows */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
                 <div className="absolute top-[10%] left-[15%] w-[450px] h-[450px] bg-cyan-500/5 dark:bg-cyan-500/12 rounded-full blur-[120px] animate-float-blue"></div>
@@ -808,5 +818,6 @@ export default function ProfilePage() {
                 </div>
             )}
         </div>
-    );
+    </PageTransition>
+  );
 }

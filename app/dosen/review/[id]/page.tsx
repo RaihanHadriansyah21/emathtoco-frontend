@@ -12,6 +12,8 @@ import { useToast } from '@/app/hooks/useToast';
 import ToastContainer from '@/app/components/Toast';
 import { apiGet, apiPost } from '@/lib/api-client';
 
+import { useAuth } from '@/app/components/AuthGate';
+
 // Helper to generate the 24 section slots (1a - 4f)
 const generateSlots = () => {
   const list = [];
@@ -146,6 +148,7 @@ export default function ReviewWorkspace() {
   const router = useRouter();
   const params = useParams();
   const submissionId = params.id as string;
+  const { user } = useAuth();
 
   // Auth and Loading States
   const [isChecking, setIsChecking] = useState(true);
@@ -269,35 +272,11 @@ export default function ReviewWorkspace() {
   const isAIProcessing = isAIActive && !isBackendOffline;
 
   useEffect(() => {
-    // 1. Verify lecturer role
+    if (!user) return;
+
+    // 1. Verify lecturer role & assignment
     const verifyUser = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          await supabase.auth.signOut();
-          document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
-          router.push('/login');
-          return;
-        }
-
-        const { data: profile } = await supabase
-          .from('profil_pengguna')
-          .select('role')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        const userRole = normalizeRole(profile?.role);
-        if (userRole !== 'dosen') {
-          if (userRole === 'admin') {
-            router.push('/admin');
-          } else {
-            router.push('/');
-          }
-          return;
-        }
-
-        setIsChecking(false);
-
         // Authorization check: verify lecturer is assigned to this submission's course
         const { data: subMeta } = await supabase
           .from('pengumpulan_tugas')
@@ -317,21 +296,25 @@ export default function ReviewWorkspace() {
           if (!assignmentCheck) {
             console.warn(`[Access Denied] Lecturer ${user.id} is not assigned to course ${subMeta.mata_kuliah_id}`);
             setIsAccessDenied(true);
+            setIsChecking(false);
+            setIsLoadingWorkspace(false);
             return;
           }
         }
+
+        setIsChecking(false);
 
         // Load submission and lembar_jawaban details
         loadWorkspaceDetails();
       } catch (err) {
         console.error('Dosen verification error:', err);
-        await supabase.auth.signOut();
-        document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
-        router.push('/login');
+        setErrorMsg('Terjadi kesalahan saat memeriksa akses kelas.');
+        setIsChecking(false);
+        setIsLoadingWorkspace(false);
       }
     };
     verifyUser();
-  }, [router, submissionId]);
+  }, [user, submissionId]);
 
   // Cleanup polling on unmount
   useEffect(() => {

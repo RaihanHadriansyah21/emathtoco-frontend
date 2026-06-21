@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import { User, IdCard, GraduationCap, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import PageTransition from '@/components/ui/PageTransition';
 
 export default function CompleteProfilePage() {
     const router = useRouter();
@@ -156,7 +157,8 @@ export default function CompleteProfilePage() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#060814] via-[#020205] to-[#000000] flex items-center justify-center px-4 font-sans relative overflow-hidden">
+        <PageTransition>
+            <div className="min-h-screen bg-gradient-to-br from-[#060814] via-[#020205] to-[#000000] flex items-center justify-center px-4 font-sans relative overflow-hidden">
             {/* Elegant Background Glows */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
                 <div className="absolute top-[10%] left-[15%] w-[450px] h-[450px] bg-cyan-500/12 rounded-full blur-[120px] animate-float-blue"></div>
@@ -307,5 +309,6 @@ export default function CompleteProfilePage() {
                 </motion.form>
             </motion.div>
         </div>
-    );
+    </PageTransition>
+  );
 }

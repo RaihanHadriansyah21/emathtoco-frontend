@@ -9,6 +9,8 @@ import { normalizeRole } from '@/lib/utils';
 import PageTransition from '@/components/ui/PageTransition';
 import { GlassCard } from '@/components/ui/card';
 
+import { useAuth } from '@/app/components/AuthGate';
+
 interface Course {
   id: string;
   nama_matkul: string;
@@ -36,95 +38,68 @@ const getCourseIcon = (iconName: string): string => {
 
 export default function LecturerDashboard() {
   const router = useRouter();
+  const { user } = useAuth();
   
-  // Auth state
-  const [isChecking, setIsChecking] = useState(true);
-  const [lecturerName, setLecturerName] = useState('');
-
   // Data state
   const [courses, setCourses] = useState<Course[]>([]);
   const [submissionsStats, setSubmissionsStats] = useState<SubmissionStat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [lecturerName, setLecturerName] = useState('');
+
+  const fetchData = async (userId: string) => {
+    setIsLoading(true);
+    try {
+      // Fetch assigned course IDs
+      const { data: assignments, error: assignErr } = await supabase
+        .from('dosen_mata_kuliah')
+        .select('mata_kuliah_id')
+        .eq('dosen_id', userId);
+
+      if (assignErr) throw assignErr;
+
+      const courseIds = (assignments || []).map(a => a.mata_kuliah_id);
+
+      if (courseIds.length === 0) {
+        setCourses([]);
+        setSubmissionsStats([]);
+        setIsLoading(false);
+        return;
+      }
+
+      // Fetch courses details
+      const { data: coursesData, error: coursesError } = await supabase
+        .from('mata_kuliah')
+        .select('*')
+        .in('id', courseIds);
+
+      if (coursesError) throw coursesError;
+      setCourses(coursesData || []);
+
+      // Fetch only id and status_submit of submissions to compute counters in memory
+      const { data: subsData, error: subsError } = await supabase
+        .from('pengumpulan_tugas')
+        .select('mata_kuliah_id, status_submit')
+        .in('mata_kuliah_id', courseIds)
+        .in('status_submit', ['submitted', 'processing_ai', 'reviewed', 'finalized']);
+
+      if (subsError) throw subsError;
+      setSubmissionsStats(subsData || []);
+
+      setIsLoading(false);
+    } catch (err) {
+      console.error('Error loading lecturer dashboard data:', err);
+      setErrorMsg('Gagal mengambil data kelas dan pengumpulan tugas.');
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const verifyUserAndFetchData = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          await supabase.auth.signOut();
-          document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
-          window.location.href = '/login';
-          return;
-        }
-
-        // Fetch user profile and verify role is lecturer
-        const { data: profile } = await supabase
-          .from('profil_pengguna')
-          .select('nama_lengkap, role')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        const userRole = normalizeRole(profile?.role);
-        if (!profile || userRole !== 'dosen') {
-          if (userRole === 'admin') {
-            router.push('/admin');
-          } else {
-            router.push('/');
-          }
-          return;
-        }
-
-        setLecturerName(profile.nama_lengkap);
-
-        // Fetch assigned course IDs
-        const { data: assignments, error: assignErr } = await supabase
-          .from('dosen_mata_kuliah')
-          .select('mata_kuliah_id')
-          .eq('dosen_id', user.id);
-
-        if (assignErr) throw assignErr;
-
-        const courseIds = (assignments || []).map(a => a.mata_kuliah_id);
-
-        if (courseIds.length === 0) {
-          setCourses([]);
-          setSubmissionsStats([]);
-          setIsLoading(false);
-          setIsChecking(false);
-          return;
-        }
-
-        // Fetch courses details
-        const { data: coursesData, error: coursesError } = await supabase
-          .from('mata_kuliah')
-          .select('*')
-          .in('id', courseIds);
-
-        if (coursesError) throw coursesError;
-        setCourses(coursesData || []);
-
-        // Fetch only id and status_submit of submissions to compute counters in memory
-        const { data: subsData, error: subsError } = await supabase
-          .from('pengumpulan_tugas')
-          .select('mata_kuliah_id, status_submit')
-          .in('mata_kuliah_id', courseIds)
-          .in('status_submit', ['submitted', 'processing_ai', 'reviewed', 'finalized']);
-
-        if (subsError) throw subsError;
-        setSubmissionsStats(subsData || []);
-
-        setIsLoading(false);
-        setIsChecking(false);
-      } catch (err) {
-        console.error('Error loading lecturer dashboard data:', err);
-        setErrorMsg('Gagal mengambil data kelas dan pengumpulan tugas.');
-        setIsLoading(false);
-        setIsChecking(false);
-      }
-    };
-    verifyUserAndFetchData();
-  }, [router]);
+    if (user) {
+      setLecturerName(user.nama_lengkap);
+      fetchData(user.id);
+    }
+  }, [user]);
 
   // Helper to count submissions for a specific course
   const getCourseStats = (courseId: string) => {
@@ -138,16 +113,7 @@ export default function LecturerDashboard() {
     };
   };
 
-  if (isChecking) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] flex items-center justify-center font-sans">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-10 h-10 text-cyan-500 dark:text-cyan-400 animate-spin" />
-          <p className="text-slate-500 dark:text-neutral-400 text-sm animate-pulse">Memverifikasi profil Dosen...</p>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans relative overflow-hidden flex flex-col">

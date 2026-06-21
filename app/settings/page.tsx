@@ -3,16 +3,30 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { KeyRound, MonitorDot, Info, Eye, EyeOff, Loader2, CheckCircle2, Sun, Moon } from 'lucide-react';
+import { useAuth } from '../components/AuthGate';
 import Navbar from '../components/Navbar';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
+import PageTransition from '@/components/ui/PageTransition';
 
 export default function SettingsPage() {
     const router = useRouter();
+    const { user, loading } = useAuth();
     const [userId, setUserId] = useState<string | null>(null);
     const [userEmail, setUserEmail] = useState('');
     const [role, setRole] = useState('mahasiswa');
     const [isChecking, setIsChecking] = useState(true);
+
+    // Password form states
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [showCurrent, setShowCurrent] = useState(false);
+    const [showNew, setShowNew] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
@@ -21,49 +35,13 @@ export default function SettingsPage() {
         setMounted(true);
     }, []);
 
-    // Form fields
-    const [currentPassword, setCurrentPassword] = useState('');
-    const [newPassword, setNewPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-
-    // Toggle password visibilities
-    const [showCurrent, setShowCurrent] = useState(false);
-    const [showNew, setShowNew] = useState(false);
-    const [showConfirm, setShowConfirm] = useState(false);
-
-    const [isLoading, setIsLoading] = useState(false);
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
     useEffect(() => {
-        const verifySession = async () => {
-            try {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (!user) {
-                    window.location.href = '/login';
-                    return;
-                }
-                setUserId(user.id);
-                setUserEmail(user.email || '');
-
-                const { data: profile } = await supabase
-                    .from('profil_pengguna')
-                    .select('role')
-                    .eq('id', user.id)
-                    .maybeSingle();
-                
-                if (profile?.role) {
-                    setRole(profile.role);
-                }
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setIsChecking(false);
-            }
-        };
-
-        verifySession();
-    }, [router]);
+        if (loading || !user) return;
+        setUserId(user.id);
+        setUserEmail(user.email);
+        setRole(user.role);
+        setIsChecking(false);
+    }, [user, loading]);
 
     const handlePasswordChange = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -141,7 +119,8 @@ export default function SettingsPage() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 text-slate-800 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] dark:text-neutral-300 font-sans pb-12 relative overflow-hidden">
+        <PageTransition>
+            <div className="min-h-screen bg-slate-50 text-slate-800 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] dark:text-neutral-300 font-sans pb-12 relative overflow-hidden">
             {/* Elegant Background Glows */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
                 <div className="absolute top-[10%] left-[15%] w-[450px] h-[450px] bg-cyan-500/5 dark:bg-cyan-500/12 rounded-full blur-[120px] animate-float-blue"></div>
@@ -313,5 +292,6 @@ export default function SettingsPage() {
                 </div>
             </main>
         </div>
-    );
+    </PageTransition>
+  );
 }

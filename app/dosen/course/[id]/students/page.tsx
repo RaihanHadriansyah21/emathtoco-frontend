@@ -34,6 +34,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { fadeIn, modalTransition } from '@/styles/motion';
 import PageTransition from '@/components/ui/PageTransition';
 
+import { useAuth } from '@/app/components/AuthGate';
+
 interface StudentProfile {
     id: string;
     nama_lengkap: string;
@@ -85,6 +87,7 @@ export default function LecturerStudentRoster() {
     const router = useRouter();
     const params = useParams();
     const courseId = params.id as string;
+    const { user } = useAuth();
 
     // Auth & Access Control
     const [isChecking, setIsChecking] = useState(true);
@@ -115,34 +118,11 @@ export default function LecturerStudentRoster() {
     const { toasts, toast, removeToast } = useToast();
 
     useEffect(() => {
+        if (!user) return;
+
         const verifyAccess = async () => {
             try {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (!user) {
-                    await supabase.auth.signOut();
-                    document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
-                    router.push('/login');
-                    return;
-                }
-
-                // Verify lecturer profile
-                const { data: profile } = await supabase
-                    .from('profil_pengguna')
-                    .select('nama_lengkap, role')
-                    .eq('id', user.id)
-                    .maybeSingle();
-
-                const userRole = normalizeRole(profile?.role);
-                if (!profile || userRole !== 'dosen') {
-                    if (profile?.role === 'admin') {
-                        router.push('/admin');
-                    } else {
-                        router.push('/');
-                    }
-                    return;
-                }
-
-                setLecturerName(profile.nama_lengkap);
+                setLecturerName(user.nama_lengkap);
 
                 // Verify course assignment
                 const { data: assignmentCheck, error: checkErr } = await supabase
@@ -174,12 +154,13 @@ export default function LecturerStudentRoster() {
                 fetchRosterData();
             } catch (err) {
                 console.error('Roster verification error:', err);
-                router.push('/login');
+                setErrorMsg('Terjadi kesalahan saat memeriksa akses kelas.');
+                setIsChecking(false);
             }
         };
 
         verifyAccess();
-    }, [router, courseId]);
+    }, [user, courseId]);
 
     const fetchRosterData = useCallback(async () => {
         setIsLoadingData(true);

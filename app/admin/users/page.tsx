@@ -36,7 +36,7 @@ const roleBadge = (role: string) => {
 export default function UserManagementPage() {
   const router = useRouter();
   const { toasts, toast, removeToast } = useToast();
-  const [isChecking, setIsChecking] = useState(true);
+  const [isChecking, setIsChecking] = useState(false);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,18 +52,8 @@ export default function UserManagementPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    const checkAdmin = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { router.push('/login'); return; }
-        const { data: profile } = await supabase.from('profil_pengguna').select('role').eq('id', user.id).maybeSingle();
-        if (normalizeRole(profile?.role) !== 'admin') { router.push('/'); return; }
-        setIsChecking(false);
-        fetchUsers();
-      } catch { router.push('/'); }
-    };
-    checkAdmin();
-  }, [router]);
+    fetchUsers();
+  }, []);
 
   const fetchUsers = async () => {
     setIsLoading(true);

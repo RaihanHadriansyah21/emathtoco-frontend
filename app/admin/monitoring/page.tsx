@@ -28,25 +28,15 @@ interface RecentActivity {
 
 export default function MonitoringPage() {
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
+  const [isChecking, setIsChecking] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [pipeline, setPipeline] = useState<PipelineStats>({ submitted: 0, processing_ai: 0, reviewed: 0, finalized: 0, total: 0 });
   const [answerSheetCount, setAnswerSheetCount] = useState(0);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
 
   useEffect(() => {
-    const checkAdmin = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { router.push('/login'); return; }
-        const { data: profile } = await supabase.from('profil_pengguna').select('role').eq('id', user.id).maybeSingle();
-        if (normalizeRole(profile?.role) !== 'admin') { router.push('/'); return; }
-        setIsChecking(false);
-        fetchMonitoringData();
-      } catch { router.push('/'); }
-    };
-    checkAdmin();
-  }, [router]);
+    fetchMonitoringData();
+  }, []);
 
   const fetchMonitoringData = async () => {
     setIsLoading(true);

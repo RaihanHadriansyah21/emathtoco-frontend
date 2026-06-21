@@ -10,6 +10,8 @@ import Logo from '../../Emathtoco.png';
 import { Eye, EyeOff, ArrowLeft, BookOpen } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PageTransition from '@/components/ui/PageTransition';
+import TextType from '@/components/ui/TextType';
+import ShinyText from '@/components/ui/ShinyText';
 
 export default function DosenLoginPage() {
     const router = useRouter();
@@ -228,8 +230,17 @@ export default function DosenLoginPage() {
                 className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 md:px-10 lg:px-14 pt-[calc(1.25rem+env(safe-area-inset-top))] pb-5"
             >
                 <div className="flex items-center">
-                    <span className="text-white text-xs sm:text-sm font-bold tracking-wider select-none">
-                        E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-bold">TOCO</span>
+                    <span className="text-xs sm:text-sm font-bold tracking-wider select-none flex items-center gap-0">
+                        <ShinyText
+                            text="E-MATH"
+                            color="#a3a3a3"
+                            shineColor="#ffffff"
+                            speed={3}
+                            className="font-bold"
+                        />
+                        <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-bold">
+                            TOCO
+                        </span>
                     </span>
                 </div>
             </motion.nav>
@@ -275,7 +286,21 @@ export default function DosenLoginPage() {
                             Masuk sebagai <span className="bg-gradient-to-r from-indigo-400 to-purple-500 bg-clip-text text-transparent">Dosen</span>
                         </h1>
                     </div>
-                    <p className="text-neutral-500 text-xs uppercase tracking-widest mt-1">Kelola kelas dan lakukan review hasil penilaian AI</p>
+                    <div className="text-neutral-500 text-[10px] sm:text-xs uppercase tracking-widest mt-1">
+                        <div>Kelola kelas dan lakukan review hasil penilaian</div>
+                        <div className="min-h-[1.25rem] mt-0.5">
+                            <TextType
+                                text={['AI.', 'otomatis.', 'instan.']}
+                                as="span"
+                                typingSpeed={70}
+                                deletingSpeed={40}
+                                pauseDuration={1800}
+                                className="text-indigo-400 font-semibold"
+                                showCursor={true}
+                                cursorCharacter="|"
+                            />
+                        </div>
+                    </div>
                 </motion.div>
 
                 {errorMessage && (
