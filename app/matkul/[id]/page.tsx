@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { UploadCloud, CheckCircle, Loader2, AlertTriangle, Eye, Lock, X, RefreshCw, Trophy, Camera, Image as ImageIcon, Trash2, Zap, ZapOff } from 'lucide-react';
 import Navbar from '../../components/Navbar';
@@ -2101,7 +2101,7 @@ export default function UploadWorkspace() {
         checkMobile();
     }, []);
 
-    const loadSubmissionDetails = async (uid: string) => {
+    const loadSubmissionDetails = useCallback(async (uid: string) => {
         try {
             // Cek data submission yang sudah ada (terbaru)
             const { data: existingSubmission } = await supabase
@@ -2203,7 +2203,7 @@ export default function UploadWorkspace() {
         } catch (err) {
             console.error('Error fetching submission details:', err);
         }
-    };
+    }, [matkulId, slots, isDeletingSlot]);
 
     useEffect(() => {
         // Inisialisasi struktur 24 slot lembar kerja kosong
@@ -2277,6 +2277,11 @@ export default function UploadWorkspace() {
         });
     }, [router, matkulId]);
 
+    const loadSubmissionDetailsRef = useRef(loadSubmissionDetails);
+    useEffect(() => {
+        loadSubmissionDetailsRef.current = loadSubmissionDetails;
+    }, [loadSubmissionDetails]);
+
     // Polling submission status to ensure synchronization with Dosen dashboard and AI workflow
     useEffect(() => {
         if (!userId) return;
@@ -2285,7 +2290,7 @@ export default function UploadWorkspace() {
         // Status changes are driven by the dosen/AI pipeline, not the student;
         // 15 second sync lag is imperceptible and saves ~80% of polling egress.
         const interval = setInterval(() => {
-            loadSubmissionDetails(userId);
+            loadSubmissionDetailsRef.current(userId);
         }, 15000);
 
         return () => clearInterval(interval);
@@ -2298,7 +2303,7 @@ export default function UploadWorkspace() {
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
                 console.log('[SYNC] Tab visible, loading latest submission details...');
-                loadSubmissionDetails(userId);
+                loadSubmissionDetailsRef.current(userId);
             }
         };
 

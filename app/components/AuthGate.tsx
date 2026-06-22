@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext, useCallback, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
@@ -36,7 +36,20 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
     const [isMounted, setIsMounted] = useState(false);
 
-    const checkAuth = async () => {
+    const handleSignOut = useCallback(() => {
+        setUser(null);
+        document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
+        const currentPath = window.location.pathname;
+        const isPublic = currentPath.startsWith('/login') || 
+                         currentPath.startsWith('/forgot-password') || 
+                         currentPath.startsWith('/reset-password') || 
+                         currentPath.startsWith('/register');
+        if (!isPublic) {
+            window.location.href = '/login';
+        }
+    }, []);
+
+    const checkAuth = useCallback(async () => {
         console.log('[AuthGate] checkAuth starting...');
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -91,20 +104,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             console.log('[AuthGate] checkAuth finished. Setting loading to false.');
             setLoading(false);
         }
-    };
-
-    const handleSignOut = () => {
-        setUser(null);
-        document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
-        const currentPath = window.location.pathname;
-        const isPublic = currentPath.startsWith('/login') || 
-                         currentPath.startsWith('/forgot-password') || 
-                         currentPath.startsWith('/reset-password') || 
-                         currentPath.startsWith('/register');
-        if (!isPublic) {
-            window.location.href = '/login';
-        }
-    };
+    }, [router, handleSignOut]);
 
     // Run initial auth check and listen for session changes
     useEffect(() => {
@@ -168,7 +168,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             subscription.unsubscribe();
             clearTimeout(safetyTimeout);
         };
-    }, []);
+    }, [checkAuth, handleSignOut, router]);
 
     // Perform route guarding locally and synchronously on path/user changes
     useEffect(() => {
@@ -257,13 +257,19 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         return true;
     };
 
+    const authContextValue = useMemo(() => ({
+        user,
+        loading,
+        refresh: checkAuth
+    }), [user, loading, checkAuth]);
+
     // During SSR, or until mounted, show fullscreen loader to prevent content flash
     if (!isMounted || loading) {
         return <FullscreenLoader />;
     }
 
     return (
-        <AuthContext.Provider value={{ user, loading, refresh: checkAuth }}>
+        <AuthContext.Provider value={authContextValue}>
             <div className="animate-in fade-in duration-200 h-full w-full flex flex-col flex-1">
                 {isAuthorizedRoute() ? children : <FullscreenLoader />}
             </div>
