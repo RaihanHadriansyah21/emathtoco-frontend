@@ -54,13 +54,14 @@ export default function Navbar({
 }: NavbarProps) {
   const router = useRouter();
   const { user } = useAuth();
-  const [userEmail, setUserEmail] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState('mahasiswa');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  const userEmail = user?.email || '';
+  const fullName = user?.nama_lengkap || '';
+  const role = user?.role || 'mahasiswa';
   
   const normalizedRole = normalizeRole(role);
   
@@ -69,9 +70,6 @@ export default function Navbar({
 
   useEffect(() => {
     if (user) {
-      setUserEmail(user.email);
-      setFullName(user.nama_lengkap);
-      setRole(user.role);
       setAvatarUrl(user.foto_profil_url);
       setImageError(false);
     }

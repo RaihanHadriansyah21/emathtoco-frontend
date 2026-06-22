@@ -103,111 +103,6 @@ export default function LecturerCoursePortal() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!user) return;
-
-    const verifyAccess = async () => {
-      try {
-        setLecturerName(user.nama_lengkap);
-
-        // Authorization check: Verify lecturer is assigned to this course
-        const { data: assignmentCheck, error: checkErr } = await supabase
-          .from('dosen_mata_kuliah')
-          .select('id')
-          .eq('dosen_id', user.id)
-          .eq('mata_kuliah_id', courseId)
-          .maybeSingle();
-
-        if (checkErr || !assignmentCheck) {
-          console.warn(`[Access Denied] Lecturer ${user.id} is not assigned to course ${courseId}`);
-          setIsAccessDenied(true);
-          setIsChecking(false);
-          setIsLoadingData(false);
-          return;
-        }
-
-        // Fetch course details
-        const { data: courseInfo } = await supabase
-          .from('mata_kuliah')
-          .select('nama_matkul, kode_matkul')
-          .eq('id', courseId)
-          .maybeSingle();
-
-        if (courseInfo) {
-          setCourseName(courseInfo.nama_matkul);
-          setCourseCode(courseInfo.kode_matkul);
-        }
-
-        // Fetch student count from backend
-        try {
-          const statsRes = await apiGet(`/lecturer/course/${courseId}/stats`);
-          if (statsRes.ok) {
-            const statsData = await statsRes.json();
-            setTotalStudents(statsData.total_students);
-          }
-        } catch (err: any) {
-          console.error("AI Backend Error - Gagal memuat statistik mahasiswa:", err);
-          const userFriendlyMsg = (err instanceof TypeError || (err.message && err.message.includes("fetch")))
-            ? "Backend tidak dapat dihubungi. Pastikan server FastAPI berjalan dan IP backend benar."
-            : "Gagal memuat statistik mahasiswa.";
-          toast.error("Gagal", userFriendlyMsg);
-        }
-
-        setIsChecking(false);
-
-        // Fetch submissions for this course
-        fetchSubmissions();
-      } catch (err) {
-        console.error('Dosen verification error:', err);
-        setErrorMsg('Terjadi kesalahan saat memeriksa akses kelas.');
-        setIsChecking(false);
-        setIsLoadingData(false);
-      }
-    };
-    verifyAccess();
-  }, [user, courseId]);
- 
-  // Polling logic when any submission is 'processing' (BUG 2 fix)
-  useEffect(() => {
-    const hasProcessing = submissions.some(s => s.ai_status === 'processing');
-
-    if (!hasProcessing) {
-      // Stop polling when nothing is processing
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
-      return;
-    }
-
-    // Only create a new interval if one doesn't already exist
-    if (pollingRef.current) return;
-
-    // EGRESS FIX: Poll every 15 seconds (was 3s — 5× reduction in Supabase API calls).
-    pollingRef.current = setInterval(() => {
-      // Prevent overlapping fetches
-      if (isFetchingRef.current) return;
-      fetchSubmissions();
-    }, 15000);
-
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
-    };
-  }, [submissions]);
-
-  // Cleanup polling on unmount
-  useEffect(() => {
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
-    };
-  }, []);
-
   const fetchSubmissions = useCallback(async () => {
     // Prevent overlapping fetches (BUG 2 fix)
     if (isFetchingRef.current) return;
@@ -254,6 +149,121 @@ export default function LecturerCoursePortal() {
       isFetchingRef.current = false;
     }
   }, [courseId]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const verifyAccess = async () => {
+      try {
+        setLecturerName(user.nama_lengkap);
+
+        // Authorization check: Verify lecturer is assigned to this course
+        const { data: assignmentCheck, error: checkErr } = await supabase
+          .from('dosen_mata_kuliah')
+          .select('id')
+          .eq('dosen_id', user.id)
+          .eq('mata_kuliah_id', courseId)
+          .maybeSingle();
+
+        if (checkErr || !assignmentCheck) {
+          console.warn(`[Access Denied] Lecturer ${user.id} is not assigned to course ${courseId}`);
+          setIsAccessDenied(true);
+          setIsChecking(false);
+          setIsLoadingData(false);
+          return;
+        }
+
+        // Authorized! Disable page loader immediately
+        setIsChecking(false);
+
+        // Fetch course details, statistics, and submissions in parallel
+        Promise.all([
+          Promise.resolve(
+            supabase
+              .from('mata_kuliah')
+              .select('nama_matkul, kode_matkul')
+              .eq('id', courseId)
+              .maybeSingle()
+          )
+            .then(({ data: courseInfo }) => {
+              if (courseInfo) {
+                setCourseName(courseInfo.nama_matkul);
+                setCourseCode(courseInfo.kode_matkul);
+              }
+            })
+            .catch((err: any) => {
+              console.error("Error loading course details:", err);
+            }),
+          apiGet(`/lecturer/course/${courseId}/stats`)
+            .then(async (statsRes) => {
+              if (statsRes.ok) {
+                const statsData = await statsRes.json();
+                setTotalStudents(statsData.total_students);
+              } else {
+                throw new Error("Stats API returned non-200");
+              }
+            })
+            .catch((err: any) => {
+              console.error("AI Backend Error - Gagal memuat statistik mahasiswa:", err);
+              const userFriendlyMsg = (err instanceof TypeError || (err.message && err.message.includes("fetch")))
+                ? "Backend tidak dapat dihubungi. Pastikan server FastAPI berjalan dan IP backend benar."
+                : "Gagal memuat statistik mahasiswa.";
+              toast.error("Gagal", userFriendlyMsg);
+            }),
+          fetchSubmissions()
+        ]);
+      } catch (err) {
+        console.error('Dosen verification error:', err);
+        setErrorMsg('Terjadi kesalahan saat memeriksa akses kelas.');
+        setIsChecking(false);
+        setIsLoadingData(false);
+      }
+    };
+    verifyAccess();
+  }, [user, courseId, fetchSubmissions]);
+ 
+  // Polling logic when any submission is 'processing' (BUG 2 fix)
+  useEffect(() => {
+    const hasProcessing = submissions.some(s => s.ai_status === 'processing');
+
+    if (!hasProcessing) {
+      // Stop polling when nothing is processing
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      return;
+    }
+
+    // Only create a new interval if one doesn't already exist
+    if (pollingRef.current) return;
+
+    // EGRESS FIX: Poll every 15 seconds (was 3s — 5× reduction in Supabase API calls).
+    pollingRef.current = setInterval(() => {
+      // Prevent overlapping fetches
+      if (isFetchingRef.current) return;
+      fetchSubmissions();
+    }, 15000);
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [submissions]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, []);
+
+
 
   // BUG 1 fix: Open model selection modal instead of running directly
   const handleRunAIBatch = async () => {

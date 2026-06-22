@@ -86,6 +86,49 @@ const getSignedPreviewUrl = async (path: string): Promise<string | null> => {
     }
 };
 
+const getSignedPreviewUrls = async (paths: string[]): Promise<Map<string, string>> => {
+    const result = new Map<string, string>();
+    if (paths.length === 0) return result;
+
+    const now = Date.now();
+    const pathsToFetch: string[] = [];
+
+    // Check cache first
+    for (const path of paths) {
+        const cached = signedUrlCache.get(path);
+        if (cached && cached.expiresAt - now > 60_000) {
+            result.set(path, cached.url);
+        } else {
+            pathsToFetch.push(path);
+        }
+    }
+
+    if (pathsToFetch.length === 0) {
+        return result;
+    }
+
+    try {
+        const { data, error } = await supabase.storage
+            .from('lembar-jawaban')
+            .createSignedUrls(pathsToFetch, 3600);
+
+        if (error) throw error;
+
+        if (data) {
+            for (const item of data) {
+                if (item.signedUrl && item.path) {
+                    signedUrlCache.set(item.path, { url: item.signedUrl, expiresAt: now + 3_000_000 });
+                    result.set(item.path, item.signedUrl);
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Error generating bulk signed URLs:', err);
+    }
+
+    return result;
+};
+
 const getExifOrientation = (file: File): Promise<number> => {
     return new Promise((resolve) => {
         const reader = new FileReader();
@@ -2160,31 +2203,39 @@ export default function UploadWorkspace() {
                         return slot;
                     });
 
-                    // Ambil signed preview URL — EGRESS FIX: skip if already cached
-                    // (URL is cached in signedUrlCache for 50 minutes; no need to regenerate on every poll)
-                    const urlPromises = updatedSlots.map(async (slot) => {
+                    // Determine which paths need signed URLs (skip cached ones)
+                    const pathsToFetch: string[] = [];
+                    const now = Date.now();
+
+                    updatedSlots.forEach(slot => {
                         if (slot.status === 'success' && slot.imagePath) {
-                            // Check 1: module-level signedUrlCache (survives re-renders)
-                            const now = Date.now();
+                            const cached = signedUrlCache.get(slot.imagePath);
+                            const existingSlot = slots.find(s => s.label === slot.label);
+                            const isCached = (cached && cached.expiresAt - now > 60_000) || 
+                                             (existingSlot?.fileUrl && existingSlot.imagePath === slot.imagePath);
+                            if (!isCached) {
+                                pathsToFetch.push(slot.imagePath);
+                            }
+                        }
+                    });
+
+                    const signedUrlsMap = await getSignedPreviewUrls(pathsToFetch);
+
+                    const resolvedSlots = updatedSlots.map(slot => {
+                        if (slot.status === 'success' && slot.imagePath) {
                             const cached = signedUrlCache.get(slot.imagePath);
                             if (cached && cached.expiresAt - now > 60_000) {
                                 return { ...slot, fileUrl: cached.url };
                             }
-                            // Check 2: current slot state has valid URL for same path
                             const existingSlot = slots.find(s => s.label === slot.label);
                             if (existingSlot?.fileUrl && existingSlot.imagePath === slot.imagePath) {
                                 return { ...slot, fileUrl: existingSlot.fileUrl };
                             }
-                            const signedUrl = await getSignedPreviewUrl(slot.imagePath);
-                            if (!signedUrl) {
-                                console.warn(`Failed to generate signed URL for path: ${slot.imagePath}. It might be a temporary network issue.`);
-                            }
+                            const signedUrl = signedUrlsMap.get(slot.imagePath) || null;
                             return { ...slot, fileUrl: signedUrl };
                         }
                         return slot;
                     });
-
-                    const resolvedSlots = await Promise.all(urlPromises);
 
                     // Merge with current slots to preserve local 'uploading' and deleting state
                     setSlots(prevSlots => {

@@ -99,6 +99,49 @@ const getSignedPreviewUrl = async (path: string): Promise<string | null> => {
   }
 };
 
+const getSignedPreviewUrls = async (paths: string[]): Promise<Map<string, string>> => {
+  const result = new Map<string, string>();
+  if (paths.length === 0) return result;
+
+  const now = Date.now();
+  const pathsToFetch: string[] = [];
+
+  // Check cache first
+  for (const path of paths) {
+    const cached = signedUrlCache.get(path);
+    if (cached && cached.expiresAt - now > 60_000) {
+      result.set(path, cached.url);
+    } else {
+      pathsToFetch.push(path);
+    }
+  }
+
+  if (pathsToFetch.length === 0) {
+    return result;
+  }
+
+  try {
+    const { data, error } = await supabase.storage
+      .from('lembar-jawaban')
+      .createSignedUrls(pathsToFetch, 3600);
+
+    if (error) throw error;
+
+    if (data) {
+      for (const item of data) {
+        if (item.signedUrl && item.path) {
+          signedUrlCache.set(item.path, { url: item.signedUrl, expiresAt: now + 3_000_000 });
+          result.set(item.path, item.signedUrl);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error generating bulk signed URLs:', err);
+  }
+
+  return result;
+};
+
 const isSubmissionEqual = (a: SubmissionData | null, b: SubmissionData | null): boolean => {
   if (!a && !b) return true;
   if (!a || !b) return false;
@@ -481,16 +524,22 @@ export default function ReviewWorkspace() {
         };
       });
 
-      // Generate signed URLs ONLY for slots that need them (don't have them yet)
-      const urlPromises = initialSlots.map(async (slot) => {
+      // Identify all paths that need signed URLs (skip cached ones)
+      const pathsToFetch = initialSlots
+        .filter(slot => slot.hasSheet && slot.imagePath && !slot.fileUrl)
+        .map(slot => slot.imagePath!);
+
+      // Fetch signed URLs in bulk
+      const signedUrlsMap = await getSignedPreviewUrls(pathsToFetch);
+
+      // Assign the signed URLs to the slots
+      const resolvedSlots = initialSlots.map(slot => {
         if (slot.hasSheet && slot.imagePath && !slot.fileUrl) {
-          const signedUrl = await getSignedPreviewUrl(slot.imagePath);
+          const signedUrl = signedUrlsMap.get(slot.imagePath) || null;
           return { ...slot, fileUrl: signedUrl };
         }
         return slot;
       });
-
-      const resolvedSlots = await Promise.all(urlPromises);
 
       // Compare and update AI total score
       const newTotalScore = aiResultsData ? aiResultsData.nilai_akhir : null;

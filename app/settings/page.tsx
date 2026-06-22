@@ -36,10 +36,12 @@ export default function SettingsPage() {
     }, []);
 
     useEffect(() => {
-        if (loading || !user) return;
-        setUserId(user.id);
-        setUserEmail(user.email);
-        setRole(user.role);
+        if (loading) return;
+        if (user) {
+            setUserId(user.id);
+            setUserEmail(user.email);
+            setRole(user.role);
+        }
         setIsChecking(false);
     }, [user, loading]);
 

@@ -44,8 +44,11 @@ export default function StudentDashboard() {
   const [reuploadWarnings, setReuploadWarnings] = useState<Record<string, { count: number; firstSlot: string }>>({});
 
   useEffect(() => {
-    if (loading || !user) return;
-    if (normalizeRole(user.role) !== 'mahasiswa') return;
+    if (loading) return;
+    if (!user || normalizeRole(user.role) !== 'mahasiswa') {
+      setIsLoadingCourses(false);
+      return;
+    }
 
     // Ambil data user yang sedang login aktif dari session Supabase
     const getDashboardData = async () => {

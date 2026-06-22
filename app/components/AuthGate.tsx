@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, createContext, useContext, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, createContext, useContext, useCallback, useMemo, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
@@ -29,12 +29,46 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext);
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
+    console.count("[AUTHGATE] RENDER");
     const router = useRouter();
     const pathname = usePathname();
     
     const [user, setUser] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [isMounted, setIsMounted] = useState(false);
+    const checkAuthPromiseRef = useRef<Promise<void> | null>(null);
+    const checkAuthRequestIdRef = useRef(0);
+    const routerRefCounter = useRef(0);
+    const mountTimeRef = useRef(Date.now());
+
+    useEffect(() => {
+        const mountedDuration = Date.now() - mountTimeRef.current;
+        console.log(`[PERF] [AUTH] AuthGate mounted in ${mountedDuration}ms`);
+    }, []);
+
+    useEffect(() => {
+        routerRefCounter.current++;
+        console.log(
+            "[AUTHGATE] ROUTER_REFERENCE_CHANGED",
+            routerRefCounter.current
+        );
+    }, [router]);
+
+    useEffect(() => {
+        if (process.env.NODE_ENV !== 'development') return;
+        const interval = setInterval(() => {
+            if (
+                typeof window !== "undefined" &&
+                "memory" in performance
+            ) {
+                console.log(
+                    "[MEMORY]",
+                    (performance as any).memory.usedJSHeapSize
+                );
+            }
+        }, 30000);
+        return () => clearInterval(interval);
+    }, []);
 
     const handleSignOut = useCallback(() => {
         setUser(null);
@@ -50,60 +84,109 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     }, []);
 
     const checkAuth = useCallback(async () => {
-        console.log('[AuthGate] checkAuth starting...');
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            console.log('[AuthGate] getSession result:', session ? 'Session exists' : 'No session');
-            if (session) {
-                const authUser = session.user;
-                if (authUser) {
-                    console.log('[AuthGate] User found in session:', authUser.id);
-                    document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${session.expires_in}; SameSite=Lax`;
-                    
-                    console.log('[AuthGate] Fetching profile from database...');
-                    // Fetch role from profile table for route-level defense-in-depth
-                    const { data: profile, error: profileError } = await supabase
-                        .from('profil_pengguna')
-                        .select('nama_lengkap, role, foto_profil_url')
-                        .eq('id', authUser.id)
-                        .maybeSingle();
-
-                    if (profileError) {
-                        console.error('[AuthGate] Fetch profile error:', profileError);
-                    }
-                    console.log('[AuthGate] Profile query finished. Profile data:', profile);
-
-                    setUser({
-                        id: authUser.id,
-                        email: authUser.email || '',
-                        nama_lengkap: profile?.nama_lengkap || 'User',
-                        role: profile?.role || 'mahasiswa',
-                        foto_profil_url: profile?.foto_profil_url || null,
-                    });
-                    console.log('[AuthGate] User state set.');
-                } else {
-                    console.warn('[AuthGate] No user in session, signing out...');
-                    handleSignOut();
-                }
-            } else {
-                console.log('[AuthGate] No session. Clearing user state...');
-                setUser(null);
-                const currentPath = window.location.pathname;
-                const isPublic = currentPath.startsWith('/login') || 
-                                 currentPath.startsWith('/forgot-password') || 
-                                 currentPath.startsWith('/reset-password') || 
-                                 currentPath.startsWith('/register');
-                if (!isPublic) {
-                    console.log('[AuthGate] Route is not public, redirecting to /login...');
-                    router.replace('/login');
-                }
-            }
-        } catch (err) {
-            console.error('[AuthGate] checkAuth error:', err);
-        } finally {
-            console.log('[AuthGate] checkAuth finished. Setting loading to false.');
-            setLoading(false);
+        console.count("[AUTHGATE] CHECK_AUTH");
+        console.time("[AUTHGATE] CHECK_AUTH_DURATION");
+        if (checkAuthPromiseRef.current) {
+            console.log('[AuthGate] checkAuth already in progress, reusing promise...');
+            return checkAuthPromiseRef.current;
         }
+
+        console.log('[AuthGate] checkAuth starting...');
+        const checkAuthStart = Date.now();
+        const requestId = ++checkAuthRequestIdRef.current;
+
+        const promise = (async () => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5-second timeout limit
+
+            try {
+                const getSessionStart = Date.now();
+                const { data: { session } } = await supabase.auth.getSession();
+                const getSessionDuration = Date.now() - getSessionStart;
+                console.log(`[PERF] [AUTH] getSession completed in ${getSessionDuration}ms`);
+
+                if (requestId !== checkAuthRequestIdRef.current) {
+                    console.log('[AuthGate] Stale auth request ignored after getSession.');
+                    return;
+                }
+
+                if (session) {
+                    const authUser = session.user;
+                    if (authUser) {
+                        console.log('[AuthGate] User found in session:', authUser.id);
+                        document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${session.expires_in}; SameSite=Lax`;
+                        
+                        console.log('[AuthGate] Fetching profile from database...');
+                        console.count("[AUTHGATE] PROFILE_FETCH");
+                        
+                        const profileFetchStart = Date.now();
+                        // Fetch role from profile table for route-level defense-in-depth
+                        const { data: profile, error: profileError } = await supabase
+                            .from('profil_pengguna')
+                            .select('nama_lengkap, role, foto_profil_url')
+                            .eq('id', authUser.id)
+                            .abortSignal(controller.signal)
+                            .maybeSingle();
+
+                        const profileFetchDuration = Date.now() - profileFetchStart;
+                        console.log(`[PERF] [AUTH] Profile fetch completed in ${profileFetchDuration}ms`);
+
+                        if (requestId !== checkAuthRequestIdRef.current) {
+                            console.log('[AuthGate] Stale auth request ignored after profile fetch.');
+                            return;
+                        }
+
+                        if (profileError) {
+                            console.error('[AuthGate] Fetch profile error:', profileError);
+                        }
+                        console.log('[AuthGate] Profile query finished. Profile data:', profile);
+
+                        setUser({
+                            id: authUser.id,
+                            email: authUser.email || '',
+                            nama_lengkap: profile?.nama_lengkap || 'User',
+                            role: profile?.role || 'mahasiswa',
+                            foto_profil_url: profile?.foto_profil_url || null,
+                        });
+                        console.log('[AuthGate] User state set.');
+                    } else {
+                        console.warn('[AuthGate] No user in session, signing out...');
+                        handleSignOut();
+                    }
+                } else {
+                    console.log('[AuthGate] No session. Clearing user state...');
+                    setUser(null);
+                    const currentPath = window.location.pathname;
+                    const isPublic = currentPath.startsWith('/login') || 
+                                     currentPath.startsWith('/forgot-password') || 
+                                     currentPath.startsWith('/reset-password') || 
+                                     currentPath.startsWith('/register');
+                    if (!isPublic) {
+                        console.log('[AuthGate] Route is not public, redirecting to /login...');
+                        router.replace('/login');
+                    }
+                }
+            } catch (err: any) {
+                if (err.name === 'AbortError') {
+                    console.error('[PERF] [AUTH] Profile fetch timed out (5s)');
+                } else {
+                    console.error('[AuthGate] checkAuth error:', err);
+                }
+            } finally {
+                clearTimeout(timeoutId);
+                if (requestId === checkAuthRequestIdRef.current) {
+                    console.log('[AuthGate] checkAuth finished. Setting loading to false.');
+                    setLoading(false);
+                    checkAuthPromiseRef.current = null;
+                }
+                const totalDuration = Date.now() - checkAuthStart;
+                console.log(`[PERF] [AUTH] checkAuth completed in ${totalDuration}ms`);
+                console.timeEnd("[AUTHGATE] CHECK_AUTH_DURATION");
+            }
+        })();
+
+        checkAuthPromiseRef.current = promise;
+        return promise;
     }, [router, handleSignOut]);
 
     // Run initial auth check and listen for session changes
@@ -121,7 +204,17 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         });
 
         // Listen for authentication changes (e.g. login, logout, password recovery)
+        console.count("[AUTHGATE] AUTH_SUBSCRIBE");
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.count(`[AUTH_EVENT] ${event}`);
+            console.log(
+                "[AUTH_EVENT]",
+                event,
+                {
+                    hasSession: !!session,
+                    userId: session?.user?.id
+                }
+            );
             console.log(`[AuthGate] Auth event: ${event}`);
             
             if (event === 'INITIAL_SESSION') {
@@ -165,6 +258,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         });
 
         return () => {
+            console.count("[AUTHGATE] AUTH_UNSUBSCRIBE");
             subscription.unsubscribe();
             clearTimeout(safetyTimeout);
         };
@@ -263,10 +357,38 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         refresh: checkAuth
     }), [user, loading, checkAuth]);
 
+    const currentPath = pathname || '';
+    const isPublic = currentPath.startsWith('/login') || 
+                     currentPath.startsWith('/forgot-password') || 
+                     currentPath.startsWith('/reset-password') || 
+                     currentPath.startsWith('/register');
+
+    // If it's a public path, render it immediately even if we are still loading/mounting
+    if (isPublic) {
+        return (
+            <AuthContext.Provider value={authContextValue}>
+                <div className="animate-in fade-in duration-200 h-full w-full flex flex-col flex-1">
+                    {children}
+                </div>
+            </AuthContext.Provider>
+        );
+    }
+
     // During SSR, or until mounted, show fullscreen loader to prevent content flash
     if (!isMounted || loading) {
         return <FullscreenLoader />;
     }
+
+    console.count(
+        "[AUTHGATE] CONTEXT_VALUE_CREATED"
+    );
+    console.log(
+        "[AUTHGATE] Context Dependencies",
+        {
+            userId: user?.id,
+            loading
+        }
+    );
 
     return (
         <AuthContext.Provider value={authContextValue}>

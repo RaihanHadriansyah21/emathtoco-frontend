@@ -307,7 +307,11 @@ export default function ProfilePage() {
     }, []);
 
     useEffect(() => {
-        if (loading || !user) return;
+        if (loading) return;
+        if (!user) {
+            setIsChecking(false);
+            return;
+        }
 
         const fetchUserProfile = async () => {
             try {

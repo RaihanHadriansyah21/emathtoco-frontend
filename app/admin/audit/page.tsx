@@ -171,29 +171,23 @@ export default function AuditLogPage() {
 
   const fetchStats = async () => {
     try {
-      // 1. Total logs count
-      const { count: total } = await supabase.from('audit_log').select('*', { count: 'exact', head: true });
-      setTotalLogsCount(total || 0);
+      const [totalRes, loginsRes, aiRunsRes, finalizedRes, resetsRes] = await Promise.all([
+        supabase.from('audit_log').select('*', { count: 'exact', head: true }),
+        supabase.from('audit_log').select('*', { count: 'exact', head: true })
+          .or('action.in.("ADMIN_LOGIN","LECTURER_LOGIN","STUDENT_LOGIN")'),
+        supabase.from('audit_log').select('*', { count: 'exact', head: true })
+          .or('action.in.("AI_PROCESS_STARTED","AI_PROCESS_COMPLETED","AI_PROCESS_FAILED")'),
+        supabase.from('audit_log').select('*', { count: 'exact', head: true })
+          .eq('action', 'FINAL_SCORE_SUBMITTED'),
+        supabase.from('audit_log').select('*', { count: 'exact', head: true })
+          .eq('action', 'SYSTEM_RESET')
+      ]);
 
-      // 2. Total logins count (admin + lecturer + student logins)
-      const { count: logins } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
-        .or('action.in.("ADMIN_LOGIN","LECTURER_LOGIN","STUDENT_LOGIN")');
-      setTotalLoginCount(logins || 0);
-
-      // 3. Total AI Run count (started + completed + failed)
-      const { count: aiRuns } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
-        .or('action.in.("AI_PROCESS_STARTED","AI_PROCESS_COMPLETED","AI_PROCESS_FAILED")');
-      setTotalAIRunCount(aiRuns || 0);
-
-      // 4. Total Finalisasi count
-      const { count: finalized } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
-        .eq('action', 'FINAL_SCORE_SUBMITTED');
-      setTotalFinalizedCount(finalized || 0);
-
-      // 5. Total Reset count
-      const { count: resets } = await supabase.from('audit_log').select('*', { count: 'exact', head: true })
-        .eq('action', 'SYSTEM_RESET');
-      setTotalResetCount(resets || 0);
+      setTotalLogsCount(totalRes.count || 0);
+      setTotalLoginCount(loginsRes.count || 0);
+      setTotalAIRunCount(aiRunsRes.count || 0);
+      setTotalFinalizedCount(finalizedRes.count || 0);
+      setTotalResetCount(resetsRes.count || 0);
     } catch (err) {
       console.error('Error fetching audit statistics:', err);
     }

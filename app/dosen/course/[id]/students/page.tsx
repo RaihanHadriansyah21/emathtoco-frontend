@@ -117,51 +117,6 @@ export default function LecturerStudentRoster() {
     // Toast Container
     const { toasts, toast, removeToast } = useToast();
 
-    useEffect(() => {
-        if (!user) return;
-
-        const verifyAccess = async () => {
-            try {
-                setLecturerName(user.nama_lengkap);
-
-                // Verify course assignment
-                const { data: assignmentCheck, error: checkErr } = await supabase
-                    .from('dosen_mata_kuliah')
-                    .select('id')
-                    .eq('dosen_id', user.id)
-                    .eq('mata_kuliah_id', courseId)
-                    .maybeSingle();
-
-                if (checkErr || !assignmentCheck) {
-                    setIsAccessDenied(true);
-                    setIsChecking(false);
-                    return;
-                }
-
-                // Fetch course info
-                const { data: courseInfo } = await supabase
-                    .from('mata_kuliah')
-                    .select('nama_matkul, kode_matkul')
-                    .eq('id', courseId)
-                    .maybeSingle();
-
-                if (courseInfo) {
-                    setCourseName(courseInfo.nama_matkul);
-                    setCourseCode(courseInfo.kode_matkul);
-                }
-
-                setIsChecking(false);
-                fetchRosterData();
-            } catch (err) {
-                console.error('Roster verification error:', err);
-                setErrorMsg('Terjadi kesalahan saat memeriksa akses kelas.');
-                setIsChecking(false);
-            }
-        };
-
-        verifyAccess();
-    }, [user, courseId]);
-
     const fetchRosterData = useCallback(async () => {
         setIsLoadingData(true);
         setErrorMsg(null);
@@ -211,6 +166,53 @@ export default function LecturerStudentRoster() {
             setIsLoadingData(false);
         }
     }, [courseId]);
+
+    useEffect(() => {
+        if (!user) return;
+
+        const verifyAccess = async () => {
+            try {
+                setLecturerName(user.nama_lengkap);
+
+                // Run course assignment check and course info query concurrently
+                const [assignResult, courseResult] = await Promise.all([
+                    supabase
+                        .from('dosen_mata_kuliah')
+                        .select('id')
+                        .eq('dosen_id', user.id)
+                        .eq('mata_kuliah_id', courseId)
+                        .maybeSingle(),
+                    supabase
+                        .from('mata_kuliah')
+                        .select('nama_matkul, kode_matkul')
+                        .eq('id', courseId)
+                        .maybeSingle()
+                ]);
+
+                if (assignResult.error || !assignResult.data) {
+                    setIsAccessDenied(true);
+                    setIsChecking(false);
+                    return;
+                }
+
+                if (courseResult.data) {
+                    setCourseName(courseResult.data.nama_matkul);
+                    setCourseCode(courseResult.data.kode_matkul);
+                }
+
+                setIsChecking(false);
+                fetchRosterData();
+            } catch (err) {
+                console.error('Roster verification error:', err);
+                setErrorMsg('Terjadi kesalahan saat memeriksa akses kelas.');
+                setIsChecking(false);
+            }
+        };
+
+        verifyAccess();
+    }, [user, courseId, fetchRosterData]);
+
+
 
     // Handle student row click to load predictions and display modal
     const handleOpenModal = async (student: EnrolledStudent) => {

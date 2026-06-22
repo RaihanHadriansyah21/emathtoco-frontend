@@ -25,6 +25,11 @@ export default function LoginAIScene() {
     // ═══════════════════════════════════════════════════════
     // LOADING & CONNECTIVITY SAFEGUARD
     // ═══════════════════════════════════════════════════════
+    const isLoadingRef = React.useRef(isLoading);
+    React.useEffect(() => {
+        isLoadingRef.current = isLoading;
+    }, [isLoading]);
+
     useEffect(() => {
         if (typeof window !== 'undefined' && window.innerWidth < 768) {
             setHasError(true);
@@ -63,7 +68,7 @@ export default function LoginAIScene() {
         checkSplineConnectivity();
 
         const safeguardTimer = setTimeout(() => {
-            if (isMounted && isLoading) {
+            if (isMounted && isLoadingRef.current) {
                 console.warn('Spline load timed out (20s safeguard). Falling back to premium static view.');
                 setHasError(true);
             }
@@ -73,7 +78,7 @@ export default function LoginAIScene() {
             isMounted = false;
             clearTimeout(safeguardTimer);
         };
-    }, [isLoading]);
+    }, []);
 
     return (
         <div className="relative w-full h-full min-h-[400px] lg:min-h-screen bg-transparent flex items-center justify-center overflow-hidden">
