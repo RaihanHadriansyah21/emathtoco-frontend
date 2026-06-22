@@ -37,19 +37,28 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     const [isMounted, setIsMounted] = useState(false);
 
     const checkAuth = async () => {
+        console.log('[AuthGate] checkAuth starting...');
         try {
             const { data: { session } } = await supabase.auth.getSession();
+            console.log('[AuthGate] getSession result:', session ? 'Session exists' : 'No session');
             if (session) {
-                const { data: { user: authUser }, error } = await supabase.auth.getUser();
-                if (authUser && !error) {
+                const authUser = session.user;
+                if (authUser) {
+                    console.log('[AuthGate] User found in session:', authUser.id);
                     document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${session.expires_in}; SameSite=Lax`;
                     
+                    console.log('[AuthGate] Fetching profile from database...');
                     // Fetch role from profile table for route-level defense-in-depth
-                    const { data: profile } = await supabase
+                    const { data: profile, error: profileError } = await supabase
                         .from('profil_pengguna')
                         .select('nama_lengkap, role, foto_profil_url')
                         .eq('id', authUser.id)
                         .maybeSingle();
+
+                    if (profileError) {
+                        console.error('[AuthGate] Fetch profile error:', profileError);
+                    }
+                    console.log('[AuthGate] Profile query finished. Profile data:', profile);
 
                     setUser({
                         id: authUser.id,
@@ -58,10 +67,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                         role: profile?.role || 'mahasiswa',
                         foto_profil_url: profile?.foto_profil_url || null,
                     });
+                    console.log('[AuthGate] User state set.');
                 } else {
+                    console.warn('[AuthGate] No user in session, signing out...');
                     handleSignOut();
                 }
             } else {
+                console.log('[AuthGate] No session. Clearing user state...');
                 setUser(null);
                 const currentPath = window.location.pathname;
                 const isPublic = currentPath.startsWith('/login') || 
@@ -69,12 +81,14 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                                  currentPath.startsWith('/reset-password') || 
                                  currentPath.startsWith('/register');
                 if (!isPublic) {
+                    console.log('[AuthGate] Route is not public, redirecting to /login...');
                     router.replace('/login');
                 }
             }
         } catch (err) {
             console.error('[AuthGate] checkAuth error:', err);
         } finally {
+            console.log('[AuthGate] checkAuth finished. Setting loading to false.');
             setLoading(false);
         }
     };
