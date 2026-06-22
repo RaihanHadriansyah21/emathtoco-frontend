@@ -95,11 +95,27 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     // Run initial auth check and listen for session changes
     useEffect(() => {
         setIsMounted(true);
-        checkAuth();
+        
+        // Safety timeout fallback: if auth checks hang for more than 6 seconds, force-disable the loader
+        const safetyTimeout = setTimeout(() => {
+            console.warn('[AuthGate] Safety timeout triggered. Forcing loader disable.');
+            setLoading(false);
+        }, 6000);
+
+        checkAuth().then(() => {
+            clearTimeout(safetyTimeout);
+        });
 
         // Listen for authentication changes (e.g. login, logout, password recovery)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             console.log(`[AuthGate] Auth event: ${event}`);
+            
+            if (event === 'INITIAL_SESSION') {
+                clearTimeout(safetyTimeout);
+                if (!session) {
+                    setLoading(false);
+                }
+            }
             
             if (event === 'PASSWORD_RECOVERY') {
                 console.log("[AUTH GATE] PASSWORD_RECOVERY event triggered. Redirecting to /reset-password...");
@@ -136,6 +152,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
         return () => {
             subscription.unsubscribe();
+            clearTimeout(safetyTimeout);
         };
     }, []);
 
