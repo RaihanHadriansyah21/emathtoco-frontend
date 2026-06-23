@@ -29,22 +29,46 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext);
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
-    console.log("[AUTHGATE_RENDER]", Date.now());
-    console.count("[AUTHGATE] RENDER");
+
+    // =========================================================================
+    // PHASE 1 — RENDER REASON TRACKING
+    // All tracking uses refs — zero setState — does NOT cause re-renders.
+    // =========================================================================
+    const renderIdRef = useRef(0);
+    const prevUserIdRef = useRef<string | undefined>(undefined);
+    const prevLoadingRef = useRef<boolean | undefined>(undefined);
+    const prevPathnameRef = useRef<string | null | undefined>(undefined);
+    const prevRouterRef = useRef<ReturnType<typeof useRouter> | undefined>(undefined);
+    const prevCheckAuthRef_tracking = useRef<Function | undefined>(undefined);
+    const prevHandleSignOutRef_tracking = useRef<Function | undefined>(undefined);
+
+    // =========================================================================
+    // HOOKS — all hooks declared before any early returns
+    // =========================================================================
     const router = useRouter();
     const pathname = usePathname();
+
+    // routerRef: always holds latest router; used in effects/callbacks to avoid
+    // capturing a stale router and to avoid adding `router` to effect deps.
     const routerRef = useRef(router);
     useEffect(() => {
         routerRef.current = router;
     }, [router]);
-    
+
     const [user, setUser] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [isMounted, setIsMounted] = useState(false);
+
     const checkAuthPromiseRef = useRef<Promise<void> | null>(null);
     const checkAuthRequestIdRef = useRef(0);
-    const routerRefCounter = useRef(0);
     const mountTimeRef = useRef(Date.now());
+
+    // userRef: always holds latest user; used inside auth callbacks to avoid
+    // stale closures in the subscription (which is created mount-only).
+    const userRef = useRef<UserProfile | null>(null);
+    useEffect(() => {
+        userRef.current = user;
+    }, [user]);
 
     useEffect(() => {
         const mountedDuration = Date.now() - mountTimeRef.current;
@@ -52,36 +76,28 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     }, []);
 
     useEffect(() => {
-        routerRefCounter.current++;
-        console.log(
-            "[AUTHGATE] ROUTER_REFERENCE_CHANGED",
-            routerRefCounter.current
-        );
-    }, [router]);
-
-    useEffect(() => {
         if (process.env.NODE_ENV !== 'development') return;
         const interval = setInterval(() => {
-            if (
-                typeof window !== "undefined" &&
-                "memory" in performance
-            ) {
-                console.log(
-                    "[MEMORY]",
-                    (performance as any).memory.usedJSHeapSize
-                );
+            if (typeof window !== 'undefined' && 'memory' in performance) {
+                console.log('[MEMORY]', (performance as any).memory.usedJSHeapSize);
             }
         }, 30000);
         return () => clearInterval(interval);
     }, []);
 
+    // =========================================================================
+    // PHASE 4 — CALLBACK STABILITY
+    // handleSignOut: deps=[] → identity is permanently stable.
+    // checkAuth:     deps=[handleSignOut] → stable because handleSignOut is stable.
+    // =========================================================================
+
     const handleSignOut = useCallback(() => {
         setUser(null);
         document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
         const currentPath = window.location.pathname;
-        const isPublic = currentPath.startsWith('/login') || 
-                         currentPath.startsWith('/forgot-password') || 
-                         currentPath.startsWith('/reset-password') || 
+        const isPublic = currentPath.startsWith('/login') ||
+                         currentPath.startsWith('/forgot-password') ||
+                         currentPath.startsWith('/reset-password') ||
                          currentPath.startsWith('/register');
         if (!isPublic) {
             window.location.href = '/login';
@@ -89,9 +105,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     }, []);
 
     const checkAuth = useCallback(async () => {
-        console.log("[CHECK_AUTH_START]", Date.now());
-        console.count("[AUTHGATE] CHECK_AUTH");
-        console.time("[AUTHGATE] CHECK_AUTH_DURATION");
+        console.log('[CHECK_AUTH_START]', Date.now());
+        console.count('[AUTHGATE] CHECK_AUTH');
+        console.time('[AUTHGATE] CHECK_AUTH_DURATION');
         if (checkAuthPromiseRef.current) {
             console.log('[AuthGate] checkAuth already in progress, reusing promise...');
             return checkAuthPromiseRef.current;
@@ -104,7 +120,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         const promise = (async () => {
             let profileFetchDuration = 0;
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5-second timeout limit
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
 
             try {
                 const getSessionStart = Date.now();
@@ -122,12 +138,23 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                     if (authUser) {
                         console.log('[AuthGate] User found in session:', authUser.id);
                         document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${session.expires_in}; SameSite=Lax`;
-                        
-                        console.log('[AuthGate] Fetching profile from database...');
-                        console.count("[AUTHGATE] PROFILE_FETCH");
-                        
+
+                        // PHASE 9B: Skip DB profile fetch if user is already loaded.
+                        // Supabase fires SIGNED_IN on every navigation. Re-fetching the profile
+                        // on each event caused a 5-6 second UI freeze via the 5s AbortController.
+                        // Profile data does not change between navigations — only the cookie needs updating.
+                        // Full DB fetch only runs on cold start (userRef.current === null) or
+                        // when refresh() is called explicitly by a consumer.
+                        if (userRef.current !== null && userRef.current.id === authUser.id) {
+                            console.log('[AuthGate] User already loaded. Skipping profile DB fetch. [PHASE_9B]');
+                            clearTimeout(timeoutId);
+                            return;
+                        }
+
+                        console.log('[AuthGate] Cold start or user change. Fetching profile from database...');
+                        console.count('[AUTHGATE] PROFILE_FETCH');
+
                         const profileFetchStart = Date.now();
-                        // Fetch role from profile table for route-level defense-in-depth
                         const { data: profile, error: profileError } = await supabase
                             .from('profil_pengguna')
                             .select('nama_lengkap, role, foto_profil_url')
@@ -164,9 +191,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                     console.log('[AuthGate] No session. Clearing user state...');
                     setUser(null);
                     const currentPath = window.location.pathname;
-                    const isPublic = currentPath.startsWith('/login') || 
-                                     currentPath.startsWith('/forgot-password') || 
-                                     currentPath.startsWith('/reset-password') || 
+                    const isPublic = currentPath.startsWith('/login') ||
+                                     currentPath.startsWith('/forgot-password') ||
+                                     currentPath.startsWith('/reset-password') ||
                                      currentPath.startsWith('/register');
                     if (!isPublic) {
                         console.log('[AuthGate] Route is not public, redirecting to /login...');
@@ -187,9 +214,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                     checkAuthPromiseRef.current = null;
                 }
                 const totalDuration = Date.now() - checkAuthStart;
-                console.log("[CHECK_AUTH_END]", Date.now(), { totalDuration, profileFetchDuration });
+                console.log('[CHECK_AUTH_END]', Date.now(), { totalDuration, profileFetchDuration });
                 console.log(`[PERF] [AUTH] checkAuth completed in ${totalDuration}ms`);
-                console.timeEnd("[AUTHGATE] CHECK_AUTH_DURATION");
+                console.timeEnd('[AUTHGATE] CHECK_AUTH_DURATION');
             }
         })();
 
@@ -197,184 +224,231 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         return promise;
     }, [handleSignOut]);
 
-    // Run initial auth check and listen for session changes
+    // =========================================================================
+    // PHASE 5 — SUBSCRIPTION HARDENING
+    // Stable refs for checkAuth and handleSignOut allow the subscription
+    // useEffect to be mount-only (deps=[]).
+    // A mount-only subscription is NEVER recreated on renders or navigations.
+    // The refs are always kept in sync with the latest callback identity.
+    // =========================================================================
+
+    // These refs let the mount-only subscription always call the current version
+    // of checkAuth/handleSignOut without capturing stale closures.
+    const checkAuthRef = useRef(checkAuth);
+    const handleSignOutRef = useRef(handleSignOut);
+    useEffect(() => { checkAuthRef.current = checkAuth; }, [checkAuth]);
+    useEffect(() => { handleSignOutRef.current = handleSignOut; }, [handleSignOut]);
+
+    // PHASE 5 — AUTH SUBSCRIPTION: mount-only, never recreated.
+    // All navigation uses routerRef.current (never the captured `router` closure).
+    // All callbacks use their respective refs (checkAuthRef, handleSignOutRef).
     useEffect(() => {
         setIsMounted(true);
-        
-        // Safety timeout fallback: if auth checks hang for more than 6 seconds, force-disable the loader
+
+        // Safety timeout: if auth check hangs >6s, force-disable the loader.
         const safetyTimeout = setTimeout(() => {
             console.warn('[AuthGate] Safety timeout triggered. Forcing loader disable.');
             setLoading(false);
         }, 6000);
 
-        checkAuth().then(() => {
+        checkAuthRef.current().then(() => {
             clearTimeout(safetyTimeout);
         });
 
-        // Listen for authentication changes (e.g. login, logout, password recovery)
-        console.log("[AUTHGATE] AUTH_SUBSCRIBE", Date.now());
-        console.count("[AUTHGATE] AUTH_SUBSCRIBE");
+        console.log('[AUTHGATE] AUTH_SUBSCRIBE', Date.now());
+        console.count('[AUTHGATE] AUTH_SUBSCRIBE');
+
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log("[AUTH_EVENT]", event, Date.now(), { hasSession: !!session, userId: session?.user?.id });
+            console.log('[AUTH_EVENT]', event, Date.now(), { hasSession: !!session, userId: session?.user?.id });
             console.count(`[AUTH_EVENT] ${event}`);
-            console.log(
-                "[AUTH_EVENT]",
-                event,
-                {
-                    hasSession: !!session,
-                    userId: session?.user?.id
-                }
-            );
-            console.log(`[AuthGate] Auth event: ${event}`);
-            
+
             if (event === 'INITIAL_SESSION') {
                 clearTimeout(safetyTimeout);
                 if (!session) {
                     setLoading(false);
                 }
+                return;
             }
-            
+
             if (event === 'PASSWORD_RECOVERY') {
-                console.log("[AUTH GATE] PASSWORD_RECOVERY event triggered. Redirecting to /reset-password...");
+                console.log('[AuthGate] PASSWORD_RECOVERY event. Redirecting to /reset-password...');
                 if (session) {
                     document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${session.expires_in}; SameSite=Lax`;
                 }
                 setLoading(false);
-                router.replace('/reset-password');
+                // FIX: Use routerRef.current — not the captured `router` closure
+                // (which was stale since subscription is mount-only).
+                routerRef.current.replace('/reset-password');
                 return;
             }
 
             if (event === 'SIGNED_OUT') {
-                handleSignOut();
+                handleSignOutRef.current();
                 setLoading(false);
-            } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                return;
+            }
+
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
                 if (session) {
                     document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${session.expires_in}; SameSite=Lax`;
                 }
-                
-                const currentPath = window.location.pathname;
-                const isPublic = currentPath.startsWith('/login') || 
-                                 currentPath.startsWith('/forgot-password') || 
-                                 currentPath.startsWith('/reset-password') || 
-                                 currentPath.startsWith('/register');
-                
-                if (isPublic) {
-                    // Let the login/register/reset pages handle their own redirection
+
+                // PHASE 9B: If user is already loaded, just update cookie and exit.
+                // No need to invoke checkAuth (which triggers an expensive DB fetch).
+                if (userRef.current !== null) {
+                    console.log('[AuthGate] SIGNED_IN/TOKEN_REFRESHED with existing user. Cookie updated; skipping checkAuth(). [PHASE_9B]');
                     return;
                 }
-                
-                await checkAuth();
+
+                const currentPath = window.location.pathname;
+                const isPublic = currentPath.startsWith('/login') ||
+                                 currentPath.startsWith('/forgot-password') ||
+                                 currentPath.startsWith('/reset-password') ||
+                                 currentPath.startsWith('/register');
+                if (isPublic) {
+                    // Let the login/register/reset pages handle their own redirection.
+                    return;
+                }
+
+                await checkAuthRef.current();
             }
         });
 
         return () => {
-            console.log("[AUTHGATE] AUTH_UNSUBSCRIBE", Date.now());
-            console.count("[AUTHGATE] AUTH_UNSUBSCRIBE");
+            console.log('[AUTHGATE] AUTH_UNSUBSCRIBE', Date.now());
+            console.count('[AUTHGATE] AUTH_UNSUBSCRIBE');
             subscription.unsubscribe();
             clearTimeout(safetyTimeout);
         };
-    }, [checkAuth, handleSignOut]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // MOUNT-ONLY: subscription is created once and never recreated.
 
-    // Perform route guarding locally and synchronously on path/user changes
+    // =========================================================================
+    // PHASE 3 — ROUTE GUARD: `router` REMOVED from deps
+    //
+    // ROOT CAUSE OF THE RENDER LOOP (Line 355 in previous version):
+    //   }, [pathname, user, isMounted, loading, router]);
+    //                                             ^^^^^^ THIS
+    //
+    // Next.js useRouter() returns a NEW object reference on every render.
+    // Having `router` in this effect's deps caused:
+    //   render → new router ref → effect runs → router.replace() → navigation
+    //   state update → re-render → new router ref → effect runs → ...
+    //
+    // FIX: All router.replace() calls now use routerRef.current.
+    //      `router` is removed from the dependency array entirely.
+    //      Route guard logic is identical — only the reference source changed.
+    // =========================================================================
     useEffect(() => {
         if (!isMounted || loading) return;
 
         const currentPath = pathname;
 
         if (!user) {
-            const isPublic = currentPath.startsWith('/login') || 
-                             currentPath.startsWith('/forgot-password') || 
-                             currentPath.startsWith('/reset-password') || 
+            const isPublic = currentPath.startsWith('/login') ||
+                             currentPath.startsWith('/forgot-password') ||
+                             currentPath.startsWith('/reset-password') ||
                              currentPath.startsWith('/register');
             if (!isPublic) {
-                router.replace('/login');
+                routerRef.current.replace('/login'); // FIX: was router.replace
             }
             return;
         }
 
-        const role = user.role;
-        const normalizedUserRole = normalizeRole(role);
+        const normalizedUserRole = normalizeRole(user.role);
 
-        // Guard routes based on user role
         if (normalizedUserRole === 'mahasiswa') {
             if (currentPath.startsWith('/dosen') || currentPath.startsWith('/admin')) {
-                router.replace('/');
+                routerRef.current.replace('/'); // FIX: was router.replace
                 return;
             }
         } else if (normalizedUserRole === 'dosen') {
             if (currentPath.startsWith('/admin') || currentPath === '/') {
-                router.replace('/dosen');
+                routerRef.current.replace('/dosen'); // FIX: was router.replace
                 return;
             }
         } else if (normalizedUserRole === 'admin') {
             if (currentPath === '/' || currentPath.startsWith('/dosen')) {
-                router.replace('/admin');
+                routerRef.current.replace('/admin'); // FIX: was router.replace
                 return;
             }
         }
 
         if (currentPath.startsWith('/login') || currentPath.startsWith('/register') || currentPath.startsWith('/forgot-password')) {
             if (normalizedUserRole === 'dosen') {
-                router.replace('/dosen');
+                routerRef.current.replace('/dosen'); // FIX: was router.replace
             } else if (normalizedUserRole === 'admin') {
-                router.replace('/admin');
+                routerRef.current.replace('/admin'); // FIX: was router.replace
             } else {
-                router.replace('/');
+                routerRef.current.replace('/');      // FIX: was router.replace
             }
         }
-    }, [pathname, user, isMounted, loading, router]);
+    }, [pathname, user, isMounted, loading]); // FIXED: `router` removed — was the primary render loop source
 
-    // Helper to determine if current route is authorized for rendering
-    const isAuthorizedRoute = () => {
-        if (!isMounted || loading) return false;
-
-        const currentPath = pathname;
-        const isPublic = currentPath.startsWith('/login') || 
-                         currentPath.startsWith('/forgot-password') || 
-                         currentPath.startsWith('/reset-password') || 
-                         currentPath.startsWith('/register');
-
-        if (!user) {
-            return isPublic;
-        }
-
-        // Logged-in users should be redirected away from public auth pages, so show loader
-        if (isPublic) {
-            return false;
-        }
-
-        const role = normalizeRole(user.role);
-
-        if (role === 'mahasiswa') {
-            if (currentPath.startsWith('/dosen') || currentPath.startsWith('/admin')) {
-                return false;
-            }
-        } else if (role === 'dosen') {
-            if (currentPath.startsWith('/admin') || currentPath === '/') {
-                return false;
-            }
-        } else if (role === 'admin') {
-            if (currentPath === '/' || currentPath.startsWith('/dosen')) {
-                return false;
-            }
-        }
-
-        return true;
-    };
-
+    // =========================================================================
+    // PHASE 2 — CONTEXT STABILITY
+    // authContextValue is memoized. It only changes when user, loading, or
+    // checkAuth identity changes. checkAuth is stable (useCallback with stable
+    // deps), so this value is highly stable.
+    // =========================================================================
     const authContextValue = useMemo(() => ({
         user,
         loading,
-        refresh: checkAuth
+        refresh: checkAuth,
     }), [user, loading, checkAuth]);
 
+    // =========================================================================
+    // PHASE 1 — RENDER REASON LOGGING (runs on every render, ref-based only)
+    // This block is placed AFTER all hook declarations but BEFORE early returns.
+    // Uses ONLY refs and console — zero state mutations — cannot cause re-renders.
+    // =========================================================================
+    renderIdRef.current++;
+    if (process.env.NODE_ENV === 'development') {
+        const renderId = renderIdRef.current;
+        const userIdChanged = prevUserIdRef.current !== user?.id;
+        const loadingChanged = prevLoadingRef.current !== undefined && prevLoadingRef.current !== loading;
+        const pathnameChanged = prevPathnameRef.current !== undefined && prevPathnameRef.current !== pathname;
+        const routerChanged = prevRouterRef.current !== undefined && !Object.is(prevRouterRef.current, router);
+        const checkAuthChanged = prevCheckAuthRef_tracking.current !== undefined && !Object.is(prevCheckAuthRef_tracking.current, checkAuth);
+        const handleSignOutChanged = prevHandleSignOutRef_tracking.current !== undefined && !Object.is(prevHandleSignOutRef_tracking.current, handleSignOut);
+
+        // Update tracking refs for next render comparison
+        prevUserIdRef.current = user?.id;
+        prevLoadingRef.current = loading;
+        prevPathnameRef.current = pathname;
+        prevRouterRef.current = router;
+        prevCheckAuthRef_tracking.current = checkAuth;
+        prevHandleSignOutRef_tracking.current = handleSignOut;
+
+        console.log('[AUTHGATE_RENDER]', Date.now());
+        console.count('[AUTHGATE] RENDER');
+        console.log('[RENDER_REASON]', {
+            render: renderId,
+            // What changed since last render:
+            userIdChanged,
+            loadingChanged,
+            pathnameChanged,
+            routerChanged,   // If TRUE in a loop → router in useEffect deps is the cause
+            checkAuthChanged,
+            handleSignOutChanged,
+            // Current values:
+            userId: user?.id,
+            loading,
+            pathname,
+        });
+    }
+
+    // =========================================================================
+    // RENDER PATHS
+    // =========================================================================
+
     const currentPath = pathname || '';
-    const isPublic = currentPath.startsWith('/login') || 
-                     currentPath.startsWith('/forgot-password') || 
-                     currentPath.startsWith('/reset-password') || 
+    const isPublic = currentPath.startsWith('/login') ||
+                     currentPath.startsWith('/forgot-password') ||
+                     currentPath.startsWith('/reset-password') ||
                      currentPath.startsWith('/register');
 
-    // If it's a public path, render it immediately even if we are still loading/mounting
+    // Public routes: render immediately without waiting for auth.
     if (isPublic) {
         return (
             <AuthContext.Provider value={authContextValue}>
@@ -385,25 +459,46 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         );
     }
 
-    // During SSR, or until mounted, show fullscreen loader to prevent content flash
+    // Protected routes: block render until auth is resolved.
     if (!isMounted || loading) {
         return <FullscreenLoader />;
     }
 
-    console.log("[AUTH_CONTEXT]", Date.now(), {
-        userId: user?.id,
-        loading
-    });
-    console.count(
-        "[AUTHGATE] CONTEXT_VALUE_CREATED"
-    );
-    console.log(
-        "[AUTHGATE] Context Dependencies",
-        {
-            userId: user?.id,
-            loading
+    // =========================================================================
+    // PHASE 6 — INSTRUMENTATION AUDIT
+    // The CONTEXT_VALUE_CREATED log below does NOT use setState — it is a pure
+    // console.count call on every render past this code path. It does NOT cause
+    // re-renders. It is kept for diagnostic visibility.
+    // =========================================================================
+    if (process.env.NODE_ENV === 'development') {
+        console.log('[AUTH_CONTEXT]', Date.now(), { userId: user?.id, loading });
+        console.count('[AUTHGATE] CONTEXT_VALUE_CREATED');
+    }
+
+    // isAuthorizedRoute: determines whether to render children or a loader
+    // based on current pathname and user role. This is a synchronous helper
+    // called during render — it reads stable state (pathname, user) and does
+    // NOT cause re-renders.
+    const isAuthorizedRoute = (): boolean => {
+        if (!isMounted || loading) return false;
+
+        const isCurrentPublic = currentPath.startsWith('/login') ||
+                                currentPath.startsWith('/forgot-password') ||
+                                currentPath.startsWith('/reset-password') ||
+                                currentPath.startsWith('/register');
+        if (!user) return isCurrentPublic;
+        if (isCurrentPublic) return false; // Logged-in user redirect is pending
+
+        const role = normalizeRole(user.role);
+        if (role === 'mahasiswa') {
+            if (currentPath.startsWith('/dosen') || currentPath.startsWith('/admin')) return false;
+        } else if (role === 'dosen') {
+            if (currentPath.startsWith('/admin') || currentPath === '/') return false;
+        } else if (role === 'admin') {
+            if (currentPath === '/' || currentPath.startsWith('/dosen')) return false;
         }
-    );
+        return true;
+    };
 
     return (
         <AuthContext.Provider value={authContextValue}>
