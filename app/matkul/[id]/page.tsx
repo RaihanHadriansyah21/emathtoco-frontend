@@ -51,7 +51,8 @@ const createSubmission = async (mahasiswaId: string, mataKuliahId: string) => {
         .insert({
             mahasiswa_id: mahasiswaId,
             mata_kuliah_id: mataKuliahId,
-            status_submit: 'draft'
+            status_submit: 'draft',
+            ai_status: 'idle'
         })
         .select()
         .maybeSingle();
