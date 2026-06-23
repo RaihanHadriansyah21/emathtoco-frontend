@@ -13,6 +13,77 @@ import PageTransition from '@/components/ui/PageTransition';
 import TextType from '@/components/ui/TextType';
 import ShinyText from '@/components/ui/ShinyText';
 
+// ─── Error classification helper ────────────────────────────────────────────
+// ISSUE C FIX: Converts raw errors into accurate, user-facing Indonesian messages.
+// Never conflates network failures with credential errors.
+function classifyLoginError(err: unknown): string {
+    if (err instanceof TypeError && (
+        err.message.includes('fetch') ||
+        err.message.includes('network') ||
+        err.message.includes('Failed to fetch') ||
+        err.message.includes('ERR_NAME_NOT_RESOLVED') ||
+        err.message.includes('ERR_INTERNET_DISCONNECTED') ||
+        err.message.includes('Load failed')
+    )) {
+        return 'Server tidak dapat dihubungi. Periksa koneksi internet Anda.';
+    }
+    if (err instanceof Error && err.name === 'AbortError') {
+        return 'Koneksi timeout. Server tidak merespons dalam waktu yang ditentukan.';
+    }
+    return 'Terjadi kesalahan tidak terduga. Silakan coba lagi.';
+}
+
+function classifySupabaseError(error: { message?: string; status?: number } | null): string {
+    if (!error) return '';
+
+    const msg = (error.message || '').toLowerCase();
+    const status = error.status;
+
+    // Network-level failure surfaced through Supabase client
+    if (
+        msg.includes('fetch') ||
+        msg.includes('network') ||
+        msg.includes('failed to fetch') ||
+        msg.includes('err_name_not_resolved') ||
+        msg.includes('load failed') ||
+        msg.includes('internet')
+    ) {
+        return 'Server autentikasi tidak dapat dihubungi. Periksa koneksi internet Anda.';
+    }
+
+    // Timeout
+    if (msg.includes('timeout') || msg.includes('timed out')) {
+        return 'Koneksi timeout. Server tidak merespons. Silakan coba lagi.';
+    }
+
+    // HTTP 401 — wrong credentials
+    if (status === 401 || msg.includes('invalid login credentials') || msg.includes('invalid password')) {
+        return 'Email atau password salah! Silakan periksa kembali akun Anda.';
+    }
+
+    // HTTP 403 — forbidden / locked
+    if (status === 403 || msg.includes('access denied') || msg.includes('forbidden')) {
+        return 'Akses ditolak. Akun Anda mungkin telah dinonaktifkan.';
+    }
+
+    // HTTP 404 — user not found
+    if (status === 404 || msg.includes('user not found')) {
+        return 'Akun dengan email ini tidak ditemukan.';
+    }
+
+    // Rate limited
+    if (status === 429 || msg.includes('rate limit') || msg.includes('too many')) {
+        return 'Terlalu banyak percobaan login. Silakan tunggu beberapa menit.';
+    }
+
+    // Email not confirmed
+    if (msg.includes('email not confirmed')) {
+        return 'Email belum dikonfirmasi. Periksa kotak masuk email Anda.';
+    }
+
+    return 'Email atau password salah! Silakan periksa kembali akun Anda.';
+}
+
 export default function DosenLoginPage() {
     const router = useRouter();
     const [email, setEmail] = useState('');
@@ -113,15 +184,22 @@ export default function DosenLoginPage() {
         setIsLoading(true);
 
         try {
-            // Cek apakah email sudah terdaftar menggunakan backend API
+            // ── Email existence check (optional, non-blocking) ────────────────
+            // ISSUE C FIX: Uses AbortController with 5s timeout.
+            // On network failure, logs the error but does NOT block login.
             try {
                 const checkUrl = `${API_URL}/auth/check-email?email=${encodeURIComponent(email)}`;
+                const checkController = new AbortController();
+                const checkTimeout = setTimeout(() => checkController.abort(), 5000);
                 const checkRes = await fetch(checkUrl, {
                     headers: {
                         'ngrok-skip-browser-warning': 'true',
                         'Accept': 'application/json',
-                    }
+                    },
+                    signal: checkController.signal,
                 });
+                clearTimeout(checkTimeout);
+
                 if (checkRes.ok) {
                     const checkData = await checkRes.json();
                     if (checkData.exists === false) {
@@ -130,28 +208,32 @@ export default function DosenLoginPage() {
                         return;
                     }
                 } else {
-                    console.error("Gagal mendeteksi apakah email terdaftar, HTTP status:", checkRes.status);
+                    console.warn('[LOGIN] check-email returned HTTP', checkRes.status, '— continuing to Supabase auth');
                 }
             } catch (emailCheckError) {
-                console.error("Gagal mendeteksi apakah email terdaftar:", emailCheckError);
+                // ISSUE C FIX: Network/timeout error on check-email is NOT shown to user.
+                // We log it and continue — Supabase auth is the authoritative gate.
+                console.warn('[LOGIN] check-email unreachable (network/timeout) — continuing to Supabase auth:', emailCheckError);
             }
 
+            // ── Supabase authentication ───────────────────────────────────────
             const { data, error } = await supabase.auth.signInWithPassword({
-                email: email,
-                password: password,
+                email,
+                password,
             });
 
             if (error) {
-                setErrorMessage('Email atau password salah! Silakan periksa kembali akun Anda.');
+                // ISSUE C FIX: Classify the Supabase error accurately.
+                setErrorMessage(classifySupabaseError(error));
                 setIsLoading(false);
                 return;
             }
 
             if (data?.session) {
-                console.log("[AUDIT DEBUG] Login success");
+                console.log('[AUDIT DEBUG] Login success');
                 document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax`;
 
-                let targetHref = '/';
+                let targetPath = '/';
 
                 try {
                     const { data: profile } = await supabase
@@ -161,7 +243,6 @@ export default function DosenLoginPage() {
                         .maybeSingle();
 
                     const role = normalizeRole(profile?.role);
-                    const userName = profile?.nama_lengkap || data.session.user.email || 'Anonymous';
 
                     // ═══════════════════════════════════════════════════════
                     // ROLE VALIDATION LAYER - Portal Dosen
@@ -180,34 +261,46 @@ export default function DosenLoginPage() {
                     }
 
                     // Role-based redirect destination
-                    targetHref = role === 'admin' ? '/admin' : '/dosen';
+                    targetPath = role === 'admin' ? '/admin' : '/dosen';
 
                     // Session storage guard to prevent duplicate login logging
                     const sessionLoggedKey = `logged_${data.session.user.id}`;
                     if (typeof window !== 'undefined' && !sessionStorage.getItem(sessionLoggedKey)) {
-                        console.log("[AUDIT DEBUG] About to write audit log");
+                        console.log('[AUDIT DEBUG] About to write audit log');
                         sessionStorage.setItem(sessionLoggedKey, 'true');
 
                         const auditAction = role === 'admin' ? 'ADMIN_LOGIN' : 'LECTURER_LOGIN';
-                        const auditTarget = 'auth';
-
-                        if (auditAction) {
-                            sendLoginAuditLog({
-                                action: auditAction,
-                                target: auditTarget,
-                                details: { role },
-                            }, data.session.access_token);
-                            console.log("[AUDIT DEBUG] Audit log request sent via sendBeacon");
-                        }
+                        sendLoginAuditLog({
+                            action: auditAction,
+                            target: 'auth',
+                            details: { role },
+                        }, data.session.access_token);
+                        console.log('[AUDIT DEBUG] Audit log request sent');
                     }
                 } catch (auditErr) {
                     console.error('[AUDIT] Failed to log user login:', auditErr);
                 }
 
-                window.location.href = targetHref;
+                // ─────────────────────────────────────────────────────────────
+                // ISSUE A FIX: Use router.push() instead of window.location.href
+                //
+                // BEFORE (broken):
+                //   window.location.href = targetHref;
+                //   → Hard browser reload → React unmounts entirely → AuthGate
+                //     remounts with loading=true → cold auth restart → FullscreenLoader
+                //     blocks UI for 5-6 seconds until checkAuth() completes.
+                //
+                // AFTER (fixed):
+                //   router.push(targetPath);
+                //   → Client-side navigation → React stays mounted → Supabase has
+                //     already fired SIGNED_IN event → AuthGate already has user in
+                //     state → no cold restart → immediate render.
+                // ─────────────────────────────────────────────────────────────
+                router.push(targetPath);
             }
         } catch (err) {
-            setErrorMessage('Terjadi gangguan jaringan pada sistem autentikasi.');
+            // ISSUE C FIX: Top-level catch handles network/unknown errors accurately.
+            setErrorMessage(classifyLoginError(err));
         } finally {
             setIsLoading(false);
         }
