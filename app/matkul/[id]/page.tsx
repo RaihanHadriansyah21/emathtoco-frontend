@@ -10,6 +10,7 @@ import { useToast } from '@/app/hooks/useToast';
 import ToastContainer from '@/app/components/Toast';
 import { createAuditLog } from '@/lib/services/audit-service';
 import { apiPost } from '@/lib/api-client';
+import { useAuth } from '../../components/AuthGate';
 
 const getMaxScore = (label: string): number => {
     return label.toLowerCase().endsWith('f') ? 5 : 4;
@@ -2044,9 +2045,11 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
 };
 
 export default function UploadWorkspace() {
+    console.log("[WORKSPACE_RENDER]", Date.now());
     const router = useRouter();
     const params = useParams();
     const matkulId = params.id as string;
+    const { user: authUser, loading: authLoading } = useAuth();
 
     const [slots, setSlots] = useState<SlotState[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -2145,7 +2148,25 @@ export default function UploadWorkspace() {
         checkMobile();
     }, []);
 
+    const activeFetchRef = useRef<string | null>(null);
+    const slotsRef = useRef(slots);
+    const isDeletingSlotRef = useRef(isDeletingSlot);
+    useEffect(() => {
+        slotsRef.current = slots;
+        isDeletingSlotRef.current = isDeletingSlot;
+    }, [slots, isDeletingSlot]);
+
     const loadSubmissionDetails = useCallback(async (uid: string) => {
+        const fetchStart = Date.now();
+        console.log("[POLL_EXECUTION] loadSubmissionDetails start", fetchStart);
+        
+        const fetchKey = `${uid}-${matkulId}`;
+        if (activeFetchRef.current === fetchKey) {
+            console.log('[SYNC] Overlapping loadSubmissionDetails call ignored.');
+            return;
+        }
+        activeFetchRef.current = fetchKey;
+
         try {
             // Cek data submission yang sudah ada (terbaru)
             const { data: existingSubmission } = await supabase
@@ -2158,18 +2179,6 @@ export default function UploadWorkspace() {
                 .maybeSingle();
 
             if (existingSubmission) {
-                setSubmissionId(existingSubmission.id);
-                setSubmissionStatus(existingSubmission.status_submit);
-                setNilaiAkhir(existingSubmission.nilai_akhir ?? null);
-                setModelAi(existingSubmission.model_ai ?? null);
-
-                const lockedStatuses = ['processing_ai', 'reviewed', 'finalized'];
-                if (lockedStatuses.includes(existingSubmission.status_submit)) {
-                    setIsReadOnly(true);
-                } else {
-                    setIsReadOnly(false);
-                }
-
                 // Ambil detail lembar jawaban yang sudah diupload sebelumnya
                 const { data: sheets } = await supabase
                     .from('lembar_jawaban')
@@ -2181,6 +2190,15 @@ export default function UploadWorkspace() {
                     status: 'empty' as const,
                     fileUrl: null
                 }));
+
+                // Update submission metadata states consecutively to batch renders in React 18
+                setSubmissionId(existingSubmission.id);
+                setSubmissionStatus(existingSubmission.status_submit);
+                setNilaiAkhir(existingSubmission.nilai_akhir ?? null);
+                setModelAi(existingSubmission.model_ai ?? null);
+
+                const lockedStatuses = ['processing_ai', 'reviewed', 'finalized'];
+                setIsReadOnly(lockedStatuses.includes(existingSubmission.status_submit));
 
                 if (sheets && sheets.length > 0) {
                     const updatedSlots = initialSlots.map(slot => {
@@ -2211,7 +2229,7 @@ export default function UploadWorkspace() {
                     updatedSlots.forEach(slot => {
                         if (slot.status === 'success' && slot.imagePath) {
                             const cached = signedUrlCache.get(slot.imagePath);
-                            const existingSlot = slots.find(s => s.label === slot.label);
+                            const existingSlot = slotsRef.current.find(s => s.label === slot.label);
                             const isCached = (cached && cached.expiresAt - now > 60_000) || 
                                              (existingSlot?.fileUrl && existingSlot.imagePath === slot.imagePath);
                             if (!isCached) {
@@ -2228,7 +2246,7 @@ export default function UploadWorkspace() {
                             if (cached && cached.expiresAt - now > 60_000) {
                                 return { ...slot, fileUrl: cached.url };
                             }
-                            const existingSlot = slots.find(s => s.label === slot.label);
+                            const existingSlot = slotsRef.current.find(s => s.label === slot.label);
                             if (existingSlot?.fileUrl && existingSlot.imagePath === slot.imagePath) {
                                 return { ...slot, fileUrl: existingSlot.fileUrl };
                             }
@@ -2242,7 +2260,7 @@ export default function UploadWorkspace() {
                     setSlots(prevSlots => {
                         return resolvedSlots.map(fetchedSlot => {
                             const currentSlot = prevSlots.find(s => s.label === fetchedSlot.label);
-                            if (currentSlot && (currentSlot.status === 'uploading' || isDeletingSlot === fetchedSlot.label)) {
+                            if (currentSlot && (currentSlot.status === 'uploading' || isDeletingSlotRef.current === fetchedSlot.label)) {
                                 return currentSlot; // Preserve the local state
                             }
                             return fetchedSlot;
@@ -2254,10 +2272,21 @@ export default function UploadWorkspace() {
             }
         } catch (err) {
             console.error('Error fetching submission details:', err);
+        } finally {
+            if (activeFetchRef.current === fetchKey) {
+                activeFetchRef.current = null;
+            }
+            console.log("[POLL_EXECUTION] loadSubmissionDetails end", Date.now(), `| duration: ${Date.now() - fetchStart}ms`);
         }
-    }, [matkulId, slots, isDeletingSlot]);
+    }, [matkulId]);
 
     useEffect(() => {
+        if (authLoading) return;
+        if (!authUser) {
+            router.push('/login');
+            return;
+        }
+
         // Inisialisasi struktur 24 slot lembar kerja kosong
         const initialSlots = generateSlots().map(s => ({
             ...s,
@@ -2265,38 +2294,15 @@ export default function UploadWorkspace() {
             fileUrl: null
         }));
         setSlots(initialSlots);
+        setUserId(authUser.id);
 
-        // Dapatkan ID pengguna aktif untuk penamaan berkas data riwayat
-        supabase.auth.getUser().then(async ({ data: { user } }) => {
-            if (user) {
-                setUserId(user.id);
-
-                // Cek apakah profil sudah lengkap
-                const { data: profile, error } = await supabase
-                    .from('profil_pengguna')
-                    .select('nama_lengkap, role')
-                    .eq('id', user.id)
-                    .maybeSingle();
-
-                console.log("AUTH USER:", user);
-                console.log("PROFILE:", profile);
-                console.log("PROFILE ERROR:", error);
-
-                if (error) {
-                    console.error("Gagal memverifikasi status profil:", error);
-                    return;
-                }
-
-                if (!profile) {
-                    router.push('/complete-profile');
-                    return;
-                }
-
+        const initWorkspace = async () => {
+            try {
                 // Enrollment authorization check
                 const { data: enrollmentCheck, error: enrollErr } = await supabase
                     .from('mahasiswa_mata_kuliah')
                     .select('id')
-                    .eq('mahasiswa_id', user.id)
+                    .eq('mahasiswa_id', authUser.id)
                     .eq('mata_kuliah_id', matkulId)
                     .maybeSingle();
 
@@ -2305,7 +2311,7 @@ export default function UploadWorkspace() {
                 }
 
                 if (!enrollmentCheck) {
-                    console.warn(`[Access Denied] Student ${user.id} is not enrolled in course ${matkulId}`);
+                    console.warn(`[Access Denied] Student ${authUser.id} is not enrolled in course ${matkulId}`);
                     setIsAccessDenied(true);
                     return;
                 }
@@ -2322,12 +2328,14 @@ export default function UploadWorkspace() {
                     setKodeMatkul(course.kode_matkul || '');
                 }
 
-                await loadSubmissionDetails(user.id);
-            } else {
-                router.push('/login');
+                await loadSubmissionDetails(authUser.id);
+            } catch (err) {
+                console.error("Failed to initialize workspace:", err);
             }
-        });
-    }, [router, matkulId]);
+        };
+
+        initWorkspace();
+    }, [authUser, authLoading, matkulId, router]);
 
     const loadSubmissionDetailsRef = useRef(loadSubmissionDetails);
     useEffect(() => {
@@ -2342,6 +2350,7 @@ export default function UploadWorkspace() {
         // Status changes are driven by the dosen/AI pipeline, not the student;
         // 15 second sync lag is imperceptible and saves ~80% of polling egress.
         const interval = setInterval(() => {
+            console.log("[POLL_EXECUTION] interval tick", Date.now());
             loadSubmissionDetailsRef.current(userId);
         }, 15000);
 
@@ -2354,6 +2363,7 @@ export default function UploadWorkspace() {
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
+                console.log("[POLL_EXECUTION] visibility change triggers fetch", Date.now());
                 console.log('[SYNC] Tab visible, loading latest submission details...');
                 loadSubmissionDetailsRef.current(userId);
             }

@@ -33,7 +33,7 @@ const getCourseIcon = (iconName: string): string => {
 };
 
 export default function StudentDashboard() {
-  console.log("[HOME] COMPONENT RENDER");
+  console.log("[DASHBOARD_RENDER]", Date.now());
   const router = useRouter();
   const { user, loading } = useAuth();
   const [userEmail, setUserEmail] = useState('');
@@ -57,12 +57,15 @@ export default function StudentDashboard() {
         setUserEmail(user.email);
         setFullName(user.nama_lengkap);
 
-        console.log("[HOME] fetch enrollment start");
+        console.log(`[DASHBOARD_FETCH] fetchEnrollment start: ${Date.now()}`);
+        const enrollmentStart = Date.now();
         // Fetch enrolled course IDs from mahasiswa_mata_kuliah
         const { data: enrollmentData, error: enrollmentError } = await supabase
           .from('mahasiswa_mata_kuliah')
           .select('mata_kuliah_id')
           .eq('mahasiswa_id', user.id);
+        const enrollmentDuration = Date.now() - enrollmentStart;
+        console.log(`[DASHBOARD_FETCH] fetchEnrollment end: ${Date.now()} | duration: ${enrollmentDuration}ms`);
 
         if (enrollmentError) {
           throw enrollmentError;
@@ -76,12 +79,15 @@ export default function StudentDashboard() {
           return;
         }
 
-        console.log("[HOME] fetch courses start");
+        console.log(`[DASHBOARD_FETCH] fetchCourses start: ${Date.now()}`);
+        const coursesStart = Date.now();
         // Fetch courses matching the enrolled IDs
         const { data: coursesData, error: coursesError } = await supabase
           .from('mata_kuliah')
           .select('*')
           .in('id', enrolledCourseIds);
+        const coursesDuration = Date.now() - coursesStart;
+        console.log(`[DASHBOARD_FETCH] fetchCourses end: ${Date.now()} | duration: ${coursesDuration}ms`);
 
         if (coursesError) {
           throw coursesError;
@@ -89,7 +95,8 @@ export default function StudentDashboard() {
 
         setCourses(coursesData || []);
 
-        console.log("[HOME] fetch warnings start");
+        console.log(`[DASHBOARD_FETCH] fetchWarnings start: ${Date.now()}`);
+        const warningsStart = Date.now();
         // Check for reupload warnings (lembar_jawaban with status = 'reupload_required')
         const { data: submissions, error: subsError } = await supabase
           .from('pengumpulan_tugas')
@@ -129,6 +136,8 @@ export default function StudentDashboard() {
 
            setReuploadWarnings(warningCounts);
         }
+        const warningsDuration = Date.now() - warningsStart;
+        console.log(`[DASHBOARD_FETCH] fetchWarnings end: ${Date.now()} | duration: ${warningsDuration}ms`);
       } catch (err) {
         console.error('Gagal mengambil data beranda:', err);
         setCourseError('Terjadi kesalahan memuat daftar mata kuliah.');
@@ -137,7 +146,7 @@ export default function StudentDashboard() {
       }
     };
     getDashboardData();
-  }, [user, loading, router]);
+  }, [user, loading]);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans relative overflow-hidden">

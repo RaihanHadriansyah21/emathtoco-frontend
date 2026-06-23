@@ -29,9 +29,14 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext);
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
+    console.log("[AUTHGATE_RENDER]", Date.now());
     console.count("[AUTHGATE] RENDER");
     const router = useRouter();
     const pathname = usePathname();
+    const routerRef = useRef(router);
+    useEffect(() => {
+        routerRef.current = router;
+    }, [router]);
     
     const [user, setUser] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
@@ -84,6 +89,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     }, []);
 
     const checkAuth = useCallback(async () => {
+        console.log("[CHECK_AUTH_START]", Date.now());
         console.count("[AUTHGATE] CHECK_AUTH");
         console.time("[AUTHGATE] CHECK_AUTH_DURATION");
         if (checkAuthPromiseRef.current) {
@@ -96,6 +102,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         const requestId = ++checkAuthRequestIdRef.current;
 
         const promise = (async () => {
+            let profileFetchDuration = 0;
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000); // 5-second timeout limit
 
@@ -128,7 +135,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                             .abortSignal(controller.signal)
                             .maybeSingle();
 
-                        const profileFetchDuration = Date.now() - profileFetchStart;
+                        profileFetchDuration = Date.now() - profileFetchStart;
                         console.log(`[PERF] [AUTH] Profile fetch completed in ${profileFetchDuration}ms`);
 
                         if (requestId !== checkAuthRequestIdRef.current) {
@@ -163,7 +170,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                                      currentPath.startsWith('/register');
                     if (!isPublic) {
                         console.log('[AuthGate] Route is not public, redirecting to /login...');
-                        router.replace('/login');
+                        routerRef.current.replace('/login');
                     }
                 }
             } catch (err: any) {
@@ -180,6 +187,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                     checkAuthPromiseRef.current = null;
                 }
                 const totalDuration = Date.now() - checkAuthStart;
+                console.log("[CHECK_AUTH_END]", Date.now(), { totalDuration, profileFetchDuration });
                 console.log(`[PERF] [AUTH] checkAuth completed in ${totalDuration}ms`);
                 console.timeEnd("[AUTHGATE] CHECK_AUTH_DURATION");
             }
@@ -187,7 +195,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
         checkAuthPromiseRef.current = promise;
         return promise;
-    }, [router, handleSignOut]);
+    }, [handleSignOut]);
 
     // Run initial auth check and listen for session changes
     useEffect(() => {
@@ -204,8 +212,10 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         });
 
         // Listen for authentication changes (e.g. login, logout, password recovery)
+        console.log("[AUTHGATE] AUTH_SUBSCRIBE", Date.now());
         console.count("[AUTHGATE] AUTH_SUBSCRIBE");
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log("[AUTH_EVENT]", event, Date.now(), { hasSession: !!session, userId: session?.user?.id });
             console.count(`[AUTH_EVENT] ${event}`);
             console.log(
                 "[AUTH_EVENT]",
@@ -258,11 +268,12 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         });
 
         return () => {
+            console.log("[AUTHGATE] AUTH_UNSUBSCRIBE", Date.now());
             console.count("[AUTHGATE] AUTH_UNSUBSCRIBE");
             subscription.unsubscribe();
             clearTimeout(safetyTimeout);
         };
-    }, [checkAuth, handleSignOut, router]);
+    }, [checkAuth, handleSignOut]);
 
     // Perform route guarding locally and synchronously on path/user changes
     useEffect(() => {
@@ -379,6 +390,10 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         return <FullscreenLoader />;
     }
 
+    console.log("[AUTH_CONTEXT]", Date.now(), {
+        userId: user?.id,
+        loading
+    });
     console.count(
         "[AUTHGATE] CONTEXT_VALUE_CREATED"
     );

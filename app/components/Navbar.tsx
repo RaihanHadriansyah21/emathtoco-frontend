@@ -52,6 +52,7 @@ export default function Navbar({
   sidebarCollapsed = false,
   onToggleSidebar,
 }: NavbarProps) {
+  console.log("[NAVBAR_RENDER]", Date.now());
   const router = useRouter();
   const { user } = useAuth();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
