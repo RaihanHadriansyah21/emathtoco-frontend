@@ -287,6 +287,7 @@ export default function LecturerStudentRoster() {
                 .from('pengumpulan_tugas')
                 .update({
                     status_submit: 'finalized',
+                    ai_status: 'finalized', // Satisfy chk_status_sync check constraint
                     nilai_akhir: overallScore,
                     updated_at: new Date().toISOString()
                 })

@@ -865,6 +865,7 @@ export default function ReviewWorkspace() {
         .from('pengumpulan_tugas')
         .update({
           status_submit: 'finalized',
+          ai_status: 'finalized', // Satisfy chk_status_sync check constraint
           nilai_akhir: overall,
           model_ai: selectedModel,
           updated_at: new Date().toISOString()

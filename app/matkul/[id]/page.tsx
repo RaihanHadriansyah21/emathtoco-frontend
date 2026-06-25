@@ -2711,6 +2711,7 @@ export default function UploadWorkspace() {
                 .from('pengumpulan_tugas')
                 .update({
                     status_submit: 'submitted',
+                    ai_status: 'pending', // Satisfy chk_status_sync check constraint
                     waktu_submit: new Date().toISOString(),
                     updated_at: new Date().toISOString()
                 })

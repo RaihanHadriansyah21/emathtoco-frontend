@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useAuth } from '@/app/components/AuthGate';
 import { supabase } from '@/lib/supabase';
 import Image from 'next/image';
 import Logo from '../Emathtoco.png';
@@ -14,8 +15,8 @@ import ShinyText from '@/components/ui/ShinyText';
 
 function LoginPageContent() {
     const router = useRouter();
+    const { user, loading } = useAuth();
     const searchParams = useSearchParams();
-    const [isChecking, setIsChecking] = useState(true);
     const [showSelection, setShowSelection] = useState(searchParams.get('select') === 'true');
 
     const selectParam = searchParams.get('select');
@@ -23,31 +24,7 @@ function LoginPageContent() {
         setShowSelection(selectParam === 'true');
     }, [selectParam]);
 
-    useEffect(() => {
-        const checkSession = async () => {
-            try {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session) {
-                    const { data: { user } } = await supabase.auth.getUser();
-                    if (user) {
-                        document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${session.expires_in}; SameSite=Lax`;
-                        router.push('/');
-                        return;
-                    } else {
-                        await supabase.auth.signOut();
-                    }
-                }
-                document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
-            } catch (err) {
-                console.error("Gagal memeriksa sesi login:", err);
-            } finally {
-                setIsChecking(false);
-            }
-        };
-        checkSession();
-    }, [router]);
-
-    if (isChecking) {
+    if (loading || user) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-[#060814] via-[#020205] to-[#000000] flex items-center justify-center">
                 <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />

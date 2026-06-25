@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/app/components/AuthGate';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import { getBackendState } from '@/lib/backend-store';
@@ -88,6 +89,7 @@ function classifySupabaseError(error: { message?: string; status?: number } | nu
 
 export default function MahasiswaLoginPage() {
     const router = useRouter();
+    const { user, loading } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -117,51 +119,13 @@ export default function MahasiswaLoginPage() {
         }, 2000);
     };
 
-    useEffect(() => {
-        const checkSession = async () => {
-            try {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session) {
-                    const { data: { user } } = await supabase.auth.getUser();
-                    if (user) {
-                        document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${session.expires_in}; SameSite=Lax`;
-
-                        // Query role from profil_pengguna to determine correct redirect destination
-                        // This prevents the infinite loop caused by always redirecting to '/',
-                        // which AuthGate would then redirect to '/dosen' or '/admin', creating a cycle.
-                        let targetPath = '/';
-                        try {
-                            const { data: profile } = await supabase
-                                .from('profil_pengguna')
-                                .select('role')
-                                .eq('id', user.id)
-                                .maybeSingle();
-
-                            const role = normalizeRole(profile?.role);
-                            if (role === 'admin') {
-                                targetPath = '/admin';
-                            } else if (role === 'dosen') {
-                                targetPath = '/dosen';
-                            }
-                        } catch (profileErr) {
-                            console.error("Gagal mengambil profil untuk redirect:", profileErr);
-                        }
-
-                        router.push(targetPath);
-                        return;
-                    } else {
-                        await supabase.auth.signOut();
-                    }
-                }
-
-                document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
-            } catch (err) {
-                console.error("Gagal memeriksa sesi login:", err);
-            }
-        };
-        checkSession();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // FIXED: Removed `router` from deps — useRouter() returns new ref each render, causing infinite re-execution
+    if (loading || user) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-[#060814] via-[#020205] to-[#000000] flex items-center justify-center">
+                <div className="w-8 h-8 border-4 border-t-cyan-500 border-cyan-200/20 rounded-full animate-spin"></div>
+            </div>
+        );
+    } // FIXED: Removed `router` from deps — useRouter() returns new ref each render, causing infinite re-execution
 
     /**
      * Sends audit log using keepalive fetch (survives page navigation/unload).
