@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import { apiPost } from '@/lib/api-client';
+import { getBackendState } from '@/lib/backend-store';
 
 export interface CreateAuditLogParams {
   action: string;
@@ -52,8 +53,16 @@ export async function checkEnterpriseSchema(): Promise<boolean> {
 /**
  * Centrally log events in a non-blocking way.
  * Writes are routed to the FastAPI backend to bypass RLS safely.
+ *
+ * BACKEND-AWARE: Skips silently if backend is known offline.
  */
 export async function createAuditLog(params: CreateAuditLogParams): Promise<void> {
+  // Skip audit log entirely if backend is offline — no hang, no error
+  if (getBackendState() === 'offline') {
+    console.log('[AUDIT] Backend offline — skipping audit log');
+    return;
+  }
+
   try {
     let { action, target, detail, details } = params;
     let finalDetails = details !== undefined ? details : detail;

@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "./components/ThemeProvider";
 import AuthGate from "./components/AuthGate";
 import ClickSpark from "@/components/ui/ClickSpark";
+import { BackendStatusProvider } from "@/lib/backend-store";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,19 +35,22 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem storageKey="emathoco-theme">
           <AuthGate>
-            <ClickSpark
-              sparkColor="#06b6d4"
-              sparkSize={12}
-              sparkRadius={20}
-              sparkCount={8}
-              duration={500}
-              className="flex flex-col flex-1 min-h-full"
-            >
-              {children}
-            </ClickSpark>
+            <BackendStatusProvider>
+              <ClickSpark
+                sparkColor="#06b6d4"
+                sparkSize={12}
+                sparkRadius={20}
+                sparkCount={8}
+                duration={500}
+                className="flex flex-col flex-1 min-h-full"
+              >
+                {children}
+              </ClickSpark>
+            </BackendStatusProvider>
           </AuthGate>
         </ThemeProvider>
       </body>
     </html>
   );
 }
+

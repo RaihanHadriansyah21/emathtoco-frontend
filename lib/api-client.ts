@@ -1,5 +1,6 @@
 import { API_URL } from './config';
 import { supabase } from './supabase';
+import { getBackendState } from './backend-store';
 
 export interface RequestOptions extends Omit<RequestInit, 'headers'> {
   headers?: HeadersInit;
@@ -26,6 +27,13 @@ export async function apiRequest(
   path: string,
   options: RequestOptions = {}
 ): Promise<Response> {
+  // ── Pre-flight: reject immediately if backend is known offline ──────
+  // This prevents 60s hangs, CORS errors, and console noise.
+  const backendState = getBackendState();
+  if (backendState === 'offline') {
+    throw new Error('Backend AI sedang offline. Silakan coba lagi nanti.');
+  }
+
   const url = path.startsWith('http') ? path : `${API_URL}${path}`;
 
   // Build headers: ngrok bypass + Accept default + user custom headers
@@ -53,11 +61,11 @@ export async function apiRequest(
     console.error('[API CLIENT] Error fetching supabase session:', err);
   }
 
-  // AbortController for 60-second timeout safety
+  // AbortController for 10-second timeout safety (reduced from 60s)
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
     controller.abort();
-  }, 60000);
+  }, 10000);
 
   const mergedOptions: RequestInit = {
     ...options,

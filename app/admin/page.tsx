@@ -14,6 +14,7 @@ import { GlassTable, GlassTableHeader, GlassTableRow, ResponsiveTableWrapper } f
 import { GlassCard } from '@/components/ui/card';
 
 import { useRequireRole } from '@/app/hooks/useRequireRole';
+import BackendStatusBanner from '@/app/components/BackendStatusBanner';
 
 interface RecentSubmission {
   id: string;
@@ -126,6 +127,7 @@ export default function AdminDashboard() {
 
   return (
     <PageTransition>
+      <BackendStatusBanner />
       <div className="p-6 lg:p-8 max-w-[1600px] mx-auto w-full space-y-8">
         {/* Header */}
         <div>

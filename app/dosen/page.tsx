@@ -10,6 +10,7 @@ import PageTransition from '@/components/ui/PageTransition';
 import { GlassCard } from '@/components/ui/card';
 
 import { useAuth } from '@/app/components/AuthGate';
+import BackendStatusBanner from '@/app/components/BackendStatusBanner';
 
 interface Course {
   id: string;
@@ -124,6 +125,7 @@ export default function LecturerDashboard() {
       </div>
 
       <Navbar />
+      <BackendStatusBanner />
 
       <PageTransition>
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10 w-full flex-grow">

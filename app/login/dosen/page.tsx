@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
-import { API_URL } from '@/lib/config';
+import { getBackendState } from '@/lib/backend-store';
 import Image from 'next/image';
 import Logo from '../../Emathtoco.png';
 import { Eye, EyeOff, ArrowLeft, BookOpen } from 'lucide-react';
@@ -142,15 +142,20 @@ export default function DosenLoginPage() {
      * Sends audit log using keepalive fetch (survives page navigation/unload).
      * Falls back to navigator.sendBeacon if fetch fails.
      */
-    const sendLoginAuditLog = (auditPayload: {
+    const sendLoginAuditLog = async (auditPayload: {
         action: string;
         target: string;
         details: any;
     }, token?: string) => {
-        const url = `${API_URL}/audit/log`;
-        const body = JSON.stringify(auditPayload);
-
+        // Skip audit log entirely if backend is offline
+        if (getBackendState() === 'offline') {
+            console.log('[AUDIT] Backend offline — skipping audit log');
+            return;
+        }
         try {
+            const { API_URL } = await import('@/lib/config');
+            const url = `${API_URL}/audit/log`;
+            const body = JSON.stringify(auditPayload);
             fetch(url, {
                 method: 'POST',
                 headers: {
@@ -164,11 +169,7 @@ export default function DosenLoginPage() {
             }).catch(() => {});
             console.log('[AUDIT DEBUG] keepalive fetch fired');
         } catch {
-            if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-                const blob = new Blob([body], { type: 'application/json' });
-                const sent = navigator.sendBeacon(url, blob);
-                console.log(`[AUDIT DEBUG] sendBeacon fallback result: ${sent}`);
-            }
+            // Non-blocking: silently fail
         }
     };
 
@@ -184,46 +185,16 @@ export default function DosenLoginPage() {
         setIsLoading(true);
 
         try {
-            // ── Email existence check (optional, non-blocking) ────────────────
-            // ISSUE C FIX: Uses AbortController with 5s timeout.
-            // On network failure, logs the error but does NOT block login.
-            try {
-                const checkUrl = `${API_URL}/auth/check-email?email=${encodeURIComponent(email)}`;
-                const checkController = new AbortController();
-                const checkTimeout = setTimeout(() => checkController.abort(), 5000);
-                const checkRes = await fetch(checkUrl, {
-                    headers: {
-                        'ngrok-skip-browser-warning': 'true',
-                        'Accept': 'application/json',
-                    },
-                    signal: checkController.signal,
-                });
-                clearTimeout(checkTimeout);
-
-                if (checkRes.ok) {
-                    const checkData = await checkRes.json();
-                    if (checkData.exists === false) {
-                        setErrorMessage('Email Anda belum terdaftar! Silakan hubungi admin untuk mendaftarkan akun Anda.');
-                        setIsLoading(false);
-                        return;
-                    }
-                } else {
-                    console.warn('[LOGIN] check-email returned HTTP', checkRes.status, '— continuing to Supabase auth');
-                }
-            } catch (emailCheckError) {
-                // ISSUE C FIX: Network/timeout error on check-email is NOT shown to user.
-                // We log it and continue — Supabase auth is the authoritative gate.
-                console.warn('[LOGIN] check-email unreachable (network/timeout) — continuing to Supabase auth:', emailCheckError);
-            }
-
-            // ── Supabase authentication ───────────────────────────────────────
+            // ── Supabase authentication (SINGLE SOURCE OF TRUTH) ──────────────
+            // check-email ke backend DIHAPUS — Supabase auth adalah satu-satunya
+            // penentu apakah email terdaftar dan password benar.
+            // Ini menghilangkan delay 5 detik ketika backend mati.
             const { data, error } = await supabase.auth.signInWithPassword({
                 email,
                 password,
             });
 
             if (error) {
-                // ISSUE C FIX: Classify the Supabase error accurately.
                 setErrorMessage(classifySupabaseError(error));
                 setIsLoading(false);
                 return;

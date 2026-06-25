@@ -10,6 +10,7 @@ import PageTransition from '@/components/ui/PageTransition';
 import { GlassCard } from '@/components/ui/card';
 
 import { useAuth } from './components/AuthGate';
+import BackendStatusBanner from './components/BackendStatusBanner';
 
 interface MataKuliah {
   id: string;
@@ -158,6 +159,7 @@ export default function StudentDashboard() {
 
       {/* HEADER NAVBAR */}
       <Navbar />
+      <BackendStatusBanner />
 
       {/* BODY UTAMA */}
       <PageTransition>
