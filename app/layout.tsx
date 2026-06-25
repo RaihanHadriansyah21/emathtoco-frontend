@@ -34,8 +34,8 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem storageKey="emathoco-theme">
-          <AuthGate>
-            <BackendStatusProvider>
+          <BackendStatusProvider>
+            <AuthGate>
               <ClickSpark
                 sparkColor="#06b6d4"
                 sparkSize={12}
@@ -46,8 +46,8 @@ export default function RootLayout({
               >
                 {children}
               </ClickSpark>
-            </BackendStatusProvider>
-          </AuthGate>
+            </AuthGate>
+          </BackendStatusProvider>
         </ThemeProvider>
       </body>
     </html>

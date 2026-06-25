@@ -300,16 +300,16 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                     return;
                 }
 
-                const currentPath = window.location.pathname;
-                const isPublic = currentPath.startsWith('/login') ||
-                                 currentPath.startsWith('/forgot-password') ||
-                                 currentPath.startsWith('/reset-password') ||
-                                 currentPath.startsWith('/register');
-                if (isPublic) {
-                    // Let the login/register/reset pages handle their own redirection.
-                    return;
-                }
-
+                // FIX: Always load user profile on SIGNED_IN, even on public pages.
+                // Previously, public pages were skipped (early return), but this caused
+                // user state to remain null when the login page navigated to protected
+                // routes (e.g. /dosen, /admin). The route guard would then see
+                // user=null + loading=false and redirect back to /login, creating an
+                // infinite loop.
+                //
+                // Setting loading=true prevents the route guard from firing prematurely
+                // while checkAuth fetches the user profile from the database.
+                setLoading(true);
                 await checkAuthRef.current();
             }
         });
