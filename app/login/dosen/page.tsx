@@ -123,7 +123,29 @@ export default function DosenLoginPage() {
                     const { data: { user } } = await supabase.auth.getUser();
                     if (user) {
                         document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${session.expires_in}; SameSite=Lax`;
-                        router.push('/');
+
+                        // Query role from profil_pengguna to determine correct redirect destination
+                        // This prevents the infinite loop caused by always redirecting to '/',
+                        // which AuthGate would then redirect to '/dosen' or '/admin', creating a cycle.
+                        let targetPath = '/';
+                        try {
+                            const { data: profile } = await supabase
+                                .from('profil_pengguna')
+                                .select('role')
+                                .eq('id', user.id)
+                                .maybeSingle();
+
+                            const role = normalizeRole(profile?.role);
+                            if (role === 'admin') {
+                                targetPath = '/admin';
+                            } else if (role === 'dosen') {
+                                targetPath = '/dosen';
+                            }
+                        } catch (profileErr) {
+                            console.error("Gagal mengambil profil untuk redirect:", profileErr);
+                        }
+
+                        router.push(targetPath);
                         return;
                     } else {
                         await supabase.auth.signOut();
@@ -136,7 +158,8 @@ export default function DosenLoginPage() {
             }
         };
         checkSession();
-    }, [router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // FIXED: Removed `router` from deps — useRouter() returns new ref each render, causing infinite re-execution
 
     /**
      * Sends audit log using keepalive fetch (survives page navigation/unload).

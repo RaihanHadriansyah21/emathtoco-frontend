@@ -52,7 +52,7 @@ async function performHealthCheck(): Promise<boolean> {
   const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
 
   try {
-    const res = await fetch(`${API_URL}/`, {
+    const res = await fetch(`${API_URL}/health`, {
       method: 'GET',
       headers: {
         'ngrok-skip-browser-warning': 'true',

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/components/AuthGate';
 import { normalizeRole } from '@/lib/utils';
@@ -8,6 +8,12 @@ import { normalizeRole } from '@/lib/utils';
 export function useRequireRole(allowedRole: 'admin' | 'dosen' | 'mahasiswa') {
   const { user, loading } = useAuth();
   const router = useRouter();
+
+  // Use ref to avoid adding `router` to effect deps.
+  // Next.js useRouter() returns a new object reference on every render,
+  // which would cause the effect to re-run infinitely.
+  const routerRef = useRef(router);
+  useEffect(() => { routerRef.current = router; }, [router]);
 
   const isAuthorized = user ? normalizeRole(user.role) === allowedRole : false;
   const isLoading = loading;
@@ -18,7 +24,7 @@ export function useRequireRole(allowedRole: 'admin' | 'dosen' | 'mahasiswa') {
 
     if (!user) {
       document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
-      router.push('/login');
+      routerRef.current.push('/login');
       return;
     }
 
@@ -26,14 +32,14 @@ export function useRequireRole(allowedRole: 'admin' | 'dosen' | 'mahasiswa') {
     if (userRole !== allowedRole) {
       // Redirect based on role mismatch
       if (userRole === 'admin') {
-        router.push('/admin');
+        routerRef.current.push('/admin');
       } else if (userRole === 'dosen') {
-        router.push('/dosen');
+        routerRef.current.push('/dosen');
       } else {
-        router.push('/');
+        routerRef.current.push('/');
       }
     }
-  }, [user, loading, allowedRole, router]);
+  }, [user, loading, allowedRole]); // FIXED: `router` removed — was causing redirect loops
 
   return { isLoading, isAuthorized, userName };
 }
