@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { useAuth } from '@/app/components/AuthGate';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
-import { getBackendState } from '@/lib/backend-store';
+import { getBackendState, useBackendStatus } from '@/lib/backend-store';
+import { WifiOff, RefreshCw } from 'lucide-react';
 import Image from 'next/image';
 import Logo from '../../Emathtoco.png';
 import { Eye, EyeOff, ArrowLeft, GraduationCap } from 'lucide-react';
@@ -90,11 +91,13 @@ function classifySupabaseError(error: { message?: string; status?: number } | nu
 export default function MahasiswaLoginPage() {
     const router = useRouter();
     const { user, loading } = useAuth();
+    const { backendState, retryBackendCheck } = useBackendStatus();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [isRetryingBackend, setIsRetryingBackend] = useState(false);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Auto-cleanup timer on unmount
@@ -351,6 +354,35 @@ export default function MahasiswaLoginPage() {
                             </div>
                         </div>
                     </motion.div>
+
+                    {/* Backend Offline Warning */}
+                    {backendState === 'offline' && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className="mb-4 flex items-center justify-between gap-2 bg-amber-500/5 border border-amber-500/20 text-amber-400 px-4 py-3 rounded-xl"
+                        >
+                            <div className="flex items-center gap-2 min-w-0">
+                                <WifiOff className="w-3.5 h-3.5 flex-shrink-0" />
+                                <span className="text-[11px] font-medium leading-snug">
+                                    Server AI offline. Login tetap bisa, tapi fitur AI belum tersedia.
+                                </span>
+                            </div>
+                            <button
+                                onClick={async () => {
+                                    setIsRetryingBackend(true);
+                                    await retryBackendCheck();
+                                    setIsRetryingBackend(false);
+                                }}
+                                disabled={isRetryingBackend}
+                                className="flex-shrink-0 p-1.5 rounded-lg hover:bg-amber-500/10 transition-all cursor-pointer disabled:opacity-50"
+                                title="Coba lagi"
+                            >
+                                <RefreshCw className={`w-3.5 h-3.5 ${isRetryingBackend ? 'animate-spin' : ''}`} />
+                            </button>
+                        </motion.div>
+                    )}
 
                     {errorMessage && (
                         <motion.div

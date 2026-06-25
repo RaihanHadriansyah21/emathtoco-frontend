@@ -73,9 +73,11 @@ export async function apiRequest(
     signal: controller.signal,
   };
 
-  // Debug logging (dapat dihapus setelah deployment stabil)
-  console.log('[API DEBUG] URL:', url);
-  console.log('[API DEBUG] METHOD:', mergedOptions.method || 'GET');
+  // Debug logging (development only)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[API DEBUG] URL:', url);
+    console.log('[API DEBUG] METHOD:', mergedOptions.method || 'GET');
+  }
 
   try {
     const response = await fetch(url, mergedOptions);

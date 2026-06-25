@@ -65,7 +65,9 @@ async function performHealthCheck(): Promise<boolean> {
     return true;
   } catch (err) {
     clearTimeout(timeoutId);
-    console.warn('[BACKEND] Health check failed:', err instanceof Error ? err.message : err);
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[BACKEND] Health check failed:', err instanceof Error ? err.message : err);
+    }
     return false;
   }
 }
@@ -85,7 +87,9 @@ export function BackendStatusProvider({ children }: { children: React.ReactNode 
     setState(newState);
     setBackendState(newState);
 
-    console.log(`[BACKEND] Health check result: ${newState}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[BACKEND] Health check result: ${newState}`);
+    }
   }, []);
 
   // Single health check on mount — no polling, no retry

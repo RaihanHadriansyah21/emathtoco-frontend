@@ -33,6 +33,13 @@ export default function RegisterPage() {
             return;
         }
 
+        // FIX #9: Validate email format before sending to Supabase
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email.trim())) {
+            setErrorMessage('Format alamat email tidak valid!');
+            return;
+        }
+
         const alnumRegex = /^(?=.*[a-zA-Z])(?=.*\d).{6,}$/;
         if (!alnumRegex.test(password)) {
             setErrorMessage('Password harus minimal 6 karakter dan mengandung kombinasi huruf dan angka (alfanumerik).');

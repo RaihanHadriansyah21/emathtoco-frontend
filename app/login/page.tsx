@@ -3,10 +3,11 @@
 import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/app/components/AuthGate';
+import { useBackendStatus } from '@/lib/backend-store';
 import { supabase } from '@/lib/supabase';
 import Image from 'next/image';
 import Logo from '../Emathtoco.png';
-import { GraduationCap, BookOpen, ArrowRight, Loader2, Sparkles, ArrowLeft, LogIn } from 'lucide-react';
+import { GraduationCap, BookOpen, ArrowRight, Loader2, Sparkles, ArrowLeft, LogIn, WifiOff, RefreshCw } from 'lucide-react';
 import LoginAIScene from '@/components/ui/login-ai-scene';
 import { motion, AnimatePresence } from 'framer-motion';
 import PageTransition from '@/components/ui/PageTransition';
@@ -16,6 +17,7 @@ import ShinyText from '@/components/ui/ShinyText';
 function LoginPageContent() {
     const router = useRouter();
     const { user, loading } = useAuth();
+    const { backendState, retryBackendCheck } = useBackendStatus();
     const searchParams = useSearchParams();
     const [showSelection, setShowSelection] = useState(searchParams.get('select') === 'true');
 
@@ -35,6 +37,27 @@ function LoginPageContent() {
     return (
         <PageTransition>
             <div className="min-h-screen bg-gradient-to-br from-[#060814] via-[#020205] to-[#000000] relative overflow-hidden font-sans">
+            {/* Backend Offline Floating Indicator */}
+            {backendState === 'offline' && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex items-center gap-2.5 bg-[#0a0a12]/90 backdrop-blur-xl border border-amber-500/20 text-amber-400 px-4 py-2.5 rounded-full shadow-xl shadow-black/30">
+                        <WifiOff className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span className="text-[11px] font-medium whitespace-nowrap">
+                            Server AI offline
+                        </span>
+                        <button
+                            onClick={async () => {
+                                await retryBackendCheck();
+                            }}
+                            className="p-1 rounded-full hover:bg-amber-500/10 transition-all cursor-pointer"
+                            title="Coba lagi"
+                        >
+                            <RefreshCw className="w-3 h-3" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* ═══════════════════════════════════════════════════════ */}
             {/* BACKGROUND AMBIENT GLOWS                              */}
             {/* ═══════════════════════════════════════════════════════ */}

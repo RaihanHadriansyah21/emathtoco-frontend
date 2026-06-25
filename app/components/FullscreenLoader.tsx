@@ -1,10 +1,50 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Logo from '../Emathtoco.png';
+import { useBackendStatus } from '@/lib/backend-store';
+import { WifiOff, RefreshCw, LogIn, AlertTriangle } from 'lucide-react';
+
+// ============================================================
+// EMATHTOCO — Fullscreen Loader
+//
+// Loader halaman penuh yang ditampilkan saat autentikasi sedang
+// diperiksa pada route yang dilindungi.
+//
+// ESCAPE HATCH: Setelah 8 detik, jika loader masih ditampilkan,
+// tampilkan pesan informatif dan tombol aksi agar user tidak
+// pernah terjebak di loading tanpa jalan keluar.
+// ============================================================
+
+const TIMEOUT_MS = 8000; // 8 seconds before showing escape hatch
 
 export default function FullscreenLoader() {
+    const [isTimedOut, setIsTimedOut] = useState(false);
+    const { backendState, retryBackendCheck } = useBackendStatus();
+    const [isRetrying, setIsRetrying] = useState(false);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setIsTimedOut(true);
+        }, TIMEOUT_MS);
+        return () => clearTimeout(timer);
+    }, []);
+
+    const handleRetry = async () => {
+        setIsRetrying(true);
+        setIsTimedOut(false);
+        await retryBackendCheck();
+        // Force a full page reload to restart auth flow
+        window.location.reload();
+    };
+
+    const handleBackToLogin = () => {
+        // Clear any stale auth cookies
+        document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
+        window.location.href = '/login';
+    };
+
     return (
         <div className="fixed inset-0 bg-gradient-to-br from-white via-cyan-50/20 to-slate-50 dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] flex flex-col items-center justify-center z-50 font-sans relative overflow-hidden select-none">
             {/* Elegant Background Glows */}
@@ -24,7 +64,7 @@ export default function FullscreenLoader() {
             </div>
 
             {/* Content Container */}
-            <div className="relative z-10 flex flex-col items-center gap-6 text-center animate-in fade-in zoom-in-95 duration-500">
+            <div className="relative z-10 flex flex-col items-center gap-6 text-center animate-in fade-in zoom-in-95 duration-500 px-6 max-w-md">
                 {/* Logo Frame with Shimmer and Pulse */}
                 <div className="relative p-5 bg-white border border-slate-200/80 rounded-2xl shadow-xl dark:shadow-[0_0_40px_rgba(6,182,212,0.12)] flex items-center justify-center animate-[pulse-glow-box_3s_ease-in-out_infinite]">
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-500/10 dark:via-cyan-500/20 to-transparent -translate-x-full animate-[shimmer_2.5s_infinite] pointer-events-none rounded-2xl" />
@@ -41,15 +81,69 @@ export default function FullscreenLoader() {
                     <h1 className="text-3xl font-extrabold tracking-widest text-slate-800 dark:text-white">
                         E-MATH<span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 bg-clip-text text-transparent font-extrabold">TOCO</span>
                     </h1>
-                    <p className="text-slate-500 dark:text-neutral-400 text-xs font-bold uppercase tracking-[0.3em] animate-pulse">
-                        Memuat Sistem...
-                    </p>
+
+                    {!isTimedOut ? (
+                        /* ── Normal loading state ──────────────────── */
+                        <p className="text-slate-500 dark:text-neutral-400 text-xs font-bold uppercase tracking-[0.3em] animate-pulse">
+                            Memuat Sistem...
+                        </p>
+                    ) : (
+                        /* ── Timeout escape hatch ──────────────────── */
+                        <div className="animate-in fade-in slide-in-from-bottom-3 duration-500 space-y-4 mt-2">
+                            {/* Backend offline indicator */}
+                            {backendState === 'offline' && (
+                                <div className="flex items-center justify-center gap-2 text-amber-400">
+                                    <WifiOff className="w-4 h-4" />
+                                    <span className="text-xs font-bold uppercase tracking-wider">
+                                        Server Offline
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* Informative message */}
+                            <div className="flex items-start gap-2.5 bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-left">
+                                <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                                <div className="space-y-1">
+                                    <p className="text-amber-400 text-xs font-bold uppercase tracking-wider">
+                                        Koneksi Lambat
+                                    </p>
+                                    <p className="text-slate-600 dark:text-neutral-400 text-xs leading-relaxed">
+                                        {backendState === 'offline'
+                                            ? 'Server backend tidak merespons. Anda dapat mencoba lagi atau kembali ke halaman login.'
+                                            : 'Memuat sistem memakan waktu lebih lama dari biasanya. Silakan coba lagi atau kembali ke login.'
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Action buttons */}
+                            <div className="flex items-center gap-3 justify-center">
+                                <button
+                                    onClick={handleRetry}
+                                    disabled={isRetrying}
+                                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 hover:text-cyan-300 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+                                >
+                                    <RefreshCw className={`w-3.5 h-3.5 ${isRetrying ? 'animate-spin' : ''}`} />
+                                    <span>{isRetrying ? 'Memuat...' : 'Coba Lagi'}</span>
+                                </button>
+                                <button
+                                    onClick={handleBackToLogin}
+                                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-neutral-400 hover:text-white text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+                                >
+                                    <LogIn className="w-3.5 h-3.5" />
+                                    <span>Ke Login</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
-                {/* Progress Indicator */}
-                <div className="w-40 h-1 bg-slate-200 dark:bg-neutral-900 rounded-full overflow-hidden mt-4 relative">
-                    <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-600 dark:from-cyan-400 dark:to-blue-500 rounded-full w-2/3 absolute left-0 top-0 animate-[loading-bar_1.8s_ease-in-out_infinite]" />
-                </div>
+                {/* Progress Indicator — only visible during normal loading */}
+                {!isTimedOut && (
+                    <div className="w-40 h-1 bg-slate-200 dark:bg-neutral-900 rounded-full overflow-hidden mt-4 relative">
+                        <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-600 dark:from-cyan-400 dark:to-blue-500 rounded-full w-2/3 absolute left-0 top-0 animate-[loading-bar_1.8s_ease-in-out_infinite]" />
+                    </div>
+                )}
             </div>
 
             {/* Custom animations styles */}

@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/app/components/AuthGate';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import { User, IdCard, GraduationCap, Loader2 } from 'lucide-react';
@@ -10,6 +11,13 @@ import PageTransition from '@/components/ui/PageTransition';
 
 export default function CompleteProfilePage() {
     const router = useRouter();
+    const routerRef = useRef(router);
+    routerRef.current = router;
+
+    // FIX #3: Use useAuth() as single source of truth instead of
+    // calling supabase.auth.getUser() independently (which caused deadlocks)
+    const { user: authUser, loading: authLoading } = useAuth();
+
     const [namaLengkap, setNamaLengkap] = useState('');
     const [nimNip, setNimNip] = useState('');
     const [kelas, setKelas] = useState('');
@@ -21,31 +29,27 @@ export default function CompleteProfilePage() {
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     useEffect(() => {
-        // Ambil data user aktif
+        // Wait for AuthGate to finish loading
+        if (authLoading) return;
+
+        // If no authenticated user, redirect to login
+        if (!authUser) {
+            window.location.href = '/login';
+            return;
+        }
+
+        setUserId(authUser.id);
+
+        // Check if profile already exists in database
         const checkExistingProfile = async () => {
             try {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (!user) {
-                    await supabase.auth.signOut();
-                    document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
-                    window.location.href = '/login';
-                    return;
-                }
-                setUserId(user.id);
-
-                // Cek apakah data profil sudah ada di database
                 const { data: profile, error } = await supabase
                     .from('profil_pengguna')
                     .select('nama_lengkap, role')
-                    .eq('id', user.id)
+                    .eq('id', authUser.id)
                     .maybeSingle();
 
-                console.log("AUTH USER:", user);
-                console.log("PROFILE:", profile);
-                console.log("PROFILE ERROR:", error);
-
                 if (error) {
-                    console.error("Gagal memeriksa profil terdaftar:", error);
                     setErrorMessage("Gagal memeriksa data profil dari database.");
                     setIsChecking(false);
                     return;
@@ -55,18 +59,16 @@ export default function CompleteProfilePage() {
                     // Jika profil sudah lengkap, arahkan langsung ke dashboard yang sesuai
                     const userRole = normalizeRole(profile.role || 'mahasiswa');
                     if (userRole === 'dosen') {
-                        router.push('/dosen');
+                        routerRef.current.push('/dosen');
                     } else if (userRole === 'admin') {
-                        router.push('/admin');
+                        routerRef.current.push('/admin');
                     } else {
-                        router.push('/');
+                        routerRef.current.push('/');
                     }
                     return;
                 }
             } catch (err) {
-                console.error('Gagal memverifikasi data profil:', err);
-                await supabase.auth.signOut();
-                document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
+                // Network/unexpected error — redirect to login
                 window.location.href = '/login';
             } finally {
                 setIsChecking(false);
@@ -74,7 +76,9 @@ export default function CompleteProfilePage() {
         };
 
         checkExistingProfile();
-    }, [router]);
+    // FIX #10: authUser and authLoading are stable references from context,
+    // no need for router in deps (use routerRef instead)
+    }, [authUser, authLoading]);
 
     // Regex patterns for validation
     const NIM_PATTERN = /^\d{8,}$/;
