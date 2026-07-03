@@ -46,11 +46,15 @@ export default function LoginAIScene() {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 4000); // 4-second timeout limit
 
-                // Try to head-request the Spline CDN
+                // Use cors mode (not no-cors) so that firewall block pages are
+                // correctly detected as failures. no-cors accepts any opaque
+                // response (including block pages), leading to Spline being
+                // rendered and then throwing a runtime error.
                 await fetch(splineSceneUrl, {
-                    method: 'HEAD',
-                    mode: 'no-cors',
-                    signal: controller.signal
+                    method: 'GET',
+                    mode: 'cors',
+                    signal: controller.signal,
+                    headers: { 'Range': 'bytes=0-1' },
                 });
                 
                 clearTimeout(timeoutId);
