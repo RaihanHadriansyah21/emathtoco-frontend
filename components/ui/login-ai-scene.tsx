@@ -46,14 +46,22 @@ export default function LoginAIScene() {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 4000); // 4-second timeout limit
 
-                // Try to head-request the Spline CDN
-                await fetch(splineSceneUrl, {
-                    method: 'HEAD',
-                    mode: 'no-cors',
-                    signal: controller.signal
+                // Fetch the first byte of the scene file using standard CORS.
+                // If blocked by browser, network, or proxy, it will throw an error immediately.
+                const response = await fetch(splineSceneUrl, {
+                    method: 'GET',
+                    mode: 'cors',
+                    signal: controller.signal,
+                    headers: {
+                        'Range': 'bytes=0-0'
+                    }
                 });
                 
                 clearTimeout(timeoutId);
+
+                if (!response.ok && response.status !== 206) {
+                    throw new Error(`Spline CDN returned status ${response.status}`);
+                }
                 
                 if (isMounted) {
                     setIsSplineReady(true);
