@@ -20,7 +20,7 @@ export function buildContentSecurityPolicy({
       "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
-      `connect-src 'self' ${supabaseUrl} wss://${supabaseHost} ${apiOrigin} ws://localhost:* ws://127.0.0.1:* http://localhost:* http://127.0.0.1:*`,
+      `connect-src 'self' ${supabaseUrl} wss://${supabaseHost} ${apiOrigin} ws://localhost:* ws://127.0.0.1:* http://localhost:* http://127.0.0.1:* https://prod.spline.design https://*.spline.design`,
       "font-src 'self' data:",
       "media-src 'self' data: blob:",
       "worker-src 'self' blob:",
