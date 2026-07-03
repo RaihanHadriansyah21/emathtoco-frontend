@@ -1,82 +1,95 @@
 'use client'
 
-import React, { useEffect, useRef, useState } from 'react'
-import { logger } from '@/lib/logger'
+import React, { Suspense, lazy, ComponentProps, Component, ErrorInfo, ReactNode } from 'react'
+
+const Spline = lazy(() => import('@splinetool/react-spline'))
+
+type SplineProps = ComponentProps<typeof Spline>
 
 interface SplineSceneProps {
   scene: string
   className?: string
-  onLoad?: () => void
-  onError?: (err: unknown) => void
+  onLoad?: SplineProps['onLoad']
+  onError?: SplineProps['onError']
 }
 
-const fallbackSpinner = (
-  <div className="w-full h-full flex items-center justify-center">
-    <span className="loader"></span>
-  </div>
-)
+interface ErrorBoundaryProps {
+  fallback: ReactNode
+  children: ReactNode
+  onError?: (error: Error) => void
+}
 
-export function SplineScene({ scene, className, onLoad, onError }: SplineSceneProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [loading, setLoading] = useState(true)
-  const [failed, setFailed] = useState(false)
+interface ErrorBoundaryState {
+  hasError: boolean
+}
 
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-
-    let disposed = false
-
-    // Use @splinetool/runtime directly instead of the React component.
-    // The React component (<Spline>) throws synchronously during render when
-    // fetch fails, which triggers Next.js dev overlay and cannot be caught by
-    // any ErrorBoundary or window handler in dev mode.
-    // By using the runtime directly inside useEffect, ALL errors (including
-    // network failures) are caught in the promise .catch() chain and never
-    // surface as uncaught errors.
-    import('@splinetool/runtime')
-      .then(({ Application }) => {
-        if (disposed) return
-        const app = new Application(canvas)
-        return app.load(scene)
-      })
-      .then(() => {
-        if (disposed) return
-        setLoading(false)
-        onLoad?.()
-      })
-      .catch((err) => {
-        if (disposed) return
-        logger.warn('[SplineScene] Spline scene failed to load (graceful fallback):', err)
-        setFailed(true)
-        setLoading(false)
-        onError?.(err)
-      })
-
-    return () => {
-      disposed = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene])
-
-  // When failed, render nothing — the parent (LoginAIScene) handles showing
-  // the static fallback based on its own hasError/onError state.
-  if (failed) {
-    return null
+class SplineErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public state: ErrorBoundaryState = {
+    hasError: false
   }
 
+  public static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true }
+  }
+
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Intentionally empty — we do NOT log here because:
+    // 1. logger.error triggers console.error which Next.js dev overlay picks up
+    // 2. logger.warn still appears in terminal causing confusion
+    // The parent (LoginAIScene) handles error state via onError prop.
+    void error
+    void errorInfo
+    this.props.onError?.(error)
+  }
+
+  public render() {
+    if (this.state.hasError) {
+      return this.props.fallback
+    }
+
+    return this.props.children
+  }
+}
+
+export function SplineScene({ scene, className, onLoad, onError }: SplineSceneProps) {
+  const fallbackSpinner = (
+    <div className="w-full h-full flex items-center justify-center">
+      <span className="loader"></span>
+    </div>
+  )
+
+  // Suppress "Failed to fetch" errors from reaching Next.js dev overlay.
+  // React dev mode re-throws ErrorBoundary-caught errors via setTimeout,
+  // which fires a window 'error' event. We intercept it in capture phase
+  // and prevent propagation to the overlay handler.
+  React.useEffect(() => {
+    const suppressSplineError = (event: ErrorEvent) => {
+      if (
+        event.message === 'Failed to fetch' ||
+        event.message?.includes('Failed to fetch') ||
+        event.message?.includes('NetworkError')
+      ) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+      }
+    }
+    window.addEventListener('error', suppressSplineError, true)
+    return () => window.removeEventListener('error', suppressSplineError, true)
+  }, [])
+
   return (
-    <>
-      {loading && fallbackSpinner}
-      <canvas
-        ref={canvasRef}
-        className={className}
-        style={{
-          width: '100%',
-          height: '100%',
-          display: loading ? 'none' : 'block',
-        }}
-      />
-    </>
+    <SplineErrorBoundary
+      fallback={fallbackSpinner}
+      onError={(err) => onError?.(err)}
+    >
+      <Suspense fallback={fallbackSpinner}>
+        <Spline
+          scene={scene}
+          className={className}
+          onLoad={onLoad}
+          onError={onError}
+        />
+      </Suspense>
+    </SplineErrorBoundary>
   )
 }
