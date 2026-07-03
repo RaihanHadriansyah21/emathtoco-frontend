@@ -154,7 +154,7 @@ export default function LoginAIScene() {
                                 className="w-full h-full"
                                 onLoad={() => setIsLoading(false)}
                                 onError={(err) => {
-                                    logger.error('[LoginAIScene] Spline loading error:', err);
+                                    logger.warn('[LoginAIScene] Spline unreachable, switching to static fallback:', err);
                                     setHasError(true);
                                     setIsLoading(false);
                                 }}

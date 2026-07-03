@@ -32,7 +32,10 @@ class SplineErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    logger.error("Spline rendering error caught:", error, errorInfo)
+    // Use warn (not error) so Next.js dev overlay is NOT triggered.
+    // Spline CDN being unreachable is an expected scenario in restricted networks.
+    logger.warn("Spline rendering error caught (graceful fallback):", error.message)
+    void errorInfo; // suppress unused variable warning
   }
 
   public render() {
