@@ -76,6 +76,19 @@ export async function apiRequest(
   try {
     const response = await fetch(url, mergedOptions);
     clearTimeout(timeoutId);
+
+    // If unauthorized (401), automatically clear session and redirect to login page
+    // to prevent infinite loops and auth sync issues.
+    if (response.status === 401) {
+      if (typeof window !== 'undefined') {
+        const loggerModule = await import('./logger');
+        loggerModule.logger.warn('[API] 401 Unauthorized detected. Signing out and redirecting to login.');
+        void supabase.auth.signOut().then(() => {
+          window.location.href = '/login?message=session_expired';
+        });
+      }
+    }
+
     return response;
   } catch (error) {
     clearTimeout(timeoutId);
