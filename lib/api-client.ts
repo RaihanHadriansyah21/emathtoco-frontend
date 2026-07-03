@@ -42,6 +42,7 @@ export async function apiRequest(
   const headers = new Headers();
 
   headers.set('Accept', 'application/json');
+  headers.set('ngrok-skip-browser-warning', 'true');
 
   // 2. Merge custom headers dari caller (tanpa menimpa defaults jika tidak diset)
   if (fetchOptions.headers) {

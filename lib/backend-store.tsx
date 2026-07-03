@@ -41,7 +41,10 @@ async function performHealthCheck(): Promise<BackendState> {
   try {
     const response = await fetch(`${API_URL}/health/ready`, {
       method: 'GET',
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+      },
       cache: 'no-store',
       signal: controller.signal,
     });
