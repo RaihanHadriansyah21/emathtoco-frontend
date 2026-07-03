@@ -1,13 +1,13 @@
+import { logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
-import { normalizeRole } from '@/lib/utils';
 import { apiPost } from '@/lib/api-client';
 import { getBackendState } from '@/lib/backend-store';
 
 export interface CreateAuditLogParams {
   action: string;
   target: string;
-  detail?: any;
-  details?: any;
+  detail?: unknown;
+  details?: unknown;
 }
 
 /**
@@ -59,12 +59,13 @@ export async function checkEnterpriseSchema(): Promise<boolean> {
 export async function createAuditLog(params: CreateAuditLogParams): Promise<void> {
   // Skip audit log entirely if backend is offline — no hang, no error
   if (getBackendState() === 'offline') {
-    console.log('[AUDIT] Backend offline — skipping audit log');
+    logger.debug('[AUDIT] Backend offline — skipping audit log');
     return;
   }
 
   try {
-    let { action, target, detail, details } = params;
+    let { action, target } = params;
+    const { detail, details } = params;
     let finalDetails = details !== undefined ? details : detail;
 
     // Standardize model names across action, target, and details
@@ -98,11 +99,10 @@ export async function createAuditLog(params: CreateAuditLogParams): Promise<void
     const response = await apiPost('/audit/log', payload);
     if (!response.ok) {
       const errorText = await response.text();
-      console.warn('[AUDIT] Backend API write failed:', errorText);
+      logger.warn('[AUDIT] Backend API write failed:', errorText);
     }
   } catch (error) {
     // Non-blocking: catch everything, log it, do not crash the main workflow.
-    console.error('[AUDIT] Error during createAuditLog:', error);
+    logger.error('[AUDIT] Error during createAuditLog:', error);
   }
 }
-

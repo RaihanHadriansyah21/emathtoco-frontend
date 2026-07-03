@@ -1,5 +1,7 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/components/AuthGate';
@@ -135,11 +137,10 @@ export default function DosenLoginPage() {
     const sendLoginAuditLog = async (auditPayload: {
         action: string;
         target: string;
-        details: any;
+        details: Record<string, unknown>;
     }, token?: string) => {
         // Skip audit log entirely if backend is offline
         if (getBackendState() === 'offline') {
-            console.log('[AUDIT] Backend offline — skipping audit log');
             return;
         }
         try {
@@ -150,14 +151,12 @@ export default function DosenLoginPage() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'ngrok-skip-browser-warning': 'true',
                     'Accept': 'application/json',
                     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
                 },
                 body,
                 keepalive: true,
             }).catch(() => {});
-            console.log('[AUDIT DEBUG] keepalive fetch fired');
         } catch {
             // Non-blocking: silently fail
         }
@@ -191,8 +190,7 @@ export default function DosenLoginPage() {
             }
 
             if (data?.session) {
-                console.log('[AUDIT DEBUG] Login success');
-                document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax`;
+                logger.debug('[AUDIT DEBUG] Login success');
 
                 let targetPath = '/';
 
@@ -211,7 +209,6 @@ export default function DosenLoginPage() {
                     // ═══════════════════════════════════════════════════════
                     if (role !== 'dosen' && role !== 'admin') {
                         await supabase.auth.signOut();
-                        document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
                         const sessionKey = `logged_${data.session.user.id}`;
                         if (typeof window !== 'undefined') {
                             sessionStorage.removeItem(sessionKey);
@@ -227,7 +224,7 @@ export default function DosenLoginPage() {
                     // Session storage guard to prevent duplicate login logging
                     const sessionLoggedKey = `logged_${data.session.user.id}`;
                     if (typeof window !== 'undefined' && !sessionStorage.getItem(sessionLoggedKey)) {
-                        console.log('[AUDIT DEBUG] About to write audit log');
+                        logger.debug('[AUDIT DEBUG] About to write audit log');
                         sessionStorage.setItem(sessionLoggedKey, 'true');
 
                         const auditAction = role === 'admin' ? 'ADMIN_LOGIN' : 'LECTURER_LOGIN';
@@ -236,10 +233,10 @@ export default function DosenLoginPage() {
                             target: 'auth',
                             details: { role },
                         }, data.session.access_token);
-                        console.log('[AUDIT DEBUG] Audit log request sent');
+                        logger.debug('[AUDIT DEBUG] Audit log request sent');
                     }
                 } catch (auditErr) {
-                    console.error('[AUDIT] Failed to log user login:', auditErr);
+                    logger.error('[AUDIT] Failed to log user login:', auditErr);
                 }
 
                 // ─────────────────────────────────────────────────────────────

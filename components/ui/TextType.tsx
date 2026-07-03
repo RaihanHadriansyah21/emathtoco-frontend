@@ -2,7 +2,8 @@
 
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 
-export interface TextTypeProps {
+export interface TextTypeProps
+  extends Omit<React.HTMLAttributes<HTMLElement>, 'children'> {
   text: string | string[];
   as?: React.ElementType;
   typingSpeed?: number;
@@ -21,7 +22,6 @@ export interface TextTypeProps {
   onSentenceComplete?: (sentence: string, index: number) => void;
   startOnVisible?: boolean;
   reverseMode?: boolean;
-  [key: string]: any;
 }
 
 export default function TextType({
@@ -86,7 +86,7 @@ export default function TextType({
   useEffect(() => {
     if (!isVisible) return;
 
-    let timeout: any;
+    let timeout: ReturnType<typeof setTimeout>;
     const currentText = textArray[currentTextIndex];
     const processedText = reverseMode ? currentText.split('').reverse().join('') : currentText;
 

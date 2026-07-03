@@ -67,7 +67,7 @@ export default function CompleteProfilePage() {
                     }
                     return;
                 }
-            } catch (err) {
+            } catch {
                 // Network/unexpected error — redirect to login
                 window.location.href = '/login';
             } finally {
@@ -143,7 +143,7 @@ export default function CompleteProfilePage() {
                 window.location.href = '/';
             }, 1500);
 
-        } catch (err) {
+        } catch {
             setErrorMessage('Terjadi gangguan jaringan saat menghubungi server database.');
             setIsLoading(false);
         }

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 import { cardTransition } from '@/styles/motion';
 
 interface GlassCardProps {
@@ -9,7 +9,7 @@ interface GlassCardProps {
   className?: string;
   onClick?: () => void;
   hoverScale?: boolean;
-  variants?: any;
+  variants?: Variants;
   accentColor?: string; // Optional top accent color border
 }
 

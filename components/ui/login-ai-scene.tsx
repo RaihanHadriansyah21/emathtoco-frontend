@@ -1,5 +1,7 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
@@ -57,7 +59,7 @@ export default function LoginAIScene() {
                     setIsSplineReady(true);
                 }
             } catch (err) {
-                console.warn('Spline CDN is unreachable or client is offline. Gracefully falling back to static view.', err);
+                logger.warn('Spline CDN is unreachable or client is offline. Gracefully falling back to static view.', err);
                 if (isMounted) {
                     setHasError(true);
                     setIsLoading(false);
@@ -69,7 +71,7 @@ export default function LoginAIScene() {
 
         const safeguardTimer = setTimeout(() => {
             if (isMounted && isLoadingRef.current) {
-                console.warn('Spline load timed out (20s safeguard). Falling back to premium static view.');
+                logger.warn('Spline load timed out (20s safeguard). Falling back to premium static view.');
                 setHasError(true);
             }
         }, 20000);
@@ -152,7 +154,7 @@ export default function LoginAIScene() {
                                 className="w-full h-full"
                                 onLoad={() => setIsLoading(false)}
                                 onError={(err) => {
-                                    console.error('[LoginAIScene] Spline loading error:', err);
+                                    logger.error('[LoginAIScene] Spline loading error:', err);
                                     setHasError(true);
                                     setIsLoading(false);
                                 }}

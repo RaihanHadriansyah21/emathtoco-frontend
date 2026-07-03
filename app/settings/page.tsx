@@ -1,18 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { KeyRound, MonitorDot, Info, Eye, EyeOff, Loader2, CheckCircle2, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../components/AuthGate';
 import Navbar from '../components/Navbar';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
 import PageTransition from '@/components/ui/PageTransition';
+import { isStrongPassword, PASSWORD_REQUIREMENTS } from '@/lib/security/password';
 
 export default function SettingsPage() {
-    const router = useRouter();
     const { user, loading } = useAuth();
-    const [userId, setUserId] = useState<string | null>(null);
     const [userEmail, setUserEmail] = useState('');
     const [role, setRole] = useState('mahasiswa');
     const [isChecking, setIsChecking] = useState(true);
@@ -38,7 +36,6 @@ export default function SettingsPage() {
     useEffect(() => {
         if (loading) return;
         if (user) {
-            setUserId(user.id);
             setUserEmail(user.email);
             setRole(user.role);
         }
@@ -55,9 +52,8 @@ export default function SettingsPage() {
             return;
         }
 
-        const alnumRegex = /^(?=.*[a-zA-Z])(?=.*\d).{6,}$/;
-        if (!alnumRegex.test(newPassword)) {
-            setErrorMessage('Kata sandi baru harus minimal 6 karakter dan mengandung kombinasi huruf dan angka (alfanumerik).');
+        if (!isStrongPassword(newPassword)) {
+            setErrorMessage(`Kata sandi baru ${PASSWORD_REQUIREMENTS}.`);
             return;
         }
 
@@ -96,7 +92,7 @@ export default function SettingsPage() {
             setCurrentPassword('');
             setNewPassword('');
             setConfirmPassword('');
-        } catch (err) {
+        } catch {
             setErrorMessage('Terjadi kesalahan koneksi server.');
         } finally {
             setIsLoading(false);

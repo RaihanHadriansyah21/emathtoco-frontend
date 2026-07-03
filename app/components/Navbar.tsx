@@ -2,11 +2,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ChevronDown, User, Settings, LogOut, Sun, Moon, Menu, ChevronLeft } from 'lucide-react';
+import { ArrowLeft, ChevronDown, User, Settings, LogOut, Menu, ChevronLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import { useAuth } from './AuthGate';
-import { useTheme } from 'next-themes';
 import Image from 'next/image';
 import Logo from '../Emathtoco.png';
 import { AnimatedThemeToggle } from '@/components/ui/animated-theme-toggle';
@@ -52,7 +51,6 @@ export default function Navbar({
   sidebarCollapsed = false,
   onToggleSidebar,
 }: NavbarProps) {
-  console.log("[NAVBAR_RENDER]", Date.now());
   const router = useRouter();
   const { user } = useAuth();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -66,9 +64,6 @@ export default function Navbar({
   
   const normalizedRole = normalizeRole(role);
   
-  const { theme, setTheme, resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
   useEffect(() => {
     if (user) {
       setAvatarUrl(user.foto_profil_url);
@@ -91,16 +86,6 @@ export default function Navbar({
   }, []);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const currentTheme = theme === 'system' ? resolvedTheme : theme;
-
-  const toggleTheme = () => {
-    setTheme(currentTheme === 'dark' ? 'light' : 'dark');
-  };
-
-  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
@@ -114,7 +99,6 @@ export default function Navbar({
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
     window.location.href = '/login';
   };
 

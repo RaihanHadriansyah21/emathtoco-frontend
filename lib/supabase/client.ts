@@ -1,23 +1,19 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+import { publicEnv } from '@/lib/env';
 
 const getSupabaseClient = (): SupabaseClient => {
-  if (typeof window === 'undefined') {
-    return createClient(supabaseUrl, supabaseAnonKey);
+  const globalVar = globalThis as typeof globalThis & {
+    __emathtocoSupabaseClient?: SupabaseClient;
+  };
+  if (!globalVar.__emathtocoSupabaseClient) {
+    globalVar.__emathtocoSupabaseClient = createBrowserClient(
+      publicEnv.supabaseUrl,
+      publicEnv.supabasePublishableKey,
+    );
   }
-
-  const globalVar = globalThis as any;
-  if (!globalVar.__supabaseClient) {
-    globalVar.__supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        detectSessionInUrl: true,
-      }
-    });
-  }
-  return globalVar.__supabaseClient;
+  return globalVar.__emathtocoSupabaseClient;
 };
 
 export const supabase = getSupabaseClient();

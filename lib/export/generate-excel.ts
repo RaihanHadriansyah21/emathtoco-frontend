@@ -5,15 +5,9 @@
 
 import { supabase } from '@/lib/supabase';
 import ExcelJS from 'exceljs';
+import { SECTION_CODES } from '@/lib/domain-contract';
 
 // Section codes in order
-const SECTION_CODES = [
-  'S-1A', 'S-1B', 'S-1C', 'S-1D', 'S-1E', 'S-1F',
-  'S-2A', 'S-2B', 'S-2C', 'S-2D', 'S-2E', 'S-2F',
-  'S-3A', 'S-3B', 'S-3C', 'S-3D', 'S-3E', 'S-3F',
-  'S-4A', 'S-4B', 'S-4C', 'S-4D', 'S-4E', 'S-4F',
-];
-
 export interface ExportFilters {
   finalizedOnly: boolean;
   kelas?: string;

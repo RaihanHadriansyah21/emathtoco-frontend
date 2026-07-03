@@ -1,16 +1,25 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { UploadCloud, CheckCircle, Loader2, AlertTriangle, Eye, Lock, X, RefreshCw, Trophy, Camera, Image as ImageIcon, Trash2, Zap, ZapOff } from 'lucide-react';
+import { CheckCircle, Loader2, AlertTriangle, Eye, Lock, X, RefreshCw, Trophy, Camera, Image as ImageIcon, Trash2 } from 'lucide-react';
 import Navbar from '../../components/Navbar';
 import PageTransition from '@/components/ui/PageTransition';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/app/hooks/useToast';
 import ToastContainer from '@/app/components/Toast';
-import { createAuditLog } from '@/lib/services/audit-service';
 import { apiPost } from '@/lib/api-client';
+import { replaceAnswerImage } from '@/lib/services/answer-upload-service';
+import { getSubmissionStatusPollDelay } from '@/lib/egress-policy';
+import {
+    getAnswerImageUrl,
+    getAnswerImageUrls,
+    getCachedAnswerImageUrl,
+} from '@/lib/storage/answer-image-urls';
 import { useAuth } from '../../components/AuthGate';
+import { getErrorMessage } from '@/lib/errors';
 
 const getMaxScore = (label: string): number => {
     return label.toLowerCase().endsWith('f') ? 5 : 4;
@@ -21,7 +30,7 @@ const generateSlots = () => {
     const list = [];
     const bagian = ['a', 'b', 'c', 'd', 'e', 'f'];
     for (let nomor = 1; nomor <= 4; nomor++) {
-        for (let b of bagian) {
+        for (const b of bagian) {
             list.push({ label: `${nomor}${b}`, nomor_soal: nomor, bagian_soal: b });
         }
     }
@@ -46,89 +55,14 @@ interface SlotState {
     reuploadCount?: number;
 }
 
-const createSubmission = async (mahasiswaId: string, mataKuliahId: string) => {
+const createSubmission = async (mataKuliahId: string) => {
     const { data, error } = await supabase
-        .from('pengumpulan_tugas')
-        .insert({
-            mahasiswa_id: mahasiswaId,
-            mata_kuliah_id: mataKuliahId,
-            status_submit: 'draft',
-            ai_status: 'idle'
-        })
-        .select()
-        .maybeSingle();
+        .rpc('create_submission', {
+            p_mata_kuliah_id: mataKuliahId,
+        });
     if (error) throw error;
-    if (!data) throw new Error('Gagal membuat data pengumpulan baru. Baris tidak dikembalikan oleh database.');
-    return data;
-};
-
-// EGRESS FIX: Signed URL cache — avoids regenerating URLs on every 3s poll.
-// Signed URLs expire after 3600s; we cache for 50 minutes (3000s) to ensure
-// the URL is valid with a 10-minute safety buffer.
-const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
-
-const getSignedPreviewUrl = async (path: string): Promise<string | null> => {
-    const now = Date.now();
-    const cached = signedUrlCache.get(path);
-    // Return cached URL if still valid (expires in > 60s)
-    if (cached && cached.expiresAt - now > 60_000) {
-        return cached.url;
-    }
-    try {
-        const { data, error } = await supabase.storage
-            .from('lembar-jawaban')
-            .createSignedUrl(path, 3600);
-        if (error) throw error;
-        // Cache for 50 minutes (3000 seconds)
-        signedUrlCache.set(path, { url: data.signedUrl, expiresAt: now + 3_000_000 });
-        return data.signedUrl;
-    } catch (err) {
-        console.error('Error generating signed URL:', err);
-        return null;
-    }
-};
-
-const getSignedPreviewUrls = async (paths: string[]): Promise<Map<string, string>> => {
-    const result = new Map<string, string>();
-    if (paths.length === 0) return result;
-
-    const now = Date.now();
-    const pathsToFetch: string[] = [];
-
-    // Check cache first
-    for (const path of paths) {
-        const cached = signedUrlCache.get(path);
-        if (cached && cached.expiresAt - now > 60_000) {
-            result.set(path, cached.url);
-        } else {
-            pathsToFetch.push(path);
-        }
-    }
-
-    if (pathsToFetch.length === 0) {
-        return result;
-    }
-
-    try {
-        const { data, error } = await supabase.storage
-            .from('lembar-jawaban')
-            .createSignedUrls(pathsToFetch, 3600);
-
-        if (error) throw error;
-
-        if (data) {
-            for (const item of data) {
-                if (item.signedUrl && item.path) {
-                    signedUrlCache.set(item.path, { url: item.signedUrl, expiresAt: now + 3_000_000 });
-                    result.set(item.path, item.signedUrl);
-                }
-            }
-        }
-    } catch (err) {
-        console.error('Error generating bulk signed URLs:', err);
-    }
-
-    return result;
+    if (!data) throw new Error('Gagal membuat data pengumpulan baru.');
+    return { id: data as string };
 };
 
 const getExifOrientation = (file: File): Promise<number> => {
@@ -216,7 +150,7 @@ const compressImage = async (file: File): Promise<File> => {
 
         if (originalSizeMB <= 1 && orientation <= 1) {
             if (process.env.NODE_ENV !== 'production') {
-                console.log("[UPLOAD] Skip Compression & Rotation (File size <= 1MB, no rotation):", file.size);
+                logger.debug("[UPLOAD] Skip Compression & Rotation (File size <= 1MB, no rotation):", file.size);
             }
             resolve(file);
             return;
@@ -307,13 +241,13 @@ const compressImage = async (file: File): Promise<File> => {
 
                             if (process.env.NODE_ENV !== 'production') {
                                 const ratio = ((file.size - compressedFile.size) / file.size * 100).toFixed(2) + "%";
-                                console.log("[UPLOAD] Original Size:", file.size);
-                                console.log("[UPLOAD] Compressed Size:", compressedFile.size);
-                                console.log("[UPLOAD] Compression Ratio:", ratio);
-                                console.log("[UPLOAD] EXIF Orientation:", orientation);
-                                console.log("[UPLOAD] Auto-Rotate Supported by Browser:", autoRotateSupported);
-                                console.log("[UPLOAD] Original Resolution:", originalWidth, originalHeight);
-                                console.log("[UPLOAD] Final Resolution:", finalWidth, finalHeight);
+                                logger.debug("[UPLOAD] Original Size:", file.size);
+                                logger.debug("[UPLOAD] Compressed Size:", compressedFile.size);
+                                logger.debug("[UPLOAD] Compression Ratio:", ratio);
+                                logger.debug("[UPLOAD] EXIF Orientation:", orientation);
+                                logger.debug("[UPLOAD] Auto-Rotate Supported by Browser:", autoRotateSupported);
+                                logger.debug("[UPLOAD] Original Resolution:", originalWidth, originalHeight);
+                                logger.debug("[UPLOAD] Final Resolution:", finalWidth, finalHeight);
                             }
 
                             resolve(compressedFile);
@@ -343,10 +277,14 @@ interface CustomCameraModalProps {
     onFallbackToNative?: () => void;
 }
 
+type TorchCapabilities = MediaTrackCapabilities & { torch?: boolean };
+type TorchConstraint = MediaTrackConstraintSet & { torch: boolean };
+type ResizeCorner = 'TL' | 'TR' | 'BL' | 'BR';
+
 const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFile, onCapture, onClose, onFallbackToNative }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
-    const analysisIntervalRef = useRef<any>(null);
+    const analysisIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const [isCameraActive, setIsCameraActive] = useState(false);
     const [cameraError, setCameraError] = useState(false);
@@ -359,7 +297,7 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);
     const [capturedFile, setCapturedFile] = useState<File | null>(null);
-    const [coverageRatio, setCoverageRatio] = useState(0);
+    const [, setCoverageRatio] = useState(0);
 
     const [torchActive, setTorchActive] = useState(false);
     const [isTorchSupported, setIsTorchSupported] = useState(false);
@@ -384,19 +322,19 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
             const videoTrack = streamRef.current.getVideoTracks()[0];
             if (videoTrack) {
                 const nextState = !torchActive;
-                await (videoTrack as any).applyConstraints({
-                    advanced: [{ torch: nextState }]
+                await videoTrack.applyConstraints({
+                    advanced: [{ torch: nextState } as TorchConstraint]
                 });
                 setTorchActive(nextState);
             }
         } catch (e) {
-            console.error("Failed to toggle torch:", e);
+            logger.error("Failed to toggle torch:", e);
         }
     };
 
     const startCamera = async () => {
         try {
-            console.log("[CAMERA] opening web camera");
+            logger.debug("[CAMERA] opening web camera");
             const constraints = {
                 video: {
                     facingMode: { ideal: 'environment' },
@@ -406,8 +344,8 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
                 audio: false
             };
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            console.log("[CAMERA] web camera active");
-            console.log("[TRACE] using web camera");
+            logger.debug("[CAMERA] web camera active");
+            logger.debug("[TRACE] using web camera");
             streamRef.current = stream;
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
@@ -419,29 +357,28 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
             try {
                 const videoTrack = stream.getVideoTracks()[0];
                 if (videoTrack && typeof videoTrack.getCapabilities === 'function') {
-                    const capabilities = videoTrack.getCapabilities();
-                    // @ts-ignore
-                    setIsTorchSupported(!!(capabilities && 'torch' in capabilities));
+                    const capabilities = videoTrack.getCapabilities() as TorchCapabilities;
+                    setIsTorchSupported(Boolean(capabilities.torch));
                 } else {
                     setIsTorchSupported(false);
                 }
             } catch (e) {
-                console.warn("Torch check failed:", e);
+                logger.warn("Torch check failed:", e);
                 setIsTorchSupported(false);
             }
 
             // Start live analysis
             startLiveAnalysis();
-        } catch (err: any) {
-            console.error('getUserMedia failed:', err);
-            const errName = err?.name || (err instanceof Error ? err.name : "UnknownError");
-            const errMsg = err?.message || (err instanceof Error ? err.message : String(err));
+        } catch (err: unknown) {
+            logger.error('getUserMedia failed:', err);
+            const errName = err instanceof Error ? err.name : "UnknownError";
+            const errMsg = getErrorMessage(err, String(err));
             setCameraErrorName(errName);
             setCameraErrorMessage(errMsg);
-            console.log("[CAMERA ERROR NAME]", errName);
-            console.log("[CAMERA ERROR MESSAGE]", errMsg);
-            console.log("[SECURE CONTEXT]", window.isSecureContext);
-            console.log("[MEDIA DEVICES]", !!navigator.mediaDevices);
+            logger.debug("[CAMERA ERROR NAME]", errName);
+            logger.debug("[CAMERA ERROR MESSAGE]", errMsg);
+            logger.debug("[SECURE CONTEXT]", window.isSecureContext);
+            logger.debug("[MEDIA DEVICES]", !!navigator.mediaDevices);
             setCameraError(true);
             stopCamera();
         }
@@ -454,20 +391,22 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
         return () => {
             stopCamera();
         };
+    // The camera lifecycle is intentionally keyed only by the incoming file.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initialFile]);
 
     useEffect(() => {
-        console.log("[TRACE] CustomCameraModal mounted");
-        console.log("[CAMERA] overlay mounted");
+        logger.debug("[TRACE] CustomCameraModal mounted");
+        logger.debug("[CAMERA] overlay mounted");
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        console.log("[CAMERA] mobile detected", isMobile);
-        console.log("[CAMERA] analysis state", { isAnalyzing, guideStatus, guideMessage });
+        logger.debug("[CAMERA] mobile detected", isMobile);
+        logger.debug("[CAMERA] analysis state", { isAnalyzing, guideStatus, guideMessage });
     }, [isAnalyzing, guideStatus, guideMessage]);
 
     useEffect(() => {
         if (!previewUrl) {
-            console.log("[CAMERA] overlay rendered");
-            console.log("[CAMERA] overlay visible");
+            logger.debug("[CAMERA] overlay rendered");
+            logger.debug("[CAMERA] overlay visible");
         }
     }, [previewUrl]);
 
@@ -565,8 +504,8 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
                     }
                 }, 'image/jpeg', 0.95);
 
-            } catch (e: any) {
-                setValidationError('Kesalahan pemrosesan: ' + e.message);
+            } catch (error: unknown) {
+                setValidationError(`Kesalahan pemrosesan: ${getErrorMessage(error, 'UNKNOWN_ERROR')}`);
             } finally {
                 setIsAnalyzing(false);
             }
@@ -633,7 +572,7 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
                     setGuideStatus('green');
                     setGuideMessage('Siap difoto. Jaga kamera tetap stabil.');
                 }
-            } catch (e) {
+            } catch {
                 // Ignore silent errors during live analysis
             }
         }, 350);
@@ -726,7 +665,7 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
                 }
             }
         } catch (e) {
-            console.error('[CAMERA] Corner/perspective correction failed:', e);
+            logger.error('[CAMERA] Corner/perspective correction failed:', e);
         }
         return canvas;
     };
@@ -817,8 +756,8 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
             stopCamera();
             showPreview(finalCanvas);
 
-        } catch (e: any) {
-            setValidationError('Kesalahan pemrosesan: ' + e.message);
+        } catch (error: unknown) {
+            setValidationError(`Kesalahan pemrosesan: ${getErrorMessage(error, 'UNKNOWN_ERROR')}`);
         } finally {
             setIsAnalyzing(false);
         }
@@ -990,7 +929,7 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
                         </button>
                         <button
                             onClick={() => {
-                                console.log("[CAMERA] user selected native camera");
+                                logger.debug("[CAMERA] user selected native camera");
                                 stopCamera();
                                 if (onFallbackToNative) {
                                     onFallbackToNative();
@@ -1052,21 +991,14 @@ const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFil
                     overflow: 'hidden',
                     zIndex: 0,
                     // CSS custom properties for guide box dimensions
-                    // @ts-ignore
                     '--guide-width': 'min(85vw, 450px)',
                     '--guide-height': label.toLowerCase().endsWith('f')
                         ? 'calc(min(85vw, 450px) / 1.4)'
                         : 'calc(min(85vw, 450px) / 1.8)'
-                } as React.CSSProperties}>
+                } as React.CSSProperties & Record<'--guide-width' | '--guide-height', string>}>
                     {/* Live Video Preview */}
                     <video
-                        ref={(el) => {
-                            // @ts-ignore
-                            videoRef.current = el;
-                            if (el) {
-                                console.log("[TRACE] video element mounted");
-                            }
-                        }}
+                        ref={videoRef}
                         autoPlay
                         playsInline
                         muted
@@ -1394,6 +1326,8 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
             const timer = setTimeout(initializeCropBox, 100);
             return () => clearTimeout(timer);
         }
+    // initializeCropBox reads the latest element dimensions when the timer fires.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [imgUrl]);
 
     useEffect(() => {
@@ -1404,6 +1338,8 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
         return () => {
             window.removeEventListener('resize', handleResize);
         };
+    // The resize handler must be recreated only when the target aspect changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isQuestionF]);
 
     const checkCoverage = () => {
@@ -1430,6 +1366,8 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
             setIsAligned(checkCoverage());
         }, 50);
         return () => clearTimeout(timer);
+    // checkCoverage intentionally samples current DOM geometry after these values change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scale, offset, rotation, cropBox]);
 
     const handleReset = () => {
@@ -1488,7 +1426,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
         setResizeStartCursor({ x: clientX, y: clientY });
     };
 
-    const handleResizeMove = (clientX: number, clientY: number) => {
+    const handleResizeMove = (clientX: number) => {
         if (!resizeActiveCorner || !resizeStartBox || !containerRef.current) return;
         const containerRect = containerRef.current.getBoundingClientRect();
         const W_c = containerRect.width;
@@ -1496,8 +1434,6 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
         const ratio = isQuestionF ? 1.4 : 1.8;
 
         const dx = clientX - resizeStartCursor.x;
-        const dy = clientY - resizeStartCursor.y;
-
         let newWidth = resizeStartBox.width;
         let newHeight = resizeStartBox.height;
         let newLeft = resizeStartBox.left;
@@ -1551,7 +1487,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
 
     const handleMouseMove = (e: React.MouseEvent) => {
         if (resizeActiveCorner) {
-            handleResizeMove(e.clientX, e.clientY);
+            handleResizeMove(e.clientX);
         } else if (isDraggingCropBox.current && cropBox && containerRef.current) {
             const containerRect = containerRef.current.getBoundingClientRect();
             const W_c = containerRect.width;
@@ -1600,7 +1536,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
     const handleTouchMove = (e: React.TouchEvent) => {
         if (resizeActiveCorner) {
             if (e.touches[0]) {
-                handleResizeMove(e.touches[0].clientX, e.touches[0].clientY);
+                handleResizeMove(e.touches[0].clientX);
             }
         } else if (isDraggingCropBox.current && cropBox && containerRef.current && e.touches[0]) {
             const containerRect = containerRef.current.getBoundingClientRect();
@@ -1651,8 +1587,6 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
 
         try {
             const naturalW = imgRef.current.naturalWidth;
-            const naturalH = imgRef.current.naturalHeight;
-
             const targetWidth = Math.min(2048, Math.max(1200, naturalW));
             const targetHeight = isQuestionF ? Math.round(targetWidth / 1.4) : Math.round(targetWidth / 1.8);
 
@@ -1724,7 +1658,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                 setIsSaving(false);
             }, 'image/jpeg', 0.9);
         } catch (err) {
-            console.error('Failed to crop/adjust image:', err);
+            logger.error('Failed to crop/adjust image:', err);
             onConfirm(file);
             setIsSaving(false);
         }
@@ -1851,7 +1785,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                             onTouchStart={handleCropBoxTouchStart}
                         >
                             {/* Corner Handles */}
-                            {['TL', 'TR', 'BL', 'BR'].map((corner) => {
+                            {(['TL', 'TR', 'BL', 'BR'] as const).map((corner: ResizeCorner) => {
                                 const handleStyle: React.CSSProperties = {
                                     position: 'absolute',
                                     width: '18px',
@@ -1883,12 +1817,12 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                                         style={handleStyle}
                                         onMouseDown={(e) => {
                                             e.stopPropagation();
-                                            handleResizeStart(corner as any, e.clientX, e.clientY);
+                                            handleResizeStart(corner, e.clientX, e.clientY);
                                         }}
                                         onTouchStart={(e) => {
                                             e.stopPropagation();
                                             if (e.touches[0]) {
-                                                handleResizeStart(corner as any, e.touches[0].clientX, e.touches[0].clientY);
+                                                handleResizeStart(corner, e.touches[0].clientX, e.touches[0].clientY);
                                             }
                                         }}
                                     />
@@ -2045,7 +1979,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
 };
 
 export default function UploadWorkspace() {
-    console.log("[WORKSPACE_RENDER]", Date.now());
+    logger.debug("[WORKSPACE_RENDER]", Date.now());
     const router = useRouter();
     const params = useParams();
     const matkulId = params.id as string;
@@ -2143,12 +2077,14 @@ export default function UploadWorkspace() {
             const ua = navigator.userAgent || '';
             const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(ua);
             setIsMobile(isMobileDevice);
-            console.log('[DEVICE DETECT] UA:', ua, '| isMobile:', isMobileDevice);
+            logger.debug('[DEVICE DETECT] UA:', ua, '| isMobile:', isMobileDevice);
         };
         checkMobile();
     }, []);
 
     const activeFetchRef = useRef<string | null>(null);
+    const submissionVersionRef = useRef<string | null>(null);
+    const statusFetchRef = useRef(false);
     const slotsRef = useRef(slots);
     const isDeletingSlotRef = useRef(isDeletingSlot);
     useEffect(() => {
@@ -2158,32 +2094,45 @@ export default function UploadWorkspace() {
 
     const loadSubmissionDetails = useCallback(async (uid: string) => {
         const fetchStart = Date.now();
-        console.log("[POLL_EXECUTION] loadSubmissionDetails start", fetchStart);
+        logger.debug("[POLL_EXECUTION] loadSubmissionDetails start", fetchStart);
         
         const fetchKey = `${uid}-${matkulId}`;
         if (activeFetchRef.current === fetchKey) {
-            console.log('[SYNC] Overlapping loadSubmissionDetails call ignored.');
+            logger.debug('[SYNC] Overlapping loadSubmissionDetails call ignored.');
             return;
         }
         activeFetchRef.current = fetchKey;
 
         try {
             // Cek data submission yang sudah ada (terbaru)
-            const { data: existingSubmission } = await supabase
+            const { data: existingSubmission, error: submissionError } = await supabase
                 .from('pengumpulan_tugas')
-                .select('*')
+                .select('id, status_submit, nilai_akhir, model_ai, updated_at')
                 .eq('mahasiswa_id', uid)
                 .eq('mata_kuliah_id', matkulId)
                 .order('created_at', { ascending: false })
                 .limit(1)
                 .maybeSingle();
+            if (submissionError) throw submissionError;
 
             if (existingSubmission) {
                 // Ambil detail lembar jawaban yang sudah diupload sebelumnya
-                const { data: sheets } = await supabase
+                const { data: sheets, error: sheetsError } = await supabase
                     .from('lembar_jawaban')
-                    .select('*')
+                    .select(`
+                        section_code,
+                        image_url,
+                        status,
+                        prediksi_ai,
+                        feedback,
+                        nilai_final,
+                        rejection_reason,
+                        was_reuploaded,
+                        last_reupload_at,
+                        reupload_count
+                    `)
                     .eq('pengumpulan_tugas_id', existingSubmission.id);
+                if (sheetsError) throw sheetsError;
 
                 const initialSlots = generateSlots().map(s => ({
                     ...s,
@@ -2196,6 +2145,8 @@ export default function UploadWorkspace() {
                 setSubmissionStatus(existingSubmission.status_submit);
                 setNilaiAkhir(existingSubmission.nilai_akhir ?? null);
                 setModelAi(existingSubmission.model_ai ?? null);
+                submissionVersionRef.current =
+                    `${existingSubmission.status_submit}:${existingSubmission.updated_at ?? ''}`;
 
                 const lockedStatuses = ['processing_ai', 'reviewed', 'finalized'];
                 setIsReadOnly(lockedStatuses.includes(existingSubmission.status_submit));
@@ -2210,7 +2161,7 @@ export default function UploadWorkspace() {
                                 status: 'success' as const,
                                 imagePath: matchedSheet.image_url,
                                 dbStatus: matchedSheet.status,
-                                prediksiAi: matchedSheet.prediksi_ai || undefined,
+                                prediksiAi: matchedSheet.prediksi_ai ?? undefined,
                                 feedback: matchedSheet.feedback || undefined,
                                 nilaiFinal: matchedSheet.nilai_final ?? null,
                                 rejectionReason: matchedSheet.rejection_reason || null,
@@ -2224,13 +2175,12 @@ export default function UploadWorkspace() {
 
                     // Determine which paths need signed URLs (skip cached ones)
                     const pathsToFetch: string[] = [];
-                    const now = Date.now();
 
                     updatedSlots.forEach(slot => {
                         if (slot.status === 'success' && slot.imagePath) {
-                            const cached = signedUrlCache.get(slot.imagePath);
+                            const cached = getCachedAnswerImageUrl(slot.imagePath);
                             const existingSlot = slotsRef.current.find(s => s.label === slot.label);
-                            const isCached = (cached && cached.expiresAt - now > 60_000) || 
+                            const isCached = Boolean(cached) ||
                                              (existingSlot?.fileUrl && existingSlot.imagePath === slot.imagePath);
                             if (!isCached) {
                                 pathsToFetch.push(slot.imagePath);
@@ -2238,13 +2188,13 @@ export default function UploadWorkspace() {
                         }
                     });
 
-                    const signedUrlsMap = await getSignedPreviewUrls(pathsToFetch);
+                    const signedUrlsMap = await getAnswerImageUrls(pathsToFetch);
 
                     const resolvedSlots = updatedSlots.map(slot => {
                         if (slot.status === 'success' && slot.imagePath) {
-                            const cached = signedUrlCache.get(slot.imagePath);
-                            if (cached && cached.expiresAt - now > 60_000) {
-                                return { ...slot, fileUrl: cached.url };
+                            const cached = getCachedAnswerImageUrl(slot.imagePath);
+                            if (cached) {
+                                return { ...slot, fileUrl: cached };
                             }
                             const existingSlot = slotsRef.current.find(s => s.label === slot.label);
                             if (existingSlot?.fileUrl && existingSlot.imagePath === slot.imagePath) {
@@ -2269,14 +2219,16 @@ export default function UploadWorkspace() {
                 } else {
                     setSlots(initialSlots);
                 }
+            } else {
+                submissionVersionRef.current = null;
             }
         } catch (err) {
-            console.error('Error fetching submission details:', err);
+            logger.error('Error fetching submission details:', err);
         } finally {
             if (activeFetchRef.current === fetchKey) {
                 activeFetchRef.current = null;
             }
-            console.log("[POLL_EXECUTION] loadSubmissionDetails end", Date.now(), `| duration: ${Date.now() - fetchStart}ms`);
+            logger.debug("[POLL_EXECUTION] loadSubmissionDetails end", Date.now(), `| duration: ${Date.now() - fetchStart}ms`);
         }
     }, [matkulId]);
 
@@ -2307,11 +2259,11 @@ export default function UploadWorkspace() {
                     .maybeSingle();
 
                 if (enrollErr) {
-                    console.error('Error checking enrollment:', enrollErr);
+                    logger.error('Error checking enrollment:', enrollErr);
                 }
 
                 if (!enrollmentCheck) {
-                    console.warn(`[Access Denied] Student ${authUser.id} is not enrolled in course ${matkulId}`);
+                    logger.warn(`[Access Denied] Student ${authUser.id} is not enrolled in course ${matkulId}`);
                     setIsAccessDenied(true);
                     return;
                 }
@@ -2330,42 +2282,77 @@ export default function UploadWorkspace() {
 
                 await loadSubmissionDetails(authUser.id);
             } catch (err) {
-                console.error("Failed to initialize workspace:", err);
+                logger.error("Failed to initialize workspace:", err);
             }
         };
 
         initWorkspace();
-    }, [authUser, authLoading, matkulId, router]);
+    }, [authUser, authLoading, matkulId, router, loadSubmissionDetails]);
 
     const loadSubmissionDetailsRef = useRef(loadSubmissionDetails);
     useEffect(() => {
         loadSubmissionDetailsRef.current = loadSubmissionDetails;
     }, [loadSubmissionDetails]);
 
-    // Polling submission status to ensure synchronization with Dosen dashboard and AI workflow
+    const pollSubmissionStatus = useCallback(async () => {
+        if (!userId || !submissionId || statusFetchRef.current) return;
+        statusFetchRef.current = true;
+        try {
+            const { data, error } = await supabase
+                .from('pengumpulan_tugas')
+                .select('status_submit, updated_at')
+                .eq('id', submissionId)
+                .maybeSingle();
+            if (error) throw error;
+            if (!data) return;
+
+            const version = `${data.status_submit}:${data.updated_at ?? ''}`;
+            if (version !== submissionVersionRef.current) {
+                await loadSubmissionDetailsRef.current(userId);
+            }
+        } catch (error) {
+            logger.error('Submission status sync failed.', error);
+        } finally {
+            statusFetchRef.current = false;
+        }
+    }, [submissionId, userId]);
+
+    // Only the tiny parent status row is polled. Answer rows and signed image
+    // URLs are refreshed exclusively after the parent version actually changes.
     useEffect(() => {
-        if (!userId) return;
+        const delay = getSubmissionStatusPollDelay(submissionStatus);
+        if (!submissionId || delay === null) {
+            return;
+        }
 
-        // EGRESS FIX: Poll every 15 seconds (was 3s — 5× reduction in Supabase calls).
-        // Status changes are driven by the dosen/AI pipeline, not the student;
-        // 15 second sync lag is imperceptible and saves ~80% of polling egress.
-        const interval = setInterval(() => {
-            console.log("[POLL_EXECUTION] interval tick", Date.now());
-            loadSubmissionDetailsRef.current(userId);
-        }, 15000);
+        let stopped = false;
+        let timer: ReturnType<typeof setTimeout> | null = null;
 
-        return () => clearInterval(interval);
-    }, [userId]);
+        const schedule = () => {
+            if (stopped) return;
+            timer = setTimeout(run, delay);
+        };
+        const run = async () => {
+            if (document.visibilityState === 'visible') {
+                await pollSubmissionStatus();
+            }
+            schedule();
+        };
+        schedule();
+
+        return () => {
+            stopped = true;
+            if (timer) clearTimeout(timer);
+        };
+    }, [pollSubmissionStatus, submissionId, submissionStatus]);
 
     // Synchronize on focus/tab visibility change
     useEffect(() => {
-        if (!userId) return;
+        if (!submissionId) return;
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
-                console.log("[POLL_EXECUTION] visibility change triggers fetch", Date.now());
-                console.log('[SYNC] Tab visible, loading latest submission details...');
-                loadSubmissionDetailsRef.current(userId);
+                void pollSubmissionStatus();
             }
         };
 
@@ -2373,7 +2360,7 @@ export default function UploadWorkspace() {
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [userId]);
+    }, [pollSubmissionStatus, submissionId]);
 
     // Auto scroll/focus to problematic section from hash on load
     useEffect(() => {
@@ -2419,7 +2406,7 @@ export default function UploadWorkspace() {
 
         const currentSlot = slots.find(s => s.label === label);
         if (currentSlot && isSlotLocked(currentSlot)) {
-            console.log('Upload blocked: Slot is locked.');
+            logger.debug('Upload blocked: Slot is locked.');
             return;
         }
 
@@ -2445,24 +2432,21 @@ export default function UploadWorkspace() {
                     }
                 }
             } catch (dbCheckErr) {
-                console.error('Realtime status lock check failed:', dbCheckErr);
+                logger.error('Realtime status lock check failed:', dbCheckErr);
             }
         }
 
         // Ubah status komponen kotak slot menjadi Loading/Uploading
         // Generate local preview URL immediately for instant visual feedback
         const localPreviewUrl = URL.createObjectURL(file);
-        console.log('PREVIEW URL', localPreviewUrl);
+        logger.debug('PREVIEW URL', localPreviewUrl);
         setSlots(prev => prev.map(s => s.label === label ? { ...s, status: 'uploading', localPreviewUrl } : s));
-        console.log('STATE UPDATED — slot', label, 'set to uploading with local preview');
-
-        let filePath = '';
-        let storageUploaded = false;
+        logger.debug('STATE UPDATED — slot', label, 'set to uploading with local preview');
 
         try {
-            console.log('--- STARTING UPLOAD WORKFLOW ---');
-            console.log('Target Slot Label:', label);
-            console.log('File details:', { name: file.name, size: file.size, type: file.type });
+            logger.debug('--- STARTING UPLOAD WORKFLOW ---');
+            logger.debug('Target Slot Label:', label);
+            logger.debug('File details:', { name: file.name, size: file.size, type: file.type });
 
             // Compress the image before uploading if it is indeed an image file
             let fileToUpload = file;
@@ -2470,14 +2454,14 @@ export default function UploadWorkspace() {
                 try {
                     fileToUpload = await compressImage(file);
                 } catch (compressErr) {
-                    console.error('Image compression failed, falling back to original file:', compressErr);
+                    logger.error('Image compression failed, falling back to original file:', compressErr);
                 }
             }
 
             // 1. VALIDASI AUTH SESSION SEBELUM UPLOAD
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-            console.log('Session validation check:', {
+            logger.debug('Session validation check:', {
                 hasSession: !!session,
                 userId: session?.user?.id,
                 userIdState: userId,
@@ -2485,7 +2469,7 @@ export default function UploadWorkspace() {
             });
 
             if (sessionError || !session) {
-                console.error('Upload blocked: Session validation failed.', sessionError);
+                logger.error('Upload blocked: Session validation failed.', sessionError);
                 toast.error('Sesi Kedaluwarsa', 'Silakan masuk kembali untuk melanjutkan.');
                 router.push('/login');
                 setSlots(prev => prev.map(s => s.label === label ? { ...s, status: 'empty', fileUrl: null } : s));
@@ -2495,148 +2479,22 @@ export default function UploadWorkspace() {
             // Ambil atau buat row pengumpulan_tugas jika ini upload pertama kali
             let activeSubmissionId = submissionId;
             if (!activeSubmissionId) {
-                console.log('No existing submissionId found. Creating new pengumpulan_tugas row...');
-                const newSub = await createSubmission(userId, matkulId);
+                logger.debug('No existing submissionId found. Creating new pengumpulan_tugas row...');
+                const newSub = await createSubmission(matkulId);
                 activeSubmissionId = newSub.id;
                 setSubmissionId(activeSubmissionId);
                 setSubmissionStatus('draft');
-                console.log('Created parent submission:', newSub);
+                logger.debug('Created parent submission:', newSub);
             }
 
             const sectionCode = `S-${label.toUpperCase()}`;
-
-            // 2. DYNAMIC FILE EXTENSION DETECTION & STANDARDIZATION
-            // Task 6: force 'jpg' lowercase extension
-            const extension = 'jpg';
-            // Struktur nama file unik: userId/submissionId/section_code.extension
-            filePath = `${userId}/${activeSubmissionId}/${sectionCode}.${extension}`;
-
-            storageUploaded = false;
-
-            console.log('Generated upload details:', {
-                activeSubmissionId,
+            const { imagePath: filePath, signedUrl } = await replaceAnswerImage({
+                submissionId: activeSubmissionId,
+                userId,
                 sectionCode,
-                extension,
-                filePath
+                file: fileToUpload,
+                createPreviewUrl: getAnswerImageUrl,
             });
-
-            // Task 8: 60-second upload timeout protection wrapper
-            const uploadTimeout = new Promise((_, reject) => {
-                setTimeout(() => {
-                    reject(new Error('Unggahan kedaluwarsa (timeout 60 detik). Silakan coba lagi dengan koneksi yang lebih stabil.'));
-                }, 60000);
-            });
-
-            // 3. Upload file ke Storage Bucket Supabase (Private)
-            console.log('Uploading file data to storage bucket "lembar-jawaban"...');
-            const uploadPromise = supabase.storage
-                .from('lembar-jawaban')
-                .upload(filePath, fileToUpload, { cacheControl: '3600', upsert: true });
-
-            const { data: storageData, error: storageError } = await Promise.race([
-                uploadPromise,
-                uploadTimeout
-            ]) as { data: any, error: any };
-
-            if (storageError) {
-                console.error('Supabase Storage Upload Failure:', {
-                    error: storageError,
-                    filePath,
-                    bucket: 'lembar-jawaban'
-                });
-                throw storageError;
-            }
-            console.log('Storage upload successful:', storageData);
-            storageUploaded = true;
-
-            // 4. Simpan baris data detail lembar_jawaban (upsert manual aman)
-            console.log('Upserting lembar_jawaban metadata row...');
-            const { data: existingRow, error: checkError } = await supabase
-                .from('lembar_jawaban')
-                .select('id, image_url')
-                .eq('pengumpulan_tugas_id', activeSubmissionId)
-                .eq('section_code', sectionCode)
-                .maybeSingle();
-
-            if (checkError) {
-                console.error('Metadata database check failed:', checkError);
-                throw checkError;
-            }
-
-            if (existingRow) {
-                console.log('Existing row found with ID:', existingRow.id, '. Updating image_url...');
-                const updatePayload: Record<string, unknown> = {
-                    image_url: filePath,
-                    updated_at: new Date().toISOString()
-                };
-                // If this was a rejected section, reset status and clear rejection
-                const currentSlotForUpdate = slots.find(s => s.label === label);
-                if (currentSlotForUpdate?.dbStatus === 'reupload_required') {
-                    updatePayload.status = 'draft';
-                    updatePayload.prediksi_ai = null;
-                    updatePayload.nilai_final = null;
-                    updatePayload.nilai_dosen = null;
-                    updatePayload.was_reuploaded = true;
-                    updatePayload.last_reupload_at = new Date().toISOString();
-                    updatePayload.reupload_count = (currentSlotForUpdate.reuploadCount || 0) + 1;
-                }
-                const { error: dbError } = await supabase
-                    .from('lembar_jawaban')
-                    .update(updatePayload)
-                    .eq('id', existingRow.id);
-
-                if (dbError) {
-                    console.error('Metadata database update failed:', dbError);
-                    throw dbError;
-                }
-
-                // Log ANSWER_REPLACED
-                const oldFile = existingRow.image_url ? existingRow.image_url.split('/').pop() || '' : '';
-                const newFile = file.name;
-                createAuditLog({
-                    action: 'ANSWER_REPLACED',
-                    target: 'lembar_jawaban',
-                    detail: {
-                        section: sectionCode,
-                        old_file: oldFile,
-                        new_file: newFile
-                    }
-                });
-            } else {
-                console.log('No existing row found. Inserting new lembar_jawaban metadata...');
-                const { error: dbError } = await supabase
-                    .from('lembar_jawaban')
-                    .insert({
-                        pengumpulan_tugas_id: activeSubmissionId,
-                        section_code: sectionCode,
-                        image_url: filePath,
-                        status: 'draft'
-                    });
-
-                if (dbError) {
-                    console.error('Metadata database insert failed:', dbError);
-                    throw dbError;
-                }
-
-                // Log ANSWER_UPLOADED
-                createAuditLog({
-                    action: 'ANSWER_UPLOADED',
-                    target: 'lembar_jawaban',
-                    detail: {
-                        section: sectionCode,
-                        filename: file.name
-                    }
-                });
-            }
-            console.log('Database metadata successfully persisted.');
-
-            // 5. Ambil signed preview URL
-            console.log('Generating signed preview URL for path:', filePath);
-            const signedUrl = await getSignedPreviewUrl(filePath);
-            if (!signedUrl) {
-                throw new Error('Gagal menghasilkan signed URL preview berkas terunggah.');
-            }
-            console.log('Signed preview URL generated successfully:', signedUrl);
 
             // Perbarui status slot menjadi sukses
             // Revoke the local preview blob URL to free memory
@@ -2660,26 +2518,15 @@ export default function UploadWorkspace() {
                 setJustUploadedLabels(prev => prev.filter(l => l !== label));
             }, 1000);
 
-            console.log('--- UPLOAD WORKFLOW COMPLETED SUCCESSFULLY ---');
+            logger.debug('--- UPLOAD WORKFLOW COMPLETED SUCCESSFULLY ---');
         } catch (err) {
-            console.error('CRITICAL: Upload workflow error details:', {
+            logger.error('CRITICAL: Upload workflow error details:', {
                 error: err,
                 userId,
                 matkulId,
                 label,
                 submissionId
             });
-
-            // Clean up orphan file in storage if DB metadata upsert failed
-            if (storageUploaded && filePath) {
-                console.warn('DB metadata update failed. Cleaning up orphan storage file:', filePath);
-                try {
-                    await supabase.storage.from('lembar-jawaban').remove([filePath]);
-                    console.log('Orphan storage file cleaned up successfully.');
-                } catch (cleanupErr) {
-                    console.error('Failed to clean up orphan storage file:', cleanupErr);
-                }
-            }
 
             toast.error('Gagal Mengunggah', err instanceof Error ? err.message : 'Terjadi kesalahan saat upload.');
             if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
@@ -2701,71 +2548,48 @@ export default function UploadWorkspace() {
             return;
         }
 
-        if (!submissionId || isReadOnly || (submissionStatus && submissionStatus !== 'draft') || isSubmitting) return;
+        const submittableStatuses = ['draft', 'reupload_required', 'failed'];
+        if (
+            !submissionId
+            || isReadOnly
+            || (submissionStatus && !submittableStatuses.includes(submissionStatus))
+            || isSubmitting
+        ) return;
 
         setIsSubmitting(true);
 
         try {
-            // Update status_submit to 'submitted' and verify RLS allows it
             const { data: submitData, error: submitError } = await supabase
-                .from('pengumpulan_tugas')
-                .update({
-                    status_submit: 'submitted',
-                    ai_status: 'pending', // Satisfy chk_status_sync check constraint
-                    waktu_submit: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', submissionId)
-                .select();
+                .rpc('submit_submission', {
+                    p_submission_id: submissionId,
+                });
 
             if (submitError) throw submitError;
 
-            if (!submitData || submitData.length === 0) {
-                throw new Error('Gagal memperbarui status pengumpulan di database. Rute keamanan (RLS) memblokir aksi ini.');
-            }
-
-            // Update all lembar_jawaban statuses to 'submitted' and verify RLS allows it
-            const { data: sheetsData, error: sheetsError } = await supabase
-                .from('lembar_jawaban')
-                .update({ status: 'submitted', updated_at: new Date().toISOString() })
-                .eq('pengumpulan_tugas_id', submissionId)
-                .select();
-
-            if (sheetsError) throw sheetsError;
-
-            if (!sheetsData || sheetsData.length === 0) {
-                throw new Error('Gagal memperbarui status lembar jawaban di database. Rute keamanan (RLS) memblokir aksi ini.');
+            if (!submitData) {
+                throw new Error('Database tidak mengembalikan hasil submit.');
             }
 
             setSubmissionStatus('submitted');
             setSlots(prev => prev.map(s => s.status === 'success' ? { ...s, dbStatus: 'submitted' } : s));
-
-            // Log SUBMISSION_SUBMITTED
-            createAuditLog({
-                action: 'SUBMISSION_SUBMITTED',
-                target: 'pengumpulan_tugas',
-                detail: {
-                    submission_id: submissionId
-                }
-            });
 
             // Trigger AI auto-run check on backend (SST configuration)
             try {
                 const autoRunRes = await apiPost(`/submission/${submissionId}/submit`);
                 if (autoRunRes.ok) {
                     const autoRunData = await autoRunRes.json();
-                    console.log('[AI AutoRun] Backend response:', autoRunData);
+                    logger.debug('[AI AutoRun] Backend response:', autoRunData);
                     if (autoRunData.auto_run) {
                         toast.success('AI Dipicu', 'Pipeline evaluasi AI otomatis berjalan.');
                     }
                 }
             } catch (autoRunErr) {
-                console.error('[AI AutoRun] Failed to trigger auto-run:', autoRunErr);
+                logger.error('[AI AutoRun] Failed to trigger auto-run:', autoRunErr);
             }
         } catch (err) {
-            console.error("FULL ERROR:", err);
+            logger.error("FULL ERROR:", err);
             if (typeof err === 'object') {
-                console.log(JSON.stringify(err, null, 2));
+                logger.debug(JSON.stringify(err, null, 2));
             }
             toast.error(
                 'Gagal Mengumpulkan Tugas',
@@ -2781,7 +2605,7 @@ export default function UploadWorkspace() {
         const slot = slots.find(s => s.label === label);
         if (!slot || slot.status !== 'success' || !submissionId) return;
         if (isSlotLocked(slot) || submissionStatus === 'submitted') {
-            console.log('Delete blocked: Slot is locked or already submitted.');
+            logger.debug('Delete blocked: Slot is locked or already submitted.');
             toast.error('Aksi Ditolak', 'Jawaban tidak dapat dihapus setelah tugas dikumpulkan.');
             return;
         }
@@ -2806,76 +2630,38 @@ export default function UploadWorkspace() {
                 }
             }
         } catch (dbCheckErr) {
-            console.error('Realtime status lock check failed:', dbCheckErr);
+            logger.error('Realtime status lock check failed:', dbCheckErr);
         }
 
         setIsDeletingSlot(label);
         try {
             const sectionCode = `S-${label.toUpperCase()}`;
-            const imagePath = slot.imagePath;
+            const { data: deletedPath, error: metadataError } = await supabase
+                .rpc('delete_answer_metadata', {
+                    p_submission_id: submissionId,
+                    p_section_code: sectionCode,
+                });
+            if (metadataError) throw metadataError;
 
-            // STEP 1: Hapus dari Supabase Storage terlebih dahulu
-            if (imagePath) {
+            if (deletedPath) {
                 const { error: storageError } = await supabase.storage
                     .from('lembar-jawaban')
-                    .remove([imagePath]);
+                    .remove([deletedPath as string]);
                 if (storageError) {
-                    console.error('Storage delete failed:', storageError);
-                    throw new Error(`Gagal menghapus foto dari storage: ${storageError.message}`);
-                }
-                console.log('[DELETE] Storage file removed:', imagePath);
-            }
-
-            // STEP 2: Hapus baris lembar_jawaban dari database
-            const { error: dbError } = await supabase
-                .from('lembar_jawaban')
-                .delete()
-                .eq('pengumpulan_tugas_id', submissionId)
-                .eq('section_code', sectionCode);
-
-            if (dbError) {
-                console.error('DB delete failed:', dbError);
-                throw new Error(`Gagal menghapus data dari database: ${dbError.message}`);
-            }
-            console.log('[DELETE] DB row removed for section_code:', sectionCode);
-
-            // Log ANSWER_DELETED
-            createAuditLog({
-                action: 'ANSWER_DELETED',
-                target: 'lembar_jawaban',
-                detail: {
-                    section: sectionCode
-                }
-            });
-
-            // Check if there are any remaining sheets for this submission ID
-            const { data: remainingSheets, error: checkRemainingError } = await supabase
-                .from('lembar_jawaban')
-                .select('id')
-                .eq('pengumpulan_tugas_id', submissionId);
-
-            if (checkRemainingError) {
-                console.error('Failed to check remaining sheets:', checkRemainingError);
-            } else if (!remainingSheets || remainingSheets.length === 0) {
-                // No sheets left! Since the status is draft, delete the parent row in pengumpulan_tugas
-                console.log('No remaining sheets found for this draft submission. Deleting parent row in pengumpulan_tugas...');
-                const { error: deleteParentError } = await supabase
-                    .from('pengumpulan_tugas')
-                    .delete()
-                    .eq('id', submissionId);
-
-                if (deleteParentError) {
-                    console.error('Failed to delete parent pengumpulan_tugas row:', deleteParentError);
-                } else {
-                    console.log('Parent row in pengumpulan_tugas successfully deleted.');
-                    setSubmissionId(null);
-                    setSubmissionStatus(null);
-                    setNilaiAkhir(null);
-                    setModelAi(null);
+                    logger.warn('Answer object cleanup deferred.');
                 }
             }
 
-            // STEP 3: Reset slot ke status kosong
+            const remainingCount = slots.filter(
+                (candidate) => candidate.status === 'success' && candidate.label !== label,
+            ).length;
+            if (remainingCount === 0) {
+                setSubmissionId(null);
+                setSubmissionStatus(null);
+                setNilaiAkhir(null);
+                setModelAi(null);
+            }
+
             setSlots(prev => prev.map(s => s.label === label ? {
                 ...s,
                 status: 'empty' as const,
@@ -2896,9 +2682,9 @@ export default function UploadWorkspace() {
             setActiveUploadChoiceLabel(null);
 
             toast.success('Foto Dihapus', `Lembar jawaban bagian ${label.toUpperCase()} berhasil dihapus.`);
-            console.log('[DELETE] Slot', label, 'reset to empty.');
+            logger.debug('[DELETE] Slot', label, 'reset to empty.');
         } catch (err) {
-            console.error('CRITICAL: Delete slot failed:', err);
+            logger.error('CRITICAL: Delete slot failed:', err);
             toast.error('Gagal Menghapus', err instanceof Error ? err.message : 'Terjadi kesalahan saat menghapus foto.');
         } finally {
             setIsDeletingSlot(null);
@@ -2910,7 +2696,7 @@ export default function UploadWorkspace() {
         const label = slot.label;
         setActiveUploadChoiceLabel(label);
         setPendingUploadLabel(label);
-        console.log('[SLOT TRIGGER] label:', label, '| isMobile:', isMobile);
+        logger.debug('[SLOT TRIGGER] label:', label, '| isMobile:', isMobile);
 
         if (isMobile) {
             // On mobile: show the choice modal (Camera / Gallery)
@@ -3184,7 +2970,14 @@ export default function UploadWorkspace() {
                                                 {slot.status === 'success' && (
                                                     <div className="absolute inset-0 group/card">
                                                         {/* Dominant Image Preview */}
-                                                        <img src={slot.fileUrl!} alt={`Slot ${slot.label}`} className="w-full h-full object-cover opacity-80 group-hover/card:opacity-100 transition-opacity duration-300" />
+                                                        <img
+                                                            src={slot.fileUrl!}
+                                                            alt={`Slot ${slot.label}`}
+                                                            loading="lazy"
+                                                            decoding="async"
+                                                            fetchPriority="low"
+                                                            className="w-full h-full object-cover opacity-80 group-hover/card:opacity-100 transition-opacity duration-300"
+                                                        />
 
                                                         {/* Per-Section Status Badge */}
                                                         <div className="absolute top-1.5 right-1.5 z-20 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-cyan-500/20 bg-cyan-950/80 backdrop-blur-sm text-[8px] font-bold text-cyan-400 uppercase tracking-wider">
@@ -3376,11 +3169,11 @@ export default function UploadWorkspace() {
                         // Use session storage fallback — survives Android background activity recreation/reload
                         const label = getPendingUploadLabel();
                         const files = e.target.files;
-                        console.log('FILES', files);
-                        console.log('[CAMERA onChange] pendingLabel:', label, '| files:', files?.length);
+                        logger.debug('FILES', files);
+                        logger.debug('[CAMERA onChange] pendingLabel:', label, '| files:', files?.length);
                         if (label && files?.[0]) {
                             const file = files[0];
-                            console.log('FILE', file);
+                            logger.debug('FILE', file);
                             setInitialCameraFile(file);
                             setShowCustomCamera(true);
                         }
@@ -3396,11 +3189,11 @@ export default function UploadWorkspace() {
                         // Use session storage fallback — survives Android background activity recreation/reload
                         const label = getPendingUploadLabel();
                         const files = e.target.files;
-                        console.log('FILES', files);
-                        console.log('[GALLERY onChange] pendingLabel:', label, '| files:', files?.length);
+                        logger.debug('FILES', files);
+                        logger.debug('[GALLERY onChange] pendingLabel:', label, '| files:', files?.length);
                         if (label && files?.[0]) {
                             const file = files[0];
-                            console.log('FILE', file);
+                            logger.debug('FILE', file);
                             setInitialCameraFile(file);
                             setShowCustomCamera(true);
                         }
@@ -3518,7 +3311,12 @@ export default function UploadWorkspace() {
                         {/* Image Preview */}
                         {activeDetailSlot.fileUrl && (
                             <div className="p-4">
-                                <img src={activeDetailSlot.fileUrl} alt={`Lembar Jawaban ${activeDetailSlot.label}`} className="w-full rounded-xl border border-slate-200 dark:border-neutral-800 shadow-md" />
+                                <img
+                                    src={activeDetailSlot.fileUrl}
+                                    alt={`Lembar Jawaban ${activeDetailSlot.label}`}
+                                    decoding="async"
+                                    className="w-full rounded-xl border border-slate-200 dark:border-neutral-800 shadow-md"
+                                />
                             </div>
                         )}
 
@@ -3799,7 +3597,7 @@ export default function UploadWorkspace() {
                                             <button
                                                 disabled={isDeleting}
                                                 onClick={() => {
-                                                    console.log('[GANTI KAMERA BTN] pendingLabel:', getPendingUploadLabel());
+                                                    logger.debug('[GANTI KAMERA BTN] pendingLabel:', getPendingUploadLabel());
                                                     closeModal();
                                                     if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
                                                         setShowCustomCamera(true);
@@ -3821,7 +3619,7 @@ export default function UploadWorkspace() {
                                             <button
                                                 disabled={isDeleting}
                                                 onClick={() => {
-                                                    console.log('[GANTI GALERI BTN] pendingLabel:', getPendingUploadLabel());
+                                                    logger.debug('[GANTI GALERI BTN] pendingLabel:', getPendingUploadLabel());
                                                     closeModal();
                                                     setTimeout(() => {
                                                         galleryInputRef.current?.click();
@@ -3879,14 +3677,14 @@ export default function UploadWorkspace() {
                                     <div className="flex flex-col gap-3">
                                         <button
                                             onClick={() => {
-                                                console.log("[TRACE] take photo clicked");
-                                                console.log('[CAMERA BTN] pendingLabel:', getPendingUploadLabel());
+                                                logger.debug("[TRACE] take photo clicked");
+                                                logger.debug('[CAMERA BTN] pendingLabel:', getPendingUploadLabel());
                                                 closeModal();
                                                 if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
-                                                    console.log("[TRACE] camera modal opened");
+                                                    logger.debug("[TRACE] camera modal opened");
                                                     setShowCustomCamera(true);
                                                 } else {
-                                                    console.log("[TRACE] fallback to native camera");
+                                                    logger.debug("[TRACE] fallback to native camera");
                                                     toast.info('Beralih ke kamera bawaan sistem.');
                                                     setTimeout(() => {
                                                         cameraInputRef.current?.click();
@@ -3901,7 +3699,7 @@ export default function UploadWorkspace() {
 
                                         <button
                                             onClick={() => {
-                                                console.log('[GALLERY BTN] pendingLabel:', getPendingUploadLabel());
+                                                logger.debug('[GALLERY BTN] pendingLabel:', getPendingUploadLabel());
                                                 closeModal();
                                                 setTimeout(() => {
                                                     galleryInputRef.current?.click();

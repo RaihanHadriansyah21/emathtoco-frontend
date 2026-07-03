@@ -3,8 +3,14 @@
 // Shared between frontend components and API routes
 // ============================================================
 
-import { type AIModel } from '../constants/ai-models';
-export type { AIModel };
+import {
+  SECTION_CODES,
+  getMaxScoreForSection,
+  type AIModel,
+  type SectionCode,
+} from "@/lib/domain-contract";
+
+export type { AIModel, SectionCode };
 
 /**
  * Request payload for POST /predict (future integration).
@@ -14,25 +20,9 @@ export interface PredictRequest {
   model_type: string;
 }
 
-/** 24 valid section codes: S-1A through S-4F */
-export type SectionCode =
-  | 'S-1A' | 'S-1B' | 'S-1C' | 'S-1D' | 'S-1E' | 'S-1F'
-  | 'S-2A' | 'S-2B' | 'S-2C' | 'S-2D' | 'S-2E' | 'S-2F'
-  | 'S-3A' | 'S-3B' | 'S-3C' | 'S-3D' | 'S-3E' | 'S-3F'
-  | 'S-4A' | 'S-4B' | 'S-4C' | 'S-4D' | 'S-4E' | 'S-4F';
-
 /** All 24 section codes in processing order */
-export const ALL_SECTION_CODES: SectionCode[] = [
-  'S-1A', 'S-1B', 'S-1C', 'S-1D', 'S-1E', 'S-1F',
-  'S-2A', 'S-2B', 'S-2C', 'S-2D', 'S-2E', 'S-2F',
-  'S-3A', 'S-3B', 'S-3C', 'S-3D', 'S-3E', 'S-3F',
-  'S-4A', 'S-4B', 'S-4C', 'S-4D', 'S-4E', 'S-4F',
-];
-
-/** Max score per section: A-E = 4, F = 5 */
-export function getMaxScoreForSection(sectionCode: SectionCode): number {
-  return sectionCode.endsWith('F') ? 5 : 4;
-}
+export const ALL_SECTION_CODES: readonly SectionCode[] = SECTION_CODES;
+export { getMaxScoreForSection };
 
 /** Request payload sent by the frontend to start batch processing */
 export interface BatchAIRequest {

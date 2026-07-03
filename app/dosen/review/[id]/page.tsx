@@ -1,16 +1,24 @@
 'use client';
 
-import React, { useState, useEffect, useTransition, useRef, useCallback } from 'react';
+import { logger } from '@/lib/logger';
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Loader2, Play, CheckCircle, Save, AlertTriangle, Eye, X, HelpCircle, Lock, RotateCcw } from 'lucide-react';
+import { Loader2, Play, CheckCircle, Save, AlertTriangle, Eye, X, Lock, RotateCcw } from 'lucide-react';
 import Navbar from '../../../components/Navbar';
 import PageTransition from '@/components/ui/PageTransition';
 import { supabase } from '@/lib/supabase';
-import { createAuditLog } from '@/lib/services/audit-service';
-import { normalizeRole } from '@/lib/utils';
 import { useToast } from '@/app/hooks/useToast';
 import ToastContainer from '@/app/components/Toast';
 import { apiGet, apiPost } from '@/lib/api-client';
+import {
+  buildReviewPayload,
+  finalizeSubmissionReview,
+  requestAnswerReupload,
+  saveSubmissionReview,
+} from '@/lib/services/review-workflow-service';
+import { getAnswerImageUrls } from '@/lib/storage/answer-image-urls';
+import { getErrorMessage } from '@/lib/errors';
 
 import { useAuth } from '@/app/components/AuthGate';
 
@@ -19,7 +27,7 @@ const generateSlots = () => {
   const list = [];
   const bagian = ['a', 'b', 'c', 'd', 'e', 'f'];
   for (let nomor = 1; nomor <= 4; nomor++) {
-    for (let b of bagian) {
+    for (const b of bagian) {
       list.push({ label: `${nomor}${b}`, nomor_soal: nomor, bagian_soal: b });
     }
   }
@@ -74,73 +82,17 @@ interface SlotState {
   reuploadCount?: number;
 }
 
-// EGRESS FIX: Signed URL cache — prevents regenerating URLs on every polling cycle.
-// Shared at module level so it persists across re-renders.
-const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+interface AISectionResult {
+  section_code: string;
+  predicted_score: number;
+  confidence: number;
+}
 
-const getSignedPreviewUrl = async (path: string): Promise<string | null> => {
-  const now = Date.now();
-  const cached = signedUrlCache.get(path);
-  // Return cached URL if still valid (expires in > 60s)
-  if (cached && cached.expiresAt - now > 60_000) {
-    return cached.url;
-  }
-  try {
-    const { data, error } = await supabase.storage
-      .from('lembar-jawaban')
-      .createSignedUrl(path, 3600);
-    if (error) throw error;
-    // Cache for 50 minutes (3000 seconds)
-    signedUrlCache.set(path, { url: data.signedUrl, expiresAt: now + 3_000_000 });
-    return data.signedUrl;
-  } catch (err) {
-    console.error('Error generating signed URL:', err);
-    return null;
-  }
-};
-
-const getSignedPreviewUrls = async (paths: string[]): Promise<Map<string, string>> => {
-  const result = new Map<string, string>();
-  if (paths.length === 0) return result;
-
-  const now = Date.now();
-  const pathsToFetch: string[] = [];
-
-  // Check cache first
-  for (const path of paths) {
-    const cached = signedUrlCache.get(path);
-    if (cached && cached.expiresAt - now > 60_000) {
-      result.set(path, cached.url);
-    } else {
-      pathsToFetch.push(path);
-    }
-  }
-
-  if (pathsToFetch.length === 0) {
-    return result;
-  }
-
-  try {
-    const { data, error } = await supabase.storage
-      .from('lembar-jawaban')
-      .createSignedUrls(pathsToFetch, 3600);
-
-    if (error) throw error;
-
-    if (data) {
-      for (const item of data) {
-        if (item.signedUrl && item.path) {
-          signedUrlCache.set(item.path, { url: item.signedUrl, expiresAt: now + 3_000_000 });
-          result.set(item.path, item.signedUrl);
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Error generating bulk signed URLs:', err);
-  }
-
-  return result;
-};
+interface AIResultsData {
+  ai_status: string | null;
+  nilai_akhir: number | null;
+  sections: AISectionResult[];
+}
 
 const isSubmissionEqual = (a: SubmissionData | null, b: SubmissionData | null): boolean => {
   if (!a && !b) return true;
@@ -195,11 +147,11 @@ export default function ReviewWorkspace() {
 
   // Auth and Loading States
   const [isChecking, setIsChecking] = useState(true);
-  const [isPending, startTransition] = useTransition();
 
   // Polling refs (BUG 2 fix)
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFetchingRef = useRef(false);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
 
   // New state variables for UX improvement
   const [isPredicting, setIsPredicting] = useState(false);
@@ -248,14 +200,11 @@ export default function ReviewWorkspace() {
           }
         }
       } catch (err) {
-        console.error('Failed to load global active model configuration:', err);
+        logger.error('Failed to load global active model configuration:', err);
       }
     };
     loadDefaultModel();
   }, []);
-
-  const [isSimulatingAI, setIsSimulatingAI] = useState(false);
-  const [aiSimStep, setAiSimStep] = useState(0);
 
   // UI Modal Preview
   const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
@@ -337,7 +286,7 @@ export default function ReviewWorkspace() {
             .maybeSingle();
 
           if (!assignmentCheck) {
-            console.warn(`[Access Denied] Lecturer ${user.id} is not assigned to course ${subMeta.mata_kuliah_id}`);
+            logger.warn(`[Access Denied] Lecturer ${user.id} is not assigned to course ${subMeta.mata_kuliah_id}`);
             setIsAccessDenied(true);
             setIsChecking(false);
             setIsLoadingWorkspace(false);
@@ -350,13 +299,16 @@ export default function ReviewWorkspace() {
         // Load submission and lembar_jawaban details
         loadWorkspaceDetails();
       } catch (err) {
-        console.error('Dosen verification error:', err);
+        logger.error('Dosen verification error:', err);
         setErrorMsg('Terjadi kesalahan saat memeriksa akses kelas.');
         setIsChecking(false);
         setIsLoadingWorkspace(false);
       }
     };
     verifyUser();
+  // loadWorkspaceDetails intentionally remains stable through refs; adding it
+  // here would recreate the verification cycle while the initial request runs.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, submissionId]);
 
   // Cleanup polling on unmount
@@ -412,21 +364,21 @@ export default function ReviewWorkspace() {
       }
 
       // Fetch AI results from backend API
-      let aiResultsData: any = null;
+      let aiResultsData: AIResultsData | null = null;
       try {
         const aiRes = await apiGet(`/submission/${submissionId}/results`);
         if (aiRes.ok) {
-          aiResultsData = await aiRes.json();
+          aiResultsData = await aiRes.json() as AIResultsData;
           setIsBackendOffline(false);
         } else {
           setIsBackendOffline(true);
         }
-      } catch (aiErr: any) {
-        console.error('AI Backend Error:', aiErr);
+      } catch (aiErr: unknown) {
+        logger.error('AI Backend Error:', aiErr);
         setIsBackendOffline(true);
-        const userFriendlyMsg = (aiErr instanceof TypeError || (aiErr.message && aiErr.message.includes("fetch")))
+        const userFriendlyMsg = (aiErr instanceof TypeError || (aiErr instanceof Error && aiErr.message.includes("fetch")))
           ? "Backend tidak dapat dihubungi. Pastikan server FastAPI berjalan dan IP backend benar."
-          : "Gagal memuat hasil AI dari backend.";
+          : getErrorMessage(aiErr, "Gagal memuat hasil AI dari backend.");
         if (isFirstLoad) {
           setErrorMsg(userFriendlyMsg);
         }
@@ -473,7 +425,19 @@ export default function ReviewWorkspace() {
       // Fetch answer sheets
       const { data: sheets, error: sheetsError } = await supabase
         .from('lembar_jawaban')
-        .select('*')
+        .select(`
+          id,
+          section_code,
+          image_url,
+          nilai_dosen,
+          nilai_final,
+          feedback,
+          status,
+          rejection_reason,
+          was_reuploaded,
+          last_reupload_at,
+          reupload_count
+        `)
         .eq('pengumpulan_tugas_id', submissionId);
 
       if (sheetsError) throw sheetsError;
@@ -484,7 +448,7 @@ export default function ReviewWorkspace() {
         const matchedSheet = sheets?.find(sh => sh.section_code === sectionCode);
 
         // Get AI score and confidence from backend
-        const matchedSectionAI = aiResultsData?.sections?.find((sec: any) => sec.section_code === sectionCode);
+        const matchedSectionAI = aiResultsData?.sections?.find((section) => section.section_code === sectionCode);
         const aiScore = matchedSectionAI !== undefined && matchedSectionAI !== null ? matchedSectionAI.predicted_score : null;
         const confidence = matchedSectionAI !== undefined && matchedSectionAI !== null ? matchedSectionAI.confidence : null;
 
@@ -530,7 +494,7 @@ export default function ReviewWorkspace() {
         .map(slot => slot.imagePath!);
 
       // Fetch signed URLs in bulk
-      const signedUrlsMap = await getSignedPreviewUrls(pathsToFetch);
+      const signedUrlsMap = await getAnswerImageUrls(pathsToFetch);
 
       // Assign the signed URLs to the slots
       const resolvedSlots = initialSlots.map(slot => {
@@ -555,7 +519,7 @@ export default function ReviewWorkspace() {
       }
 
     } catch (err) {
-      console.error('Error loading review workspace:', err);
+      logger.error('Error loading review workspace:', err);
       if (isFirstLoad) {
         setErrorMsg('Gagal memuat detail lembar jawaban mahasiswa.');
       }
@@ -565,40 +529,59 @@ export default function ReviewWorkspace() {
     }
   }, [submissionId]);
 
-  // Polling logic when the submission is in processing status
+  // Poll accepted RQ job with 2s → 3s → 5s backoff. Polling pauses while
+  // the tab is hidden and stops at the first terminal state.
   useEffect(() => {
-    const activeStatuses = ['pending', 'processing', 'running', 'ai_pending', 'ai_running'];
-    const stopStatuses = ['completed', 'failed', 'finalized', 'reviewed'];
+    if (!activeJobId) return;
+    let stopped = false;
+    let attempt = 0;
+    const delays = [2000, 3000, 5000];
 
-    const aiStatus = submission?.ai_status || '';
-    const statusSubmit = submission?.status_submit || '';
+    const schedule = () => {
+      if (stopped) return;
+      const delay = delays[Math.min(attempt, delays.length - 1)];
+      attempt += 1;
+      pollingRef.current = setTimeout(poll, delay);
+    };
 
-    // Stop polling if we are in a terminal state
-    const isTerminal = stopStatuses.includes(aiStatus) || stopStatuses.includes(statusSubmit);
-    const shouldPoll = submission && activeStatuses.includes(aiStatus) && !isTerminal;
-
-    if (!shouldPoll) {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
+    const poll = async () => {
+      if (document.visibilityState === 'hidden') {
+        schedule();
+        return;
       }
-      return;
-    }
+      try {
+        const response = await apiGet(`/jobs/${activeJobId}`);
+        if (response.ok) {
+          const job = await response.json() as {
+            status: 'queued' | 'started' | 'completed' | 'failed';
+            error_code?: string | null;
+          };
+          if (job.status === 'completed' || job.status === 'failed') {
+            stopped = true;
+            setActiveJobId(null);
+            await loadWorkspaceDetails();
+            if (job.status === 'failed') {
+              setAiErrorMessage(job.error_code || 'AI_JOB_FAILED');
+            }
+            return;
+          }
+        }
+      } catch {
+        setIsBackendOffline(true);
+      }
+      schedule();
+    };
 
-    if (pollingRef.current) return;
-
-    pollingRef.current = setInterval(() => {
-      if (isFetchingRef.current) return;
-      loadWorkspaceDetails();
-    }, 12000); // 12 seconds interval (10-15s requirement)
+    void poll();
 
     return () => {
+      stopped = true;
       if (pollingRef.current) {
-        clearInterval(pollingRef.current);
+        clearTimeout(pollingRef.current);
         pollingRef.current = null;
       }
     };
-  }, [submission, loadWorkspaceDetails]);
+  }, [activeJobId, loadWorkspaceDetails]);
 
   // Handle manual score change
   const handleManualScoreChange = (label: string, value: string) => {
@@ -712,17 +695,23 @@ export default function ReviewWorkspace() {
           if (errJson && errJson.detail) {
             errorDetail = errJson.detail;
           }
-        } catch (_) { }
+        } catch { }
         throw new Error(errorDetail);
       }
 
+      const queuedJob = await res.json() as {
+        job_id: string;
+        accepted_ids: string[];
+      };
+      if (!queuedJob.job_id || !queuedJob.accepted_ids.includes(submission.id)) {
+        throw new Error('Submission tidak diterima oleh antrean AI.');
+      }
+      setActiveJobId(queuedJob.job_id);
       setIsBackendOffline(false);
-      // Reload workspace details to show new predictions and show the success banner naturally
-      await loadWorkspaceDetails();
-    } catch (err: any) {
-      console.error('AI Backend Error:', err);
+    } catch (err: unknown) {
 
-      const isConnectionError = err instanceof TypeError || (err.message && err.message.includes("fetch"));
+      const isConnectionError = err instanceof TypeError
+        || (err instanceof Error && err.message.includes('fetch'));
       if (isConnectionError) {
         setIsBackendOffline(true);
       }
@@ -733,7 +722,7 @@ export default function ReviewWorkspace() {
       if (isConnectionError) {
         errorToastTitle = 'Koneksi Gagal';
         errorToastMsg = 'Backend AI tidak dapat dihubungi.';
-      } else if (err.message) {
+      } else if (err instanceof Error && err.message) {
         errorToastMsg = err.message;
       }
 
@@ -759,65 +748,19 @@ export default function ReviewWorkspace() {
     setSuccessMsg(null);
 
     try {
-      const overall = getOverallScore();
-
-      const promises = slots
-        .filter(slot => slot.hasSheet && slot.sheetId)
-        .map(slot => {
-          return supabase
-            .from('lembar_jawaban')
-            .update({
-              nilai_dosen: slot.manualScore,
-              nilai_final: slot.finalScore,
-              feedback: slot.feedback,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', slot.sheetId!);
-        });
-
-      await Promise.all(promises);
-
-      // Save overall score to database
-      const { error: subUpdateError } = await supabase
-        .from('pengumpulan_tugas')
-        .update({
-          nilai_akhir: overall,
-          model_ai: selectedModel,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', submission.id);
-
-      if (subUpdateError) throw subUpdateError;
-
-      // Log REVIEW_DRAFT_SAVED
-      createAuditLog({
-        action: 'REVIEW_DRAFT_SAVED',
-        target: 'pengumpulan_tugas',
-        detail: {
-          current_score: overall
-        }
-      });
-
-      // Call Backend API to set status to reviewed
-      try {
-        const backendRes = await apiPost(`/submission/${submission.id}/reviewed`);
-        if (!backendRes.ok) {
-          console.warn('Backend API reviewed status update failed:', backendRes.statusText);
-        }
-      } catch (backendErr: any) {
-        console.error('AI Backend Error:', backendErr);
-        const userFriendlyMsg = (backendErr instanceof TypeError || (backendErr.message && backendErr.message.includes("fetch")))
-          ? "Backend tidak dapat dihubungi. Pastikan server FastAPI berjalan dan IP backend benar."
-          : "Gagal memperbarui status ke reviewed pada backend.";
-        toast.error('Gagal', userFriendlyMsg);
-      }
+      const reviewPayload = buildReviewPayload(slots);
+      await saveSubmissionReview(
+        submission.id,
+        reviewPayload,
+        selectedModel,
+      );
 
       setSuccessMsg('Draf review berhasil disimpan.');
 
       // Reload details to ensure data integrity
       loadWorkspaceDetails();
     } catch (err) {
-      console.error('Error saving review draft:', err);
+      logger.error('Error saving review draft:', err);
       setErrorMsg('Terjadi kesalahan saat menyimpan draf review.');
     } finally {
       setIsSaving(false);
@@ -840,69 +783,18 @@ export default function ReviewWorkspace() {
     setSuccessMsg(null);
 
     try {
-      const overall = getOverallScore();
-
-      // 1. Save all sheet scores and feedbacks, and set status to 'finalized'
-      const sheetPromises = slots
-        .filter(slot => slot.hasSheet && slot.sheetId)
-        .map(slot => {
-          return supabase
-            .from('lembar_jawaban')
-            .update({
-              nilai_dosen: slot.manualScore,
-              nilai_final: slot.finalScore,
-              feedback: slot.feedback,
-              status: 'finalized',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', slot.sheetId!);
-        });
-
-      await Promise.all(sheetPromises);
-
-      // 2. Update pengumpulan_tugas to finalized and store nilai_akhir
-      const { error: subUpdateError } = await supabase
-        .from('pengumpulan_tugas')
-        .update({
-          status_submit: 'finalized',
-          ai_status: 'finalized', // Satisfy chk_status_sync check constraint
-          nilai_akhir: overall,
-          model_ai: selectedModel,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', submission.id);
-
-      if (subUpdateError) throw subUpdateError;
-
-      // Log FINAL_SCORE_SUBMITTED
-      createAuditLog({
-        action: 'FINAL_SCORE_SUBMITTED',
-        target: 'pengumpulan_tugas',
-        detail: {
-          old_score: submission && submission.nilai_akhir !== undefined ? submission.nilai_akhir : null,
-          new_score: overall
-        }
-      });
-
-      // Call Backend API to set status to finalized
-      try {
-        const backendRes = await apiPost(`/submission/${submission.id}/finalize`);
-        if (!backendRes.ok) {
-          console.warn('Backend API finalize status update failed:', backendRes.statusText);
-        }
-      } catch (backendErr: any) {
-        console.error('AI Backend Error:', backendErr);
-        const userFriendlyMsg = (backendErr instanceof TypeError || (backendErr.message && backendErr.message.includes("fetch")))
-          ? "Backend tidak dapat dihubungi. Pastikan server FastAPI berjalan dan IP backend benar."
-          : "Gagal memperbarui status ke finalized pada backend.";
-        toast.error('Gagal', userFriendlyMsg);
-      }
+      const reviewPayload = buildReviewPayload(slots);
+      await finalizeSubmissionReview(
+        submission.id,
+        reviewPayload,
+        selectedModel,
+      );
 
       setSuccessMsg('Penilaian tugas berhasil difinalisasi!');
       toast.success('Finalisasi Berhasil', 'Nilai pengumpulan tugas telah dikunci secara permanen.');
       loadWorkspaceDetails();
     } catch (err) {
-      console.error('Error finalizing assessment:', err);
+      logger.error('Error finalizing assessment:', err);
       setErrorMsg('Gagal menyelesaikan proses finalisasi nilai.');
       toast.error('Finalisasi Gagal', 'Terjadi kesalahan saat mengunci nilai.');
     } finally {
@@ -918,42 +810,29 @@ export default function ReviewWorkspace() {
   };
 
   const handleRequestReupload = async () => {
-    if (!reuploadTargetSlot || !reuploadReason.trim() || isRequestingReupload) return;
+    if (
+      !submission
+      || !reuploadTargetSlot
+      || !reuploadReason.trim()
+      || isRequestingReupload
+    ) return;
 
     const targetSlot = slots.find(s => s.label === reuploadTargetSlot);
     if (!targetSlot?.sheetId) return;
 
     setIsRequestingReupload(true);
     try {
-      const { error } = await supabase
-        .from('lembar_jawaban')
-        .update({
-          status: 'reupload_required',
-          rejection_reason: reuploadReason.trim(),
-          prediksi_ai: null,
-          nilai_final: null,
-          nilai_dosen: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', targetSlot.sheetId);
-
-      if (error) throw error;
-
-      // Log REUPLOAD_REQUESTED
-      createAuditLog({
-        action: 'REUPLOAD_REQUESTED',
-        target: 'lembar_jawaban',
-        detail: {
-          section: `S-${reuploadTargetSlot.toUpperCase()}`,
-          reason: reuploadReason.trim()
-        }
-      });
+      await requestAnswerReupload(
+        submission.id,
+        reuploadTargetSlot,
+        reuploadReason,
+      );
 
       toast.success('Reupload Diminta', `Section ${reuploadTargetSlot.toUpperCase()} ditandai untuk upload ulang.`);
       setShowReuploadModal(false);
       loadWorkspaceDetails();
     } catch (err) {
-      console.error('Error requesting reupload:', err);
+      logger.error('Error requesting reupload:', err);
       toast.error('Gagal', 'Tidak dapat menandai section untuk upload ulang.');
     } finally {
       setIsRequestingReupload(false);
@@ -996,7 +875,7 @@ export default function ReviewWorkspace() {
         ? "ai_processing"
         : "none";
 
-  console.log(
+  logger.debug(
     "AI Button State:",
     {
       isProcessing,
@@ -1230,7 +1109,14 @@ export default function ReviewWorkspace() {
                                 setModalImageUrl(slot.fileUrl);
                                 setModalTitle(`Section ${slot.label.toUpperCase()}`);
                               }}>
-                                <img src={slot.fileUrl} alt={`Slot ${slot.label}`} className="w-full h-full object-cover opacity-80 group-hover/card:opacity-100 transition-opacity duration-300" />
+                                <img
+                                  src={slot.fileUrl}
+                                  alt={`Slot ${slot.label}`}
+                                  loading="lazy"
+                                  decoding="async"
+                                  fetchPriority="low"
+                                  className="w-full h-full object-cover opacity-80 group-hover/card:opacity-100 transition-opacity duration-300"
+                                />
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/card:opacity-100 flex items-center justify-center transition-all">
                                   <Eye className="w-5 h-5 text-white" />
                                 </div>
@@ -1322,7 +1208,7 @@ export default function ReviewWorkspace() {
                                   <div className="mt-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">
                                     <p className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">⚠ Upload Ulang Diminta</p>
                                     {slot.rejectionReason && (
-                                      <p className="text-xs text-amber-300/70 leading-relaxed">"{slot.rejectionReason}"</p>
+                                      <p className="text-xs text-amber-300/70 leading-relaxed">&ldquo;{slot.rejectionReason}&rdquo;</p>
                                     )}
                                   </div>
                                 )}
@@ -1331,7 +1217,7 @@ export default function ReviewWorkspace() {
                                 {slot.wasReuploaded && slot.rejectionReason && slot.dbStatus !== 'reupload_required' && (
                                   <div className="mt-2 bg-slate-100 border border-slate-250 dark:bg-neutral-900 dark:border-neutral-800 rounded-lg p-2.5">
                                     <p className="text-[10px] font-bold text-slate-500 dark:text-neutral-500 uppercase tracking-wider mb-1">Catatan Reupload Sebelumnya</p>
-                                    <p className="text-xs text-slate-600 dark:text-neutral-400 leading-relaxed">"{slot.rejectionReason}"</p>
+                                    <p className="text-xs text-slate-600 dark:text-neutral-400 leading-relaxed">&ldquo;{slot.rejectionReason}&rdquo;</p>
                                     {slot.lastReuploadAt && (
                                       <p className="text-[9px] text-slate-400 dark:text-neutral-500 font-mono mt-1.5">
                                         Reuploaded: {new Date(slot.lastReuploadAt).toLocaleString('id-ID', {
@@ -1434,7 +1320,7 @@ export default function ReviewWorkspace() {
                     className={`w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 hover:border-slate-350 dark:hover:border-neutral-800 text-slate-700 dark:text-neutral-300 rounded-xl p-3 text-sm focus:outline-none cursor-pointer ${(isReadOnly || isAIProcessing) ? 'opacity-60 cursor-not-allowed' : ''}`}
                   >
                     <option value="MobileNetV2">MobileNetV2 (Ringan & Cepat)</option>
-                    <option value="DenseNet121">DenseNet121 (Akurasi Tinggi)</option>
+                    <option value="DenseNet121">DenseNet121</option>
                     <option value="InceptionV3">InceptionV3 (Deteksi Pola Komparatif)</option>
                   </select>
                 </div>
@@ -1624,7 +1510,12 @@ export default function ReviewWorkspace() {
               </button>
             </div>
             <div className="p-4 overflow-auto flex items-center justify-center">
-              <img src={modalImageUrl} alt="Full Size Preview" className="max-w-full max-h-[70vh] rounded-xl object-contain border border-slate-200 dark:border-neutral-900 shadow-md" />
+              <img
+                src={modalImageUrl}
+                alt="Full Size Preview"
+                decoding="async"
+                className="max-w-full max-h-[70vh] rounded-xl object-contain border border-slate-200 dark:border-neutral-900 shadow-md"
+              />
             </div>
           </div>
         </div>

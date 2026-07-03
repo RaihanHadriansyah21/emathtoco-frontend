@@ -1,9 +1,10 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import Spline from '@splinetool/react-spline';
-import type { Application } from '@splinetool/runtime';
 
 interface SplineSceneProps {
     scene: string;
@@ -52,13 +53,13 @@ export default function SplineScene({ scene, className, onLoad, onError }: Splin
         }
     }, []);
 
-    const handleSplineLoad = useCallback((splineApp: Application) => {
-        console.log('Spline scene loaded successfully');
+    const handleSplineLoad = useCallback(() => {
+        logger.debug('Spline scene loaded successfully');
         if (onLoad) onLoad();
     }, [onLoad]);
 
     const handleSplineError = useCallback((err: unknown) => {
-        console.error('Spline failed to load:', err);
+        logger.error('Spline failed to load:', err);
         setHasError(true);
         if (onError) onError();
     }, [onError]);

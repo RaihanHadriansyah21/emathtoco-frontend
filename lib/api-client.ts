@@ -4,21 +4,20 @@ import { getBackendState } from './backend-store';
 
 export interface RequestOptions extends Omit<RequestInit, 'headers'> {
   headers?: HeadersInit;
+  timeoutMs?: number;
 }
 
 // ============================================================
 // EMATHTOCO — Centralized API Client
 //
 // SEMUA komunikasi ke FastAPI backend WAJIB melalui modul ini.
-// Otomatis menyisipkan header ngrok-skip-browser-warning,
-// Accept: application/json, dan logging debug.
+// Otomatis menyisipkan bearer token dan Accept: application/json.
 //
 // Mendukung: GET, POST, PUT, PATCH, DELETE
 // ============================================================
 
 /**
  * Core fetch wrapper untuk komunikasi ke FastAPI backend.
- * - Otomatis menambahkan header `ngrok-skip-browser-warning: true`
  * - Otomatis menambahkan header `Accept: application/json`
  * - Merge dengan custom headers tanpa menimpa
  * - Debug logging untuk troubleshooting deployment
@@ -27,6 +26,7 @@ export async function apiRequest(
   path: string,
   options: RequestOptions = {}
 ): Promise<Response> {
+  const { timeoutMs = 15000, ...fetchOptions } = options;
   // ── Pre-flight: reject immediately if backend is known offline ──────
   // This prevents 60s hangs, CORS errors, and console noise.
   const backendState = getBackendState();
@@ -34,18 +34,18 @@ export async function apiRequest(
     throw new Error('Backend AI sedang offline. Silakan coba lagi nanti.');
   }
 
-  const url = path.startsWith('http') ? path : `${API_URL}${path}`;
+  if (!path.startsWith('/')) {
+    throw new Error('API path harus diawali dengan /.');
+  }
+  const url = `${API_URL}${path}`;
 
-  // Build headers: ngrok bypass + Accept default + user custom headers
   const headers = new Headers();
 
-  // 1. Set default headers terlebih dahulu
-  headers.set('ngrok-skip-browser-warning', 'true');
   headers.set('Accept', 'application/json');
 
   // 2. Merge custom headers dari caller (tanpa menimpa defaults jika tidak diset)
-  if (options.headers) {
-    const custom = new Headers(options.headers);
+  if (fetchOptions.headers) {
+    const custom = new Headers(fetchOptions.headers);
     custom.forEach((value, key) => {
       headers.set(key, value);
     });
@@ -57,27 +57,20 @@ export async function apiRequest(
     if (session?.access_token) {
       headers.set('Authorization', `Bearer ${session.access_token}`);
     }
-  } catch (err) {
-    console.error('[API CLIENT] Error fetching supabase session:', err);
+  } catch {
+    throw new Error('Sesi autentikasi tidak dapat dibaca.');
   }
 
-  // AbortController for 10-second timeout safety (reduced from 60s)
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
     controller.abort();
-  }, 10000);
+  }, timeoutMs);
 
   const mergedOptions: RequestInit = {
-    ...options,
+    ...fetchOptions,
     headers,
     signal: controller.signal,
   };
-
-  // Debug logging (development only)
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[API DEBUG] URL:', url);
-    console.log('[API DEBUG] METHOD:', mergedOptions.method || 'GET');
-  }
 
   try {
     const response = await fetch(url, mergedOptions);

@@ -1,7 +1,8 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Users, Search, Loader2, ChevronLeft, ChevronRight, Shield, GraduationCap, User as UserIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
@@ -11,6 +12,8 @@ import { useToast } from '@/app/hooks/useToast';
 import ToastContainer from '@/app/components/Toast';
 import PageTransition from '@/components/ui/PageTransition';
 import { PageLoader } from '@/components/ui/loaders';
+import { apiDelete, apiPatch } from '@/lib/api-client';
+import { getErrorMessage } from '@/lib/errors';
 
 interface UserProfile {
   id: string;
@@ -34,9 +37,8 @@ const roleBadge = (role: string) => {
 };
 
 export default function UserManagementPage() {
-  const router = useRouter();
   const { toasts, toast, removeToast } = useToast();
-  const [isChecking, setIsChecking] = useState(false);
+  const isChecking = false;
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -65,7 +67,7 @@ export default function UserManagementPage() {
       if (error) throw error;
       setUsers(data || []);
     } catch (err) {
-      console.error('Error fetching users:', err);
+      logger.error('Error fetching users:', err);
     } finally {
       setIsLoading(false);
     }
@@ -75,12 +77,12 @@ export default function UserManagementPage() {
     if (!roleChangeTarget) return;
     setIsChangingRole(true);
     try {
-      console.log(`[Role Change Request] Target User ID: ${roleChangeTarget.id}, New Role: ${roleChangeTarget.newRole}`);
+      logger.debug(`[Role Change Request] Target User ID: ${roleChangeTarget.id}, New Role: ${roleChangeTarget.newRole}`);
 
       // 1. Local validation (first line of defense)
       const localUser = users.find(u => u.id === roleChangeTarget.id);
       if (normalizeRole(localUser?.role) === 'admin') {
-        console.warn(`[Role Change Blocked] Local validation blocked attempt to modify admin: ${roleChangeTarget.id}`);
+        logger.warn(`[Role Change Blocked] Local validation blocked attempt to modify admin: ${roleChangeTarget.id}`);
         toast.error('Gagal Mengubah Role', 'Administrator accounts cannot be modified.');
         setRoleChangeTarget(null);
         return;
@@ -94,44 +96,33 @@ export default function UserManagementPage() {
         .single();
 
       if (fetchErr) {
-        console.error('[Role Change Error] Failed to fetch current profile before update:', fetchErr);
+        logger.error('[Role Change Error] Failed to fetch current profile before update:', fetchErr);
         throw new Error('Gagal memverifikasi data profil pengguna.');
       }
 
-      console.log(`[Role Change DB Check] User Current Role: ${currentProfile?.role}`);
+      logger.debug(`[Role Change DB Check] User Current Role: ${currentProfile?.role}`);
       if (normalizeRole(currentProfile?.role) === 'admin') {
-        console.warn(`[Role Change Blocked] Backend validation blocked attempt to modify admin: ${roleChangeTarget.id}`);
+        logger.warn(`[Role Change Blocked] Backend validation blocked attempt to modify admin: ${roleChangeTarget.id}`);
         toast.error('Gagal Mengubah Role', 'Administrator accounts cannot be modified.');
         setRoleChangeTarget(null);
         return;
       }
 
-      // Perform update with .select() to verify changes were actually applied (and RLS did not silently filter it)
-      const { data, error } = await supabase
-        .from('profil_pengguna')
-        .update({ role: roleChangeTarget.newRole })
-        .eq('id', roleChangeTarget.id)
-        .select();
-
-      if (error) {
-        console.error('[Role Change DB Error] Update query error:', error);
-        throw error;
+      const response = await apiPatch(`/admin/user/${roleChangeTarget.id}/role`, {
+        new_role: roleChangeTarget.newRole,
+      });
+      if (!response.ok) {
+        const result = await response.json() as { detail?: string };
+        throw new Error(result.detail || 'Gagal memperbarui peran pengguna.');
       }
 
-      console.log('[Role Change DB Response] Data:', data);
-
-      if (!data || data.length === 0) {
-        console.error('[Role Change Blocked] Update query executed successfully but 0 rows affected. RLS policies likely blocked the update.');
-        throw new Error('Gagal memperbarui database. Perubahan diblokir oleh sistem keamanan RLS.');
-      }
-
-      console.log('[Role Change Success] DB update confirmed. Updating local state.');
+      logger.debug('[Role Change Success] DB update confirmed. Updating local state.');
       setUsers(prev => prev.map(u => u.id === roleChangeTarget.id ? { ...u, role: roleChangeTarget.newRole } : u));
       toast.success('Ubah Role Berhasil', `Peran untuk "${roleChangeTarget.name}" berhasil diubah menjadi "${roleChangeTarget.newRole}".`);
       setRoleChangeTarget(null);
-    } catch (err: any) {
-      console.error('[Role Change Error] Exception occurred:', err);
-      toast.error('Gagal Mengubah Role', err.message || 'Terjadi kesalahan saat mengubah peran.');
+    } catch (err: unknown) {
+      logger.error('[Role Change Error] Exception occurred:', err);
+      toast.error('Gagal Mengubah Role', getErrorMessage(err, 'Terjadi kesalahan saat mengubah peran.'));
     } finally {
       setIsChangingRole(false);
     }
@@ -141,7 +132,7 @@ export default function UserManagementPage() {
     if (!deleteTarget || isDeleting) return;
     setIsDeleting(true);
 
-    console.log("Delete User Payload", {
+    logger.debug("Delete User Payload", {
       userId: deleteTarget.id,
       userName: deleteTarget.name,
       profileId: deleteTarget.id,
@@ -149,52 +140,42 @@ export default function UserManagementPage() {
     });
 
     try {
-      console.log(`[Delete User Request] Target User ID: ${deleteTarget.id}`);
+      logger.debug(`[Delete User Request] Target User ID: ${deleteTarget.id}`);
 
       // 1. Local validation (first line of defense)
       const localUser = users.find(u => u.id === deleteTarget.id);
       if (normalizeRole(localUser?.role) === 'admin') {
-        console.warn(`[Delete User Blocked] Local validation blocked attempt to delete admin: ${deleteTarget.id}`);
+        logger.warn(`[Delete User Blocked] Local validation blocked attempt to delete admin: ${deleteTarget.id}`);
         toast.error('Gagal Menghapus', 'Administrator accounts cannot be deleted.');
         setDeleteTarget(null);
         return;
       }
 
-      // 2. Call backend endpoint to delete from both Auth and DB
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-      if (!apiUrl) {
-        throw new Error('API URL belum dikonfigurasi. Pastikan NEXT_PUBLIC_API_URL sudah diatur di .env.local.');
-      }
+      // 2. Call the centralized authenticated backend client.
+      const response = await apiDelete(`/admin/user/${deleteTarget.id}`);
 
-      const response = await fetch(`${apiUrl}/admin/user/${deleteTarget.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      console.log("Delete User API Response", {
+      logger.debug("Delete User API Response", {
         status: response.status,
         statusText: response.statusText,
         ok: response.ok
       });
 
-      const result = await response.json();
+      const result = await response.json() as { detail?: string };
 
       if (!response.ok) {
-        console.error('[Delete User API Error]', result);
-        console.log("Delete User Supabase Error", result);
+        logger.error('[Delete User API Error]', result);
+        logger.debug("Delete User Supabase Error", result);
         throw new Error(result.detail || 'Gagal menghapus pengguna dari server.');
       }
 
-      console.log('[Delete User Success]', result);
+      logger.debug('[Delete User Success]', result);
       setUsers(prev => prev.filter(u => u.id !== deleteTarget.id));
       toast.success('Hapus Berhasil', `Pengguna "${deleteTarget.name}" berhasil dihapus sepenuhnya (profil & akun autentikasi).`);
       setDeleteTarget(null);
-    } catch (err: any) {
-      console.error('[Delete User Error] Exception occurred:', err);
-      console.log("Delete User Supabase Error", err);
-      toast.error('Gagal Menghapus', err.message || 'Terjadi kesalahan saat menghapus pengguna.');
+    } catch (err: unknown) {
+      logger.error('[Delete User Error] Exception occurred:', err);
+      logger.debug("Delete User Supabase Error", err);
+      toast.error('Gagal Menghapus', getErrorMessage(err, 'Terjadi kesalahan saat menghapus pengguna.'));
     } finally {
       setIsDeleting(false);
     }

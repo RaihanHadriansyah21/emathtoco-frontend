@@ -47,7 +47,7 @@ export default function ForgotPasswordPage() {
 
             setSuccessMessage('Tautan reset password telah dikirim ke email Anda. Silakan periksa kotak masuk atau spam email Anda.');
             setEmail('');
-        } catch (err) {
+        } catch {
             setErrorMessage('Terjadi gangguan koneksi pada sistem. Silakan coba sesaat lagi.');
         } finally {
             setIsLoading(false);

@@ -1,10 +1,12 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, UploadCloud, ImageIcon, RefreshCw, AlertCircle, Sparkles, ZoomIn, Info } from 'lucide-react';
+import { UploadCloud, ImageIcon, RefreshCw, AlertCircle, Sparkles, ZoomIn, Info } from 'lucide-react';
 import Navbar from '../../components/Navbar';
 import PageTransition from '@/components/ui/PageTransition';
+import { getErrorMessage } from '@/lib/errors';
 
 interface DiagnosticResult {
     originalName: string;
@@ -23,7 +25,6 @@ interface DiagnosticResult {
 }
 
 export default function ImageDiagnostics() {
-    const router = useRouter();
     const [isProcessing, setIsProcessing] = useState(false);
     const [result, setResult] = useState<DiagnosticResult | null>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -162,9 +163,9 @@ export default function ImageDiagnostics() {
                 skipped: false
             });
 
-        } catch (err: any) {
-            console.error(err);
-            setErrorMsg(err.message || 'Terjadi kesalahan saat mengompresi gambar.');
+        } catch (err: unknown) {
+            logger.error(err);
+            setErrorMsg(getErrorMessage(err, 'Terjadi kesalahan saat mengompresi gambar.'));
         } finally {
             setIsProcessing(false);
         }

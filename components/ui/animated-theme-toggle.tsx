@@ -4,10 +4,19 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 
-function Button({ className, variant, disabled, onClick, children, "aria-label": ariaLabel, ...props }: {
-  className?: string; variant?: string; disabled?: boolean; onClick?: () => void;
-  children?: React.ReactNode; "aria-label"?: string; [key: string]: any
-}) {
+type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: string;
+};
+
+function Button({
+  className,
+  variant,
+  disabled,
+  onClick,
+  children,
+  "aria-label": ariaLabel,
+  ...props
+}: ButtonProps) {
   return (
     <button
       className={cn(
@@ -17,6 +26,7 @@ function Button({ className, variant, disabled, onClick, children, "aria-label":
       disabled={disabled}
       onClick={onClick}
       aria-label={ariaLabel}
+      data-variant={variant}
       {...props}
     >
       {children}

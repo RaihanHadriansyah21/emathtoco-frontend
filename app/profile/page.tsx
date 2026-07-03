@@ -1,11 +1,13 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { User, IdCard, GraduationCap, Edit3, Save, X, Loader2, Camera, CheckCircle2, Trash2, Eye, AlertTriangle } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { supabase } from '@/lib/supabase';
-import Cropper from 'react-easy-crop';
+import Cropper, { type Area } from 'react-easy-crop';
 import { useAuth } from '../components/AuthGate';
 import PageTransition from '@/components/ui/PageTransition';
 
@@ -15,6 +17,16 @@ const getInitials = (name: string) => {
     if (parts.length === 0) return 'U';
     if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
     return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+};
+
+const profileObjectPathFromUrl = (url: string | null): string | null => {
+    if (!url) return null;
+    const marker = '/profile-images/';
+    const markerIndex = url.indexOf(marker);
+    if (markerIndex < 0) return null;
+    return decodeURIComponent(
+        url.slice(markerIndex + marker.length).split('?')[0],
+    );
 };
 
 const getCroppedImg = (
@@ -101,7 +113,7 @@ export default function ProfilePage() {
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [crop, setCrop] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
-    const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
     const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
     const [isCropModalOpen, setIsCropModalOpen] = useState(false);
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -147,7 +159,7 @@ export default function ProfilePage() {
         reader.readAsDataURL(file);
     };
 
-    const onCropComplete = (croppedArea: any, croppedAreaPixels: any) => {
+    const onCropComplete = (_croppedArea: Area, croppedAreaPixels: Area) => {
         setCroppedAreaPixels(croppedAreaPixels);
     };
 
@@ -158,61 +170,57 @@ export default function ProfilePage() {
         setUploadError(null);
         setUploadSuccess(null);
 
-        console.log("handleSaveAvatar initiated for user:", userId);
+        logger.debug("handleSaveAvatar initiated for user:", userId);
 
         try {
             // 1. Generate crop blob using HTML5 Canvas
             const blob = await getCroppedImg(imageSrc, croppedAreaPixels);
-            console.log("Generated crop blob:", blob);
+            logger.debug("Generated crop blob:", blob);
 
-            const filePath = `${userId}/avatar.jpg`;
-            // Clean up: delete existing file first to ensure storage and CDN refresh completely
-            try {
-                await supabase.storage.from('profile-images').remove([filePath]);
-                console.log("Old file deleted from storage before re-upload.");
-            } catch (e) {
-                console.log("No old file to delete or delete failed, continuing...");
-            }
+            const filePath = `${userId}/${crypto.randomUUID()}.jpg`;
+            const previousPath = profileObjectPathFromUrl(fotoProfilUrl);
 
             const { error: uploadErr } = await supabase.storage
                 .from('profile-images')
                 .upload(filePath, blob, {
                     contentType: 'image/jpeg',
-                    upsert: true,
-                    cacheControl: '0'
+                    upsert: false,
+                    cacheControl: '3600'
                 });
 
             if (uploadErr) {
-                console.error("Storage upload error details:", uploadErr);
+                logger.error("Storage upload error details:", uploadErr);
                 throw new Error(`Gagal mengunggah foto: ${uploadErr.message}`);
             }
 
-            console.log("Storage upload successful!");
+            logger.debug("Storage upload successful!");
 
             // 3. Retrieve the public URL and append cache-buster
             const { data: { publicUrl: rawPublicUrl } } = supabase.storage
                 .from('profile-images')
                 .getPublicUrl(filePath);
 
-            const publicUrl = `${rawPublicUrl}?t=${Date.now()}`;
-            console.log("Retrieved storage public URL:", publicUrl);
+            const publicUrl = rawPublicUrl;
+            logger.debug("Retrieved storage public URL:", publicUrl);
 
             // 4. Update the DB table
-            console.log("Updating database table public.profil_pengguna with foto_profil_url...");
+            logger.debug("Updating database table public.profil_pengguna with foto_profil_url...");
             const { error: dbErr } = await supabase
                 .from('profil_pengguna')
                 .update({ foto_profil_url: publicUrl })
                 .eq('id', userId);
 
             if (dbErr) {
-                console.error("DB update error details:", dbErr);
+                await supabase.storage.from('profile-images').remove([filePath]);
                 throw new Error(`Gagal menyimpan ke database: ${dbErr.message}`);
             }
 
-            console.log("DB update successful!");
+            if (previousPath && previousPath !== filePath) {
+                await supabase.storage.from('profile-images').remove([previousPath]);
+            }
 
             // Sync with global auth context
-            await refresh();
+            await refresh(true);
 
             // 5. Dispatch sync event
             window.dispatchEvent(new CustomEvent('avatar-update', { detail: publicUrl }));
@@ -226,9 +234,12 @@ export default function ProfilePage() {
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
-        } catch (err: any) {
-            console.error("handleSaveAvatar caught error:", err);
-            setUploadError(err.message || "Terjadi kesalahan saat menyimpan foto profil.");
+        } catch (err: unknown) {
+            setUploadError(
+                err instanceof Error
+                    ? err.message
+                    : "Terjadi kesalahan saat menyimpan foto profil.",
+            );
         } finally {
             setIsUploading(false);
         }
@@ -246,47 +257,38 @@ export default function ProfilePage() {
         setUploadSuccess(null);
         setIsViewModalOpen(false);
 
-        console.log("confirmDeleteAvatar initiated for user:", userId);
+        logger.debug("confirmDeleteAvatar initiated for user:", userId);
 
         try {
-            // 1. Delete from Supabase Storage bucket 'profile-images'
-            const filePath = `${userId}/avatar.jpg`;
-            console.log("Removing file from storage path:", filePath);
-            const { error: storageErr } = await supabase.storage
-                .from('profile-images')
-                .remove([filePath]);
-
-            if (storageErr) {
-                console.error("Storage delete error details:", storageErr);
-            } else {
-                console.log("Storage file deleted successfully!");
-            }
-
-            // 2. Update the DB table
-            console.log("Resetting foto_profil_url to null in profil_pengguna...");
+            const previousPath = profileObjectPathFromUrl(fotoProfilUrl);
             const { error: dbErr } = await supabase
                 .from('profil_pengguna')
                 .update({ foto_profil_url: null })
                 .eq('id', userId);
 
             if (dbErr) {
-                console.error("DB update error details:", dbErr);
+                logger.error("DB update error details:", dbErr);
                 throw new Error(`Gagal menghapus dari database: ${dbErr.message}`);
             }
 
-            console.log("DB update successful!");
+            if (previousPath) {
+                await supabase.storage.from('profile-images').remove([previousPath]);
+            }
 
             // Sync with global auth context
-            await refresh();
+            await refresh(true);
 
             // 3. Dispatch sync event
             window.dispatchEvent(new CustomEvent('avatar-update', { detail: null }));
             setFotoProfilUrl(null);
             setImageError(false);
             setUploadSuccess("Foto profil berhasil dihapus.");
-        } catch (err: any) {
-            console.error("confirmDeleteAvatar caught error:", err);
-            setUploadError(err.message || "Terjadi kesalahan saat menghapus foto profil.");
+        } catch (err: unknown) {
+            setUploadError(
+                err instanceof Error
+                    ? err.message
+                    : "Terjadi kesalahan saat menghapus foto profil.",
+            );
         } finally {
             setIsUploading(false);
         }
@@ -324,8 +326,8 @@ export default function ProfilePage() {
                     .eq('id', user.id)
                     .maybeSingle();
 
-                console.log("PROFILE DATA:", profile)
-                console.log("FOTO URL:", profile?.foto_profil_url)
+                logger.debug("PROFILE DATA:", profile)
+                logger.debug("FOTO URL:", profile?.foto_profil_url)
 
                 if (profile) {
                     setNamaLengkap(profile.nama_lengkap || '');
@@ -345,7 +347,7 @@ export default function ProfilePage() {
                     router.push('/complete-profile');
                 }
             } catch (err) {
-                console.error('Gagal mengambil data profil:', err);
+                logger.error('Gagal mengambil data profil:', err);
                 setErrorMessage('Terjadi kesalahan memuat profil Anda.');
             } finally {
                 setIsChecking(false);
@@ -392,7 +394,7 @@ export default function ProfilePage() {
             }
 
             // Sync with global auth context
-            await refresh();
+            await refresh(true);
 
             setSuccessMessage('Perubahan profil berhasil disimpan!');
             setOrigNama(namaLengkap.trim());

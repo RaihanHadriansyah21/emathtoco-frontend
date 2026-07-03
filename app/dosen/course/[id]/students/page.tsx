@@ -1,5 +1,7 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
@@ -15,34 +17,20 @@ import {
     FileText,
     ExternalLink,
     Mail,
-    UserCheck,
     Cpu,
     Calendar,
-    ChevronDown,
-    Zap,
-    GraduationCap,
-    Clock
 } from 'lucide-react';
 import Navbar from '../../../../components/Navbar';
 import ToastContainer from '../../../../components/Toast';
 import { useToast } from '@/app/hooks/useToast';
 import { GlassTable, GlassTableHeader, GlassTableRow, ResponsiveTableWrapper } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase';
-import { normalizeRole } from '@/lib/utils';
-import { apiGet, apiPost } from '@/lib/api-client';
+import { apiGet } from '@/lib/api-client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fadeIn, modalTransition } from '@/styles/motion';
 import PageTransition from '@/components/ui/PageTransition';
 
 import { useAuth } from '@/app/components/AuthGate';
-
-interface StudentProfile {
-    id: string;
-    nama_lengkap: string;
-    nim_nip: string;
-    kelas: string;
-    foto_profil_url: string | null;
-}
 
 interface AnswerSheet {
     id: string;
@@ -83,6 +71,22 @@ interface PredictionDetails {
     sections: SectionPrediction[];
 }
 
+type StudentStatusFilter = 'all' | 'unsubmitted' | 'submitted' | 'pending_ai' | 'finalized';
+
+interface RosterApiStudent {
+    id: string;
+    nama_lengkap: string;
+    nim_nip: string;
+    kelas: string;
+    foto_profil_url: string | null;
+    submission: (Omit<Submission, 'lembar_jawaban'> & { sheets_count?: number }) | null;
+}
+
+interface RosterApiResponse {
+    success: boolean;
+    students?: RosterApiStudent[];
+}
+
 export default function LecturerStudentRoster() {
     const router = useRouter();
     const params = useParams();
@@ -92,7 +96,6 @@ export default function LecturerStudentRoster() {
     // Auth & Access Control
     const [isChecking, setIsChecking] = useState(true);
     const [isAccessDenied, setIsAccessDenied] = useState(false);
-    const [lecturerName, setLecturerName] = useState('');
 
     // Course state
     const [courseName, setCourseName] = useState('');
@@ -105,7 +108,7 @@ export default function LecturerStudentRoster() {
 
     // Search & Filters
     const [searchQuery, setSearchQuery] = useState('');
-    const [filterStatus, setFilterStatus] = useState<'all' | 'unsubmitted' | 'submitted' | 'pending_ai' | 'finalized'>('all');
+    const [filterStatus, setFilterStatus] = useState<StudentStatusFilter>('all');
 
     // Selected Student Modal State
     const [selectedStudent, setSelectedStudent] = useState<EnrolledStudent | null>(null);
@@ -127,9 +130,9 @@ export default function LecturerStudentRoster() {
                 throw new Error('Gagal mengambil data roster dari backend.');
             }
 
-            const data = await res.json();
+            const data = await res.json() as RosterApiResponse;
             if (data.success && data.students) {
-                const mapped: EnrolledStudent[] = data.students.map((student: any) => {
+                const mapped: EnrolledStudent[] = data.students.map((student) => {
                     let sub: Submission | null = null;
                     if (student.submission) {
                         sub = {
@@ -159,8 +162,8 @@ export default function LecturerStudentRoster() {
             } else {
                 throw new Error('Format data dari backend tidak valid.');
             }
-        } catch (err: any) {
-            console.error('Error fetching roster data:', err);
+        } catch (err: unknown) {
+            logger.error('Error fetching roster data:', err);
             setErrorMsg('Gagal memuat daftar mahasiswa terdaftar dari backend.');
         } finally {
             setIsLoadingData(false);
@@ -172,8 +175,6 @@ export default function LecturerStudentRoster() {
 
         const verifyAccess = async () => {
             try {
-                setLecturerName(user.nama_lengkap);
-
                 // Run course assignment check and course info query concurrently
                 const [assignResult, courseResult] = await Promise.all([
                     supabase
@@ -203,7 +204,7 @@ export default function LecturerStudentRoster() {
                 setIsChecking(false);
                 fetchRosterData();
             } catch (err) {
-                console.error('Roster verification error:', err);
+                logger.error('Roster verification error:', err);
                 setErrorMsg('Terjadi kesalahan saat memeriksa akses kelas.');
                 setIsChecking(false);
             }
@@ -244,7 +245,7 @@ export default function LecturerStudentRoster() {
                 });
             }
         } catch (err) {
-            console.error('Failed to load predictions:', err);
+            logger.error('Failed to load predictions:', err);
             setSelectedStudent(current => {
                 if (current?.id === student.id) {
                     setPredictionError('Backend AI tidak dapat dihubungi.');
@@ -266,50 +267,27 @@ export default function LecturerStudentRoster() {
             let overallScore = 0;
             const sub = selectedStudent?.submission;
             if (predictionDetails) {
-                overallScore = predictionDetails.sections.reduce((acc, s) => acc + (s.predicted_score || 0), 0);
+                overallScore = predictionDetails.sections.reduce((acc, s) => acc + (s.predicted_score ?? 0), 0);
             } else if (sub && sub.nilai_akhir !== null && sub.nilai_akhir !== undefined) {
                 overallScore = sub.nilai_akhir;
             }
 
-            // 2. Update status of lembar_jawaban to 'finalized'
-            const { error: sheetError } = await supabase
-                .from('lembar_jawaban')
-                .update({
-                    status: 'finalized',
-                    updated_at: new Date().toISOString()
-                })
-                .eq('pengumpulan_tugas_id', submissionId);
-
-            if (sheetError) throw sheetError;
-
-            // 3. Update pengumpulan_tugas status to finalized
-            const { error: subError } = await supabase
-                .from('pengumpulan_tugas')
-                .update({
-                    status_submit: 'finalized',
-                    ai_status: 'finalized', // Satisfy chk_status_sync check constraint
-                    nilai_akhir: overallScore,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', submissionId);
-
-            if (subError) throw subError;
-
-            // 4. Send finalize trigger to backend API
-            try {
-                await apiPost(`/submission/${submissionId}/finalize`);
-            } catch (apiErr) {
-                console.warn('API finalize update failed, but DB update succeeded:', apiErr);
+            if (!predictionDetails || predictionDetails.sections.length !== 24) {
+                throw new Error('Diperlukan 24 hasil section sebelum finalisasi.');
             }
-
-            // Log Audit
-            try {
-                await apiPost('/audit/log', {
-                    action: 'FINAL_SCORE_SUBMITTED',
-                    target: 'pengumpulan_tugas',
-                    details: { new_score: overallScore, source: 'roster_modal' }
+            const scores = predictionDetails.sections.map((section) => ({
+                section_code: section.section_code,
+                nilai_dosen: null,
+                nilai_final: section.predicted_score,
+                feedback: null,
+            }));
+            const { error: finalizeError } = await supabase
+                .rpc('finalize_submission_review', {
+                    p_submission_id: submissionId,
+                    p_scores: scores,
+                    p_model_ai: predictionDetails.model_ai || 'MobileNetV2',
                 });
-            } catch (_) {}
+            if (finalizeError) throw finalizeError;
 
             toast.success('Sukses', 'Penilaian tugas berhasil difinalisasi!');
 
@@ -334,7 +312,7 @@ export default function LecturerStudentRoster() {
 
             fetchRosterData();
         } catch (err) {
-            console.error('Failed to finalize submission:', err);
+            logger.error('Failed to finalize submission:', err);
             toast.error('Error', 'Gagal memfinalisasi penilaian tugas.');
         } finally {
             setIsFinalizing(false);
@@ -522,7 +500,7 @@ export default function LecturerStudentRoster() {
                     {/* Filter Dropdown */}
                     <select
                         value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value as any)}
+                        onChange={(e) => setFilterStatus(e.target.value as StudentStatusFilter)}
                         className="bg-slate-50 dark:bg-black border border-slate-200 dark:border-neutral-900 rounded-xl py-3 px-4 text-sm text-slate-700 dark:text-neutral-350 focus:outline-none focus:border-cyan-500/60 cursor-pointer"
                     >
                         <option value="all">Semua Status</option>

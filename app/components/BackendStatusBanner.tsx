@@ -25,14 +25,14 @@ export default function BackendStatusBanner() {
 
   // Reset dismissed state when backend comes back online then goes offline again
   React.useEffect(() => {
-    if (backendState === 'online') {
+    if (backendState === 'healthy') {
       setDismissed(false);
     }
   }, [backendState]);
 
   // Show success briefly when backend comes back online
   React.useEffect(() => {
-    if (backendState === 'online' && isRetrying) {
+    if (backendState === 'healthy' && isRetrying) {
       setJustCameOnline(true);
       setIsRetrying(false);
       const timer = setTimeout(() => setJustCameOnline(false), 3000);

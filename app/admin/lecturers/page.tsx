@@ -1,14 +1,15 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { GraduationCap, Loader2, Plus, X, Trash2 } from 'lucide-react';
+import { GraduationCap, Loader2, Plus, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { normalizeRole } from '@/lib/utils';
 import ConfirmModal from '@/app/components/ConfirmModal';
 import { GlassTable, GlassTableHeader, GlassTableRow, EmptyState, ResponsiveTableWrapper } from '@/components/ui/table';
 import PageTransition from '@/components/ui/PageTransition';
 import { PageLoader } from '@/components/ui/loaders';
+import { getErrorMessage } from '@/lib/errors';
 
 interface Lecturer {
   id: string;
@@ -32,8 +33,7 @@ interface Assignment {
 }
 
 export default function LecturerAssignmentPage() {
-  const router = useRouter();
-  const [isChecking, setIsChecking] = useState(false);
+  const isChecking = false;
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -85,7 +85,7 @@ export default function LecturerAssignmentPage() {
       });
       setAssignments(mapped);
     } catch (err) {
-      console.error('Error fetching lecturer data:', err);
+      logger.error('Error fetching lecturer data:', err);
     } finally {
       setIsLoading(false);
     }
@@ -121,8 +121,8 @@ export default function LecturerAssignmentPage() {
       setShowAddModal(false);
       setSelectedLecturer('');
       setSelectedCourse('');
-    } catch (err: any) {
-      setFormError(err.message || 'Gagal menambahkan assignment.');
+    } catch (err: unknown) {
+      setFormError(getErrorMessage(err, 'Gagal menambahkan assignment.'));
     } finally {
       setIsSaving(false);
     }
@@ -137,7 +137,7 @@ export default function LecturerAssignmentPage() {
       setAssignments(prev => prev.filter(a => a.id !== deleteTarget.id));
       setDeleteTarget(null);
     } catch (err) {
-      console.error('Error deleting assignment:', err);
+      logger.error('Error deleting assignment:', err);
     } finally {
       setIsDeleting(false);
     }

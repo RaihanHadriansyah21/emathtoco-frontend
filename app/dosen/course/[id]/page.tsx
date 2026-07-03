@@ -1,8 +1,10 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Search, Loader2, ArrowLeft, ArrowRight, BookOpen, Clock, Calendar, CheckSquare, Cpu, Download, FileSpreadsheet, Lock, Zap, ChevronDown, CheckCircle, X, Users } from 'lucide-react';
+import { Search, Loader2, ArrowLeft, ArrowRight, Cpu, Download, FileSpreadsheet, Lock, ChevronDown, Users } from 'lucide-react';
 import { GlassTable, GlassTableHeader, GlassTableRow, ResponsiveTableWrapper } from '@/components/ui/table';
 import Navbar from '../../../components/Navbar';
 import PageTransition from '@/components/ui/PageTransition';
@@ -11,8 +13,7 @@ import ExportCSVModal from '../../../components/ExportCSVModal';
 import ToastContainer from '../../../components/Toast';
 import { useToast } from '@/app/hooks/useToast';
 import { supabase } from '@/lib/supabase';
-import { normalizeRole } from '@/lib/utils';
-import { apiGet, apiPost } from '@/lib/api-client';
+import { apiGet } from '@/lib/api-client';
 
 import { useAuth } from '@/app/components/AuthGate';
 
@@ -69,14 +70,7 @@ export default function LecturerCoursePortal() {
   // Batch AI Modal state
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [isRunningAI, setIsRunningAI] = useState(false);
   const { toasts, toast, removeToast } = useToast();
-
-  // Model Selection Modal state (BUG 1 fix)
-  const [showModelSelectModal, setShowModelSelectModal] = useState(false);
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
-  const [isLoadingModels, setIsLoadingModels] = useState(false);
-  const [selectedBatchModel, setSelectedBatchModel] = useState<string | null>(null);
 
   // Polling ref to prevent duplicate intervals (BUG 2 fix)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -142,7 +136,7 @@ export default function LecturerCoursePortal() {
 
       setSubmissions((data as unknown as Submission[]) || []);
     } catch (err) {
-      console.error('Error fetching submissions:', err);
+      logger.error('Error fetching submissions:', err);
       setErrorMsg('Gagal mengambil data pengumpulan tugas mahasiswa.');
     } finally {
       setIsLoadingData(false);
@@ -166,7 +160,7 @@ export default function LecturerCoursePortal() {
           .maybeSingle();
 
         if (checkErr || !assignmentCheck) {
-          console.warn(`[Access Denied] Lecturer ${user.id} is not assigned to course ${courseId}`);
+          logger.warn(`[Access Denied] Lecturer ${user.id} is not assigned to course ${courseId}`);
           setIsAccessDenied(true);
           setIsChecking(false);
           setIsLoadingData(false);
@@ -191,8 +185,8 @@ export default function LecturerCoursePortal() {
                 setCourseCode(courseInfo.kode_matkul);
               }
             })
-            .catch((err: any) => {
-              console.error("Error loading course details:", err);
+            .catch((err: unknown) => {
+              logger.error("Error loading course details:", err);
             }),
           apiGet(`/lecturer/course/${courseId}/stats`)
             .then(async (statsRes) => {
@@ -203,9 +197,9 @@ export default function LecturerCoursePortal() {
                 throw new Error("Stats API returned non-200");
               }
             })
-            .catch((err: any) => {
-              console.error("AI Backend Error - Gagal memuat statistik mahasiswa:", err);
-              const userFriendlyMsg = (err instanceof TypeError || (err.message && err.message.includes("fetch")))
+            .catch((err: unknown) => {
+              logger.error("AI Backend Error - Gagal memuat statistik mahasiswa:", err);
+              const userFriendlyMsg = (err instanceof TypeError || (err instanceof Error && err.message.includes("fetch")))
                 ? "Backend tidak dapat dihubungi. Pastikan server FastAPI berjalan dan IP backend benar."
                 : "Gagal memuat statistik mahasiswa.";
               toast.error("Gagal", userFriendlyMsg);
@@ -213,14 +207,14 @@ export default function LecturerCoursePortal() {
           fetchSubmissions()
         ]);
       } catch (err) {
-        console.error('Dosen verification error:', err);
+        logger.error('Dosen verification error:', err);
         setErrorMsg('Terjadi kesalahan saat memeriksa akses kelas.');
         setIsChecking(false);
         setIsLoadingData(false);
       }
     };
     verifyAccess();
-  }, [user, courseId, fetchSubmissions]);
+  }, [user, courseId, fetchSubmissions, toast]);
  
   // Polling logic when any submission is 'processing' (BUG 2 fix)
   useEffect(() => {
@@ -251,7 +245,7 @@ export default function LecturerCoursePortal() {
         pollingRef.current = null;
       }
     };
-  }, [submissions]);
+  }, [submissions, fetchSubmissions]);
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -273,45 +267,6 @@ export default function LecturerCoursePortal() {
       return;
     }
     setShowBatchModal(true);
-  };
-
-  // Actually run batch after model is selected
-  const executeAIBatch = async () => {
-    if (!selectedBatchModel) return;
-    setShowModelSelectModal(false);
-
-    const eligible = submissions.filter(s => (!s.ai_status || s.ai_status === 'pending') && s.ai_status !== 'finalized');
-    if (eligible.length === 0) return;
-
-    setIsRunningAI(true);
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const sub of eligible) {
-      try {
-        const res = await apiPost(`/predict/${sub.id}?model=${selectedBatchModel}`);
-        if (res.ok) {
-          successCount++;
-        } else {
-          failCount++;
-        }
-      } catch (err: any) {
-        console.error("AI Backend Error:", err);
-        const userFriendlyMsg = (err instanceof TypeError || (err.message && err.message.includes("fetch")))
-          ? "Backend tidak dapat dihubungi. Pastikan server FastAPI berjalan dan IP backend benar."
-          : `Gagal memprediksi tugas ${sub.id}.`;
-        toast.error("AI Backend Error", userFriendlyMsg);
-        failCount++;
-      }
-    }
-
-    setIsRunningAI(false);
-    if (failCount > 0) {
-      toast.warning('Selesai dengan error', `${successCount} sukses, ${failCount} gagal.`);
-    } else {
-      toast.success('Sukses', `Berhasil menjalankan AI (${selectedBatchModel}) untuk ${successCount} tugas.`);
-    }
-    fetchSubmissions();
   };
 
   // Helper to format date
@@ -414,74 +369,6 @@ export default function LecturerCoursePortal() {
       <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-16 relative overflow-hidden flex flex-col">
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
-
-      {/* BUG 1 fix: Model Selection Modal */}
-      {showModelSelectModal && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 dark:bg-[#0A0A0F] dark:border-neutral-800 rounded-2xl max-w-md w-full shadow-[0_0_60px_rgba(168,85,247,0.06)] overflow-hidden">
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100 dark:border-neutral-900">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center flex-shrink-0">
-                  <Cpu className="w-5 h-5 text-purple-400" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-slate-900 dark:text-white">Pilih Model AI</h2>
-                  <p className="text-[11px] text-slate-500 dark:text-neutral-500 font-mono tracking-wider mt-0.5">
-                    {submissions.filter(s => (!s.ai_status || s.ai_status === 'pending') && s.ai_status !== 'finalized').length} tugas akan diproses
-                  </p>
-                </div>
-              </div>
-              <button onClick={() => setShowModelSelectModal(false)} className="text-slate-400 dark:text-neutral-500 hover:text-slate-700 dark:hover:text-white transition-colors p-1 cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="px-6 py-5 space-y-4">
-              {isLoadingModels ? (
-                <div className="flex items-center justify-center py-8 gap-2">
-                  <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
-                  <span className="text-sm text-slate-500 dark:text-neutral-400">Memuat model...</span>
-                </div>
-              ) : (
-                <>
-                  <label className="block text-[10px] font-mono font-bold tracking-widest text-slate-400 dark:text-neutral-500 uppercase mb-2">
-                    Model AI yang Tersedia
-                  </label>
-                  <div className="space-y-2">
-                    {availableModels.map(model => (
-                      <button
-                        key={model}
-                        onClick={() => setSelectedBatchModel(model)}
-                        className={`w-full text-left px-4 py-3 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
-                          selectedBatchModel === model
-                            ? 'bg-purple-500/10 border-purple-500/40 text-purple-600 dark:text-purple-300'
-                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300 dark:bg-neutral-950 dark:border-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-700'
-                        }`}
-                      >
-                        <Zap className="w-4 h-4 text-purple-400 flex-shrink-0" />
-                        <span className="font-semibold text-sm">{model}</span>
-                        {selectedBatchModel === model && (
-                          <CheckCircle className="w-4 h-4 ml-auto text-purple-400" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-              <button
-                onClick={executeAIBatch}
-                disabled={!selectedBatchModel || isLoadingModels}
-                className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-mono text-sm font-bold tracking-wider transition-all duration-300 cursor-pointer bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-[0_0_30px_rgba(168,85,247,0.15)] hover:shadow-[0_0_40px_rgba(168,85,247,0.25)] disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Cpu className="w-4 h-4" />
-                <span>Mulai Batch Processing</span>
-              </button>
-              {!selectedBatchModel && !isLoadingModels && (
-                <p className="text-xs text-amber-500 dark:text-amber-400 text-center">Pilih model AI terlebih dahulu untuk memulai batch.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Batch AI Modal */}
       <BatchAIModal
@@ -635,16 +522,12 @@ export default function LecturerCoursePortal() {
               {/* Run AI Batch Button (Primary action with purple gradient and glow) */}
               <button
                 onClick={handleRunAIBatch}
-                disabled={isRunningAI || counts.pending === 0}
+                disabled={counts.pending === 0}
                 title={counts.pending === 0 ? "Tidak ada submission yang perlu diproses" : undefined}
                 className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 hover:scale-[1.02] active:scale-[0.98] text-white px-5 py-3 rounded-xl text-xs font-bold tracking-wider transition-all duration-200 shadow-[0_0_15px_rgba(168,85,247,0.25)] hover:shadow-[0_0_25px_rgba(168,85,247,0.4)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none cursor-pointer whitespace-nowrap w-full sm:w-auto"
               >
-                {isRunningAI ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Cpu className="w-4 h-4 animate-pulse" />
-                )}
-                <span className="font-mono">{isRunningAI ? 'PROCESSING...' : 'RUN AI BATCH'}</span>
+                <Cpu className="w-4 h-4 animate-pulse" />
+                <span className="font-mono">RUN AI BATCH</span>
               </button>
 
               {/* Combined Export Dropdown */}
@@ -770,9 +653,9 @@ export default function LecturerCoursePortal() {
             {/* Mobile Cards Stack */}
             <div className="md:hidden space-y-4">
               {filteredSubmissions.map((sub) => {
-                console.log("submission", sub.id, sub.ai_status);
-                console.log("MAHASISWA DATA", sub.mahasiswa);
-                console.log("LEMBAR DATA", sub.lembar_jawaban);
+                logger.debug("submission", sub.id, sub.ai_status);
+                logger.debug("MAHASISWA DATA", sub.mahasiswa);
+                logger.debug("LEMBAR DATA", sub.lembar_jawaban);
                 const statusBadge = getStatusBadge(sub.ai_status);
                 const uploadedCount = sub.lembar_jawaban ? sub.lembar_jawaban.length : 0;
                 const mhs = Array.isArray(sub.mahasiswa) ? sub.mahasiswa[0] : sub.mahasiswa;

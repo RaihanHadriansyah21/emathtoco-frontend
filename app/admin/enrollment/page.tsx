@@ -1,10 +1,10 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { UserCheck, Loader2, Plus, Search, X, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { normalizeRole } from '@/lib/utils';
 import ConfirmModal from '@/app/components/ConfirmModal';
 import { GlassTable, GlassTableHeader, GlassTableRow, EmptyState, ResponsiveTableWrapper } from '@/components/ui/table';
 import PageTransition from '@/components/ui/PageTransition';
@@ -12,6 +12,7 @@ import { PageLoader } from '@/components/ui/loaders';
 import { useToast } from '@/app/hooks/useToast';
 import ToastContainer from '@/app/components/Toast';
 import { apiDelete } from '@/lib/api-client';
+import { getErrorMessage } from '@/lib/errors';
 
 interface Student {
   id: string;
@@ -40,9 +41,8 @@ interface Enrollment {
 const ITEMS_PER_PAGE = 20;
 
 export default function EnrollmentPage() {
-  const router = useRouter();
   const { toasts, toast, removeToast } = useToast();
-  const [isChecking, setIsChecking] = useState(false);
+  const isChecking = false;
   const [students, setStudents] = useState<Student[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
@@ -100,7 +100,7 @@ export default function EnrollmentPage() {
       });
       setEnrollments(mapped);
     } catch (err) {
-      console.error('Error fetching enrollment data:', err);
+      logger.error('Error fetching enrollment data:', err);
     } finally {
       setIsLoading(false);
     }
@@ -134,8 +134,8 @@ export default function EnrollmentPage() {
       setShowAddModal(false);
       setSelectedStudent('');
       setSelectedCourse('');
-    } catch (err: any) {
-      setFormError(err.message || 'Gagal mendaftarkan mahasiswa.');
+    } catch (err: unknown) {
+      setFormError(getErrorMessage(err, 'Gagal mendaftarkan mahasiswa.'));
     } finally {
       setIsSaving(false);
     }
@@ -145,7 +145,7 @@ export default function EnrollmentPage() {
     if (!deleteTarget || isDeleting) return;
     setIsDeleting(true);
     try {
-      console.log(`[Delete Enrollment] Sending backend deletion request for enrollment ID: ${deleteTarget.id}`);
+      logger.debug(`[Delete Enrollment] Sending backend deletion request for enrollment ID: ${deleteTarget.id}`);
       const res = await apiDelete(`/admin/enrollment/${deleteTarget.id}`);
       if (!res.ok) {
         let errorMsg = 'Gagal menghapus pendaftaran pada backend.';
@@ -154,16 +154,16 @@ export default function EnrollmentPage() {
           if (errJson && errJson.detail) {
             errorMsg = errJson.detail;
           }
-        } catch (_) {}
+        } catch {}
         throw new Error(errorMsg);
       }
 
       setEnrollments(prev => prev.filter(e => e.id !== deleteTarget.id));
       toast.success('Hapus Berhasil', `Pendaftaran mahasiswa "${deleteTarget.student_name}" berhasil dihapus beserta seluruh berkas & tugas terkait.`);
       setDeleteTarget(null);
-    } catch (err: any) {
-      console.error('Error deleting enrollment:', err);
-      toast.error('Gagal Menghapus', err.message || 'Terjadi kesalahan saat menghapus enrollment.');
+    } catch (err: unknown) {
+      logger.error('Error deleting enrollment:', err);
+      toast.error('Gagal Menghapus', getErrorMessage(err, 'Terjadi kesalahan saat menghapus enrollment.'));
     } finally {
       setIsDeleting(false);
     }

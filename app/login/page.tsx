@@ -4,7 +4,6 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/app/components/AuthGate';
 import { useBackendStatus } from '@/lib/backend-store';
-import { supabase } from '@/lib/supabase';
 import Image from 'next/image';
 import Logo from '../Emathtoco.png';
 import { GraduationCap, BookOpen, ArrowRight, Loader2, Sparkles, ArrowLeft, LogIn, WifiOff, RefreshCw } from 'lucide-react';

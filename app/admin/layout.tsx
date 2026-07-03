@@ -12,7 +12,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { isLoading, isAuthorized } = useRequireRole('admin');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem('sidebarCollapsed');
@@ -21,7 +20,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     } else {
       setSidebarCollapsed(true);
     }
-    setIsMounted(true);
   }, []);
 
   const toggleSidebar = () => {

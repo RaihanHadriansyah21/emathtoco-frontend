@@ -1,5 +1,7 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
@@ -34,11 +36,8 @@ const getCourseIcon = (iconName: string): string => {
 };
 
 export default function StudentDashboard() {
-  console.log("[DASHBOARD_RENDER]", Date.now());
   const router = useRouter();
   const { user, loading } = useAuth();
-  const [userEmail, setUserEmail] = useState('');
-  const [fullName, setFullName] = useState('');
   const [courses, setCourses] = useState<MataKuliah[]>([]);
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
   const [courseError, setCourseError] = useState<string | null>(null);
@@ -53,12 +52,9 @@ export default function StudentDashboard() {
 
     // Ambil data user yang sedang login aktif dari session Supabase
     const getDashboardData = async () => {
-      console.log("[HOME] auth check start");
+      logger.debug("[HOME] auth check start");
       try {
-        setUserEmail(user.email);
-        setFullName(user.nama_lengkap);
-
-        console.log(`[DASHBOARD_FETCH] fetchEnrollment start: ${Date.now()}`);
+        logger.debug(`[DASHBOARD_FETCH] fetchEnrollment start: ${Date.now()}`);
         const enrollmentStart = Date.now();
         // Fetch enrolled course IDs from mahasiswa_mata_kuliah
         const { data: enrollmentData, error: enrollmentError } = await supabase
@@ -66,7 +62,7 @@ export default function StudentDashboard() {
           .select('mata_kuliah_id')
           .eq('mahasiswa_id', user.id);
         const enrollmentDuration = Date.now() - enrollmentStart;
-        console.log(`[DASHBOARD_FETCH] fetchEnrollment end: ${Date.now()} | duration: ${enrollmentDuration}ms`);
+        logger.debug(`[DASHBOARD_FETCH] fetchEnrollment end: ${Date.now()} | duration: ${enrollmentDuration}ms`);
 
         if (enrollmentError) {
           throw enrollmentError;
@@ -80,7 +76,7 @@ export default function StudentDashboard() {
           return;
         }
 
-        console.log(`[DASHBOARD_FETCH] fetchCourses start: ${Date.now()}`);
+        logger.debug(`[DASHBOARD_FETCH] fetchCourses start: ${Date.now()}`);
         const coursesStart = Date.now();
         // Fetch courses matching the enrolled IDs
         const { data: coursesData, error: coursesError } = await supabase
@@ -88,7 +84,7 @@ export default function StudentDashboard() {
           .select('*')
           .in('id', enrolledCourseIds);
         const coursesDuration = Date.now() - coursesStart;
-        console.log(`[DASHBOARD_FETCH] fetchCourses end: ${Date.now()} | duration: ${coursesDuration}ms`);
+        logger.debug(`[DASHBOARD_FETCH] fetchCourses end: ${Date.now()} | duration: ${coursesDuration}ms`);
 
         if (coursesError) {
           throw coursesError;
@@ -96,7 +92,7 @@ export default function StudentDashboard() {
 
         setCourses(coursesData || []);
 
-        console.log(`[DASHBOARD_FETCH] fetchWarnings start: ${Date.now()}`);
+        logger.debug(`[DASHBOARD_FETCH] fetchWarnings start: ${Date.now()}`);
         const warningsStart = Date.now();
         // Check for reupload warnings (lembar_jawaban with status = 'reupload_required')
         const { data: submissions, error: subsError } = await supabase
@@ -138,9 +134,9 @@ export default function StudentDashboard() {
            setReuploadWarnings(warningCounts);
         }
         const warningsDuration = Date.now() - warningsStart;
-        console.log(`[DASHBOARD_FETCH] fetchWarnings end: ${Date.now()} | duration: ${warningsDuration}ms`);
+        logger.debug(`[DASHBOARD_FETCH] fetchWarnings end: ${Date.now()} | duration: ${warningsDuration}ms`);
       } catch (err) {
-        console.error('Gagal mengambil data beranda:', err);
+        logger.error('Gagal mengambil data beranda:', err);
         setCourseError('Terjadi kesalahan memuat daftar mata kuliah.');
       } finally {
         setIsLoadingCourses(false);

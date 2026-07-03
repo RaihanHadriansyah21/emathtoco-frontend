@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { apiGet } from '@/lib/api-client';
 
 export interface AvailableModelsResponse {
@@ -5,6 +6,12 @@ export interface AvailableModelsResponse {
   total_models: number;
   models: string[];
   message?: string;
+}
+
+interface AvailableModelsApiResponse {
+  success: boolean;
+  message?: string;
+  models: Array<{ name: string }>;
 }
 
 /**
@@ -21,7 +28,7 @@ export async function fetchAvailableModels(): Promise<AvailableModelsResponse> {
       throw new Error(`Gagal menghubungi server backend (HTTP ${res.status})`);
     }
 
-    const rawData = await res.json();
+    const rawData = await res.json() as AvailableModelsApiResponse;
     
     if (!rawData.success) {
       throw new Error(rawData.message || 'Server backend gagal memuat model.');
@@ -30,11 +37,14 @@ export async function fetchAvailableModels(): Promise<AvailableModelsResponse> {
     return {
       success: true,
       total_models: rawData.models.length,
-      models: rawData.models.map((m: any) => m.name)
+      models: rawData.models.map((model) => model.name)
     };
-  } catch (error: any) {
-    console.error("AI Backend Error:", error);
-    if (error instanceof TypeError || (error.message && error.message.includes("fetch"))) {
+  } catch (error: unknown) {
+    logger.error("AI Backend Error:", error);
+    if (
+      error instanceof TypeError
+      || (error instanceof Error && error.message.includes("fetch"))
+    ) {
       throw new Error("Backend tidak dapat dihubungi. Pastikan server FastAPI berjalan dan IP backend benar.");
     }
     throw error;

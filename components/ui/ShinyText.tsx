@@ -2,7 +2,8 @@
 
 import React from 'react';
 
-export interface ShinyTextProps {
+export interface ShinyTextProps
+  extends Omit<React.HTMLAttributes<HTMLSpanElement>, 'children' | 'color'> {
   text: string;
   disabled?: boolean;
   speed?: number; // duration in seconds
@@ -11,7 +12,6 @@ export interface ShinyTextProps {
   color?: string; // base text color
   shineColor?: string; // shine highlight color
   spread?: number; // angle in degrees
-  [key: string]: any;
 }
 
 export default function ShinyText({

@@ -1,11 +1,12 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, ChevronRight, BookOpen } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { supabase } from '@/lib/supabase';
-import { normalizeRole } from '@/lib/utils';
 import PageTransition from '@/components/ui/PageTransition';
 import { GlassCard } from '@/components/ui/card';
 
@@ -89,7 +90,7 @@ export default function LecturerDashboard() {
 
       setIsLoading(false);
     } catch (err) {
-      console.error('Error loading lecturer dashboard data:', err);
+      logger.error('Error loading lecturer dashboard data:', err);
       setErrorMsg('Gagal mengambil data kelas dan pengumpulan tugas.');
       setIsLoading(false);
     }

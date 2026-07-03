@@ -1,25 +1,18 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+
 import { API_URL } from './config';
 
-// ============================================================
-// EMATHTOCO — Backend Status Store
-//
-// State global yang SEPENUHNYA TERPISAH dari auth.
-// Backend mati ≠ user harus logout.
-//
-// backendState: 'online' | 'offline' | 'checking'
-//
-// Rules:
-// - Health check timeout: 3 detik
-// - Hanya sekali saat startup
-// - Tidak polling terus
-// - Tidak retry tanpa batas
-// - Tidak redirect / signOut
-// ============================================================
-
-export type BackendState = 'online' | 'offline' | 'checking';
+export type BackendState = 'healthy' | 'degraded' | 'offline' | 'checking';
 
 interface BackendStatusContextType {
   backendState: BackendState;
@@ -28,81 +21,109 @@ interface BackendStatusContextType {
 
 const BackendStatusContext = createContext<BackendStatusContextType>({
   backendState: 'checking',
-  retryBackendCheck: async () => {},
+  retryBackendCheck: async () => undefined,
 });
 
-export const useBackendStatus = () => useContext(BackendStatusContext);
-
-// ─── Module-level singleton state ────────────────────────────
-// This allows non-React code (e.g. api-client.ts) to check
-// backend status without hooks.
-let _backendState: BackendState = 'checking';
+let backendStateSnapshot: BackendState = 'checking';
 
 export function getBackendState(): BackendState {
-  return _backendState;
+  return backendStateSnapshot;
 }
 
-function setBackendState(state: BackendState) {
-  _backendState = state;
+function updateSnapshot(state: BackendState) {
+  backendStateSnapshot = state;
 }
 
-// ─── Health check function ───────────────────────────────────
-async function performHealthCheck(): Promise<boolean> {
+async function performHealthCheck(): Promise<BackendState> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+  const timeoutId = window.setTimeout(() => controller.abort(), 4000);
 
   try {
-    const res = await fetch(`${API_URL}/health`, {
+    const response = await fetch(`${API_URL}/health/ready`, {
       method: 'GET',
-      headers: {
-        'ngrok-skip-browser-warning': 'true',
-        'Accept': 'application/json',
-      },
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
       signal: controller.signal,
     });
-    clearTimeout(timeoutId);
-    // Any response (even 404) means the server is reachable
-    return true;
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[BACKEND] Health check failed:', err instanceof Error ? err.message : err);
+    if (!response.ok) {
+      return 'degraded';
     }
-    return false;
+    const data = await response.json() as { status?: string };
+    return data.status === 'healthy' ? 'healthy' : 'degraded';
+  } catch {
+    return 'offline';
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 }
 
-// ─── React Provider ──────────────────────────────────────────
+export const useBackendStatus = () => useContext(BackendStatusContext);
+
 export function BackendStatusProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<BackendState>('checking');
-  const hasCheckedRef = useRef(false);
+  const timerRef = useRef<number | null>(null);
+  const consecutiveFailuresRef = useRef(0);
+  const runningRef = useRef(false);
 
-  const doCheck = useCallback(async () => {
-    setState('checking');
-    setBackendState('checking');
-
-    const isOnline = await performHealthCheck();
-    const newState: BackendState = isOnline ? 'online' : 'offline';
-
-    setState(newState);
-    setBackendState(newState);
-
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[BACKEND] Health check result: ${newState}`);
+  const scheduleNext = useCallback((nextState: BackendState) => {
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current);
     }
+    const offlineDelays = [5_000, 15_000, 30_000, 60_000];
+    const delay = nextState === 'healthy'
+      ? 60_000
+      : nextState === 'degraded'
+        ? 15_000
+        : offlineDelays[Math.min(
+            consecutiveFailuresRef.current,
+            offlineDelays.length - 1,
+          )];
+    timerRef.current = window.setTimeout(() => {
+      window.dispatchEvent(new Event('emathtoco:backend-check'));
+    }, delay);
   }, []);
 
-  // Single health check on mount — no polling, no retry
+  const doCheck = useCallback(async () => {
+    if (runningRef.current) return;
+    runningRef.current = true;
+    try {
+      const nextState = await performHealthCheck();
+      if (nextState === 'offline') {
+        consecutiveFailuresRef.current += 1;
+      } else {
+        consecutiveFailuresRef.current = 0;
+      }
+      setState(nextState);
+      updateSnapshot(nextState);
+      scheduleNext(nextState);
+    } finally {
+      runningRef.current = false;
+    }
+  }, [scheduleNext]);
+
   useEffect(() => {
-    if (hasCheckedRef.current) return;
-    hasCheckedRef.current = true;
-    doCheck();
+    const onCheck = () => void doCheck();
+    const onFocus = () => void doCheck();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void doCheck();
+    };
+
+    void doCheck();
+    window.addEventListener('emathtoco:backend-check', onCheck);
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+      window.removeEventListener('emathtoco:backend-check', onCheck);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [doCheck]);
 
-  const contextValue = React.useMemo(() => ({
-    backendState: state,
-    retryBackendCheck: doCheck,
-  }), [state, doCheck]);
+  const contextValue = useMemo(
+    () => ({ backendState: state, retryBackendCheck: doCheck }),
+    [state, doCheck],
+  );
 
   return (
     <BackendStatusContext.Provider value={contextValue}>

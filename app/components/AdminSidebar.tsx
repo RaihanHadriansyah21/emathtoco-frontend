@@ -15,7 +15,6 @@ import {
   RotateCcw,
   Settings,
   ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
 
 interface AdminSidebarProps {

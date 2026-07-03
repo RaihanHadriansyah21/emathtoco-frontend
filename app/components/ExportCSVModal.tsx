@@ -1,5 +1,7 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useState, useMemo } from 'react';
 import {
   X, Download, Loader2, Filter, CheckCircle, FileSpreadsheet, ChevronDown
@@ -104,7 +106,7 @@ export default function ExportCSVModal({
       onToast('success', 'Export CSV Berhasil', `${count} data mahasiswa berhasil diekspor ke ${filename}`);
       onClose();
     } catch (err) {
-      console.error('[CSV Export] Error:', err);
+      logger.error('[CSV Export] Error:', err);
       onToast('error', 'Export CSV Gagal', err instanceof Error ? err.message : 'Terjadi kesalahan saat mengekspor data.');
     } finally {
       setIsExportingCSV(false);
@@ -127,7 +129,7 @@ export default function ExportCSVModal({
       onToast('success', 'Export Excel Berhasil', `${count} data mahasiswa berhasil diekspor ke ${filename}`);
       onClose();
     } catch (err) {
-      console.error('[Excel Export] Error:', err);
+      logger.error('[Excel Export] Error:', err);
       onToast('error', 'Export Excel Gagal', err instanceof Error ? err.message : 'Terjadi kesalahan saat mengekspor data.');
     } finally {
       setIsExportingExcel(false);

@@ -1,10 +1,10 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Activity, Database, FileImage, Clock, BarChart3 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { normalizeRole } from '@/lib/utils';
 import { GlassTable, GlassTableHeader, GlassTableRow, EmptyState, ResponsiveTableWrapper } from '@/components/ui/table';
 import { GlassCard } from '@/components/ui/card';
 import { PageLoader, TableLoader } from '@/components/ui/loaders';
@@ -26,9 +26,16 @@ interface RecentActivity {
   course_name: string;
 }
 
+interface RecentActivityRow {
+  id: string;
+  status_submit: string;
+  waktu_submit: string;
+  mahasiswa: { nama_lengkap: string } | Array<{ nama_lengkap: string }> | null;
+  mata_kuliah: { nama_matkul: string } | Array<{ nama_matkul: string }> | null;
+}
+
 export default function MonitoringPage() {
-  const router = useRouter();
-  const [isChecking, setIsChecking] = useState(false);
+  const isChecking = false;
   const [isLoading, setIsLoading] = useState(true);
   const [pipeline, setPipeline] = useState<PipelineStats>({ submitted: 0, processing_ai: 0, reviewed: 0, finalized: 0, total: 0 });
   const [answerSheetCount, setAnswerSheetCount] = useState(0);
@@ -62,7 +69,8 @@ export default function MonitoringPage() {
 
       setAnswerSheetCount(sheetsRes.count || 0);
 
-      const activities: RecentActivity[] = (activityRes.data || []).map((a: any) => {
+      const activityRows = (activityRes.data || []) as RecentActivityRow[];
+      const activities: RecentActivity[] = activityRows.map((a) => {
         const mhs = Array.isArray(a.mahasiswa) ? a.mahasiswa[0] : a.mahasiswa;
         const mk = Array.isArray(a.mata_kuliah) ? a.mata_kuliah[0] : a.mata_kuliah;
         return {
@@ -75,7 +83,7 @@ export default function MonitoringPage() {
       });
       setRecentActivity(activities);
     } catch (err) {
-      console.error('Error fetching monitoring data:', err);
+      logger.error('Error fetching monitoring data:', err);
     } finally {
       setIsLoading(false);
     }

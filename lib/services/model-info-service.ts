@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { apiGet } from '@/lib/api-client';
 
 // ============================================================
@@ -19,6 +20,12 @@ export interface ModelsInfoResponse {
   message?: string;
 }
 
+interface ModelsInfoApiResponse {
+  success: boolean;
+  message?: string;
+  models: Array<{ name: string; total_models: number }>;
+}
+
 /**
  * Fetches detailed information about all registered models from the FastAPI backend.
  * Returns model names and their .h5 file counts.
@@ -34,7 +41,7 @@ export async function fetchModelsInfo(): Promise<ModelsInfoResponse> {
       throw new Error(`Gagal menghubungi server backend (HTTP ${res.status})`);
     }
 
-    const rawData = await res.json();
+    const rawData = await res.json() as ModelsInfoApiResponse;
 
     if (!rawData.success) {
       throw new Error(rawData.message || 'Server backend gagal memuat informasi model.');
@@ -42,14 +49,17 @@ export async function fetchModelsInfo(): Promise<ModelsInfoResponse> {
 
     return {
       success: true,
-      models: rawData.models.map((m: any) => ({
-        name: m.name,
-        total_files: m.total_models
+      models: rawData.models.map((model) => ({
+        name: model.name,
+        total_files: model.total_models
       }))
     };
-  } catch (error: any) {
-    console.error("AI Backend Error:", error);
-    if (error instanceof TypeError || (error.message && error.message.includes("fetch"))) {
+  } catch (error: unknown) {
+    logger.error("AI Backend Error:", error);
+    if (
+      error instanceof TypeError
+      || (error instanceof Error && error.message.includes("fetch"))
+    ) {
       throw new Error("Backend tidak dapat dihubungi. Pastikan server FastAPI berjalan dan IP backend benar.");
     }
     throw error;

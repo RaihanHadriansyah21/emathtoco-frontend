@@ -1,7 +1,12 @@
+import {
+  AI_MODELS as AI_MODEL_VALUES,
+  type AIModel,
+} from "@/lib/domain-contract";
+
 export const AI_MODELS = {
-  DENSENET121: "DenseNet121",
-  INCEPTIONV3: "InceptionV3",
-  MOBILENETV2: "MobileNetV2",
+  DENSENET121: AI_MODEL_VALUES[1],
+  INCEPTIONV3: AI_MODEL_VALUES[2],
+  MOBILENETV2: AI_MODEL_VALUES[0],
 } as const;
 
-export type AIModel = typeof AI_MODELS[keyof typeof AI_MODELS];
+export type { AIModel };

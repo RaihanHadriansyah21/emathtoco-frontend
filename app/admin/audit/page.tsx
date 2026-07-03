@@ -1,5 +1,7 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
@@ -8,7 +10,6 @@ import {
   Activity
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { normalizeRole } from '@/lib/utils';
 import { standardizeModelName } from '@/lib/services/audit-service';
 import { apiGet } from '@/lib/api-client';
 import { GlassTable, GlassTableHeader, GlassTableRow, EmptyState, ResponsiveTableWrapper } from '@/components/ui/table';
@@ -27,7 +28,7 @@ interface AuditEntry {
   role?: string | null;
   action?: string | null;
   target?: string | null;
-  detail?: any;
+  detail?: unknown;
   
   // Old schema fields for backwards compatibility
   actor_id?: string | null;
@@ -48,7 +49,7 @@ export default function AuditLogPage() {
   
   // Schema Checking State
   const [schemaVersion, setSchemaVersion] = useState<'legacy' | 'enterprise' | null>(null);
-  const [columnsFound, setColumnsFound] = useState<string[]>([]);
+  const [, setColumnsFound] = useState<string[]>([]);
 
   // Logs & Pagination State
   const [logs, setLogs] = useState<AuditEntry[]>([]);
@@ -90,7 +91,7 @@ export default function AuditLogPage() {
           setSchemaVersion('legacy');
         }
       } catch (err) {
-        console.error('Failed to check audit schema:', err);
+        logger.error('Failed to check audit schema:', err);
         setSchemaVersion('legacy');
       }
     };
@@ -118,6 +119,9 @@ export default function AuditLogPage() {
       fetchLogs(currentPage);
       fetchStats();
     }
+  // Both functions consume exactly the filter state listed below. Including
+  // their per-render identities would retrigger this request indefinitely.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isChecking, currentPage, actionFilter, debouncedSearchQuery, schemaVersion]);
 
   const fetchLogs = async (page: number) => {
@@ -154,7 +158,7 @@ export default function AuditLogPage() {
         if (error.code === '42P01' || error.message?.includes('does not exist')) {
           setHasAuditTable(false);
         }
-        console.error('Error fetching audit logs:', error);
+        logger.error('Error fetching audit logs:', error);
         setLogs([]);
         setTotalCount(0);
         return;
@@ -163,7 +167,7 @@ export default function AuditLogPage() {
       setLogs(data || []);
       setTotalCount(count || 0);
     } catch (err) {
-      console.error('Error fetching audit logs:', err);
+      logger.error('Error fetching audit logs:', err);
     } finally {
       setIsLoading(false);
     }
@@ -189,7 +193,7 @@ export default function AuditLogPage() {
       setTotalFinalizedCount(finalizedRes.count || 0);
       setTotalResetCount(resetsRes.count || 0);
     } catch (err) {
-      console.error('Error fetching audit statistics:', err);
+      logger.error('Error fetching audit statistics:', err);
     }
   };
 
@@ -344,7 +348,7 @@ export default function AuditLogPage() {
     const role = log.role || log.actor_role || 'system';
     const userName = log.user_name || log.admin_name || 'System';
     
-    let detailObject: any = null;
+    let detailObject: unknown = null;
     
     // JSON safety parsing: try-catch wrapper (Rule 6 hardening)
     if (log.detail !== undefined && log.detail !== null) {

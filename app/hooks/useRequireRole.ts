@@ -23,7 +23,6 @@ export function useRequireRole(allowedRole: 'admin' | 'dosen' | 'mahasiswa') {
     if (loading) return;
 
     if (!user) {
-      document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
       routerRef.current.push('/login');
       return;
     }

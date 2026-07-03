@@ -1,18 +1,17 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Settings, Loader2, Globe, Database, Palette, Server, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 import { apiGet, apiPost } from '@/lib/api-client';
 import PageTransition from '@/components/ui/PageTransition';
-import { PageLoader } from '@/components/ui/loaders';
 import { useAuth } from '@/app/components/AuthGate';
 
 export default function SystemSettingsPage() {
-  const router = useRouter();
   const { user } = useAuth();
   const [dbConnected, setDbConnected] = useState<boolean | null>(null);
   const { theme, resolvedTheme } = useTheme();
@@ -36,7 +35,7 @@ export default function SystemSettingsPage() {
         setAutoRunAi(settings.auto_run_ai === 'true');
       }
     } catch (err) {
-      console.error('Failed to load settings from database:', err);
+      logger.error('Failed to load settings from database:', err);
     }
   };
 
@@ -70,7 +69,7 @@ export default function SystemSettingsPage() {
         throw new Error('API update failed');
       }
     } catch (err) {
-      console.error('Failed to save settings:', err);
+      logger.error('Failed to save settings:', err);
       // Rollback
       setter(oldVal);
     }

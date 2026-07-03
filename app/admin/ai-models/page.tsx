@@ -1,17 +1,18 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useEffect, useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import { Cpu, Loader2, BarChart3, Hash, Award, CheckCircle2, Layers, BrainCircuit, Code2, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
-import { createAuditLog, standardizeModelName } from '@/lib/services/audit-service';
 import { fetchAvailableModels } from '@/lib/services/model-service';
 import { fetchModelsInfo, type ModelInfo } from '@/lib/services/model-info-service';
 import { apiGet, apiPost } from '@/lib/api-client';
 import { GlassTable, GlassTableHeader, GlassTableRow, ResponsiveTableWrapper } from '@/components/ui/table';
 import PageTransition from '@/components/ui/PageTransition';
 import { PageLoader } from '@/components/ui/loaders';
+import { getErrorMessage } from '@/lib/errors';
 
 interface ModelStat {
   model_name: string;
@@ -54,8 +55,7 @@ function getModelTheme(name: string) {
 }
 
 export default function AIModelInventoryPage() {
-  const router = useRouter();
-  const [isChecking, setIsChecking] = useState(false);
+  const isChecking = false;
   const [models, setModels] = useState<ModelStat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -80,7 +80,7 @@ export default function AIModelInventoryPage() {
         }
       }
     } catch (err) {
-      console.error('Failed to load active model setting:', err);
+      logger.error('Failed to load active model setting:', err);
     }
   };
 
@@ -106,7 +106,7 @@ export default function AIModelInventoryPage() {
         throw new Error('Failed to save settings');
       }
     } catch (err) {
-      console.error('Failed to update active model:', err);
+      logger.error('Failed to update active model:', err);
       // Rollback
       setSelectedModel(oldModel);
     }
@@ -139,9 +139,9 @@ export default function AIModelInventoryPage() {
     try {
       const data = await fetchAvailableModels();
       setAvailableModels(data.models || []);
-    } catch (err: any) {
-      console.error('Error fetching backend models:', err);
-      setBackendError(err.message || 'Gagal memuat model dari server backend.');
+    } catch (err: unknown) {
+      logger.error('Error fetching backend models:', err);
+      setBackendError(getErrorMessage(err, 'Gagal memuat model dari server backend.'));
     } finally {
       setIsLoadingBackend(false);
     }
@@ -153,9 +153,9 @@ export default function AIModelInventoryPage() {
     try {
       const data = await fetchModelsInfo();
       setModelsInfo(data.models || []);
-    } catch (err: any) {
-      console.error('Error fetching models info:', err);
-      setModelsInfoError(err.message || 'Gagal memuat informasi model.');
+    } catch (err: unknown) {
+      logger.error('Error fetching models info:', err);
+      setModelsInfoError(getErrorMessage(err, 'Gagal memuat informasi model.'));
     } finally {
       setIsLoadingModelsInfo(false);
     }
@@ -176,7 +176,7 @@ export default function AIModelInventoryPage() {
           }
         }
       } catch (err) {
-        console.error('Error fetching admin session details:', err);
+        logger.error('Error fetching admin session details:', err);
       }
     };
     fetchSession();
@@ -214,7 +214,7 @@ export default function AIModelInventoryPage() {
 
       setModels(stats);
     } catch (err) {
-      console.error('Error fetching AI models:', err);
+      logger.error('Error fetching AI models:', err);
     } finally {
       setIsLoading(false);
     }

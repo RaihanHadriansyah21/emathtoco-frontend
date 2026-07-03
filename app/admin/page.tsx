@@ -1,5 +1,7 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -7,7 +9,6 @@ import {
   Clock, ArrowRight, TrendingUp, Activity,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { normalizeRole } from '@/lib/utils';
 import PageTransition from '@/components/ui/PageTransition';
 import { PageLoader } from '@/components/ui/loaders';
 import { GlassTable, GlassTableHeader, GlassTableRow, ResponsiveTableWrapper } from '@/components/ui/table';
@@ -82,7 +83,7 @@ export default function AdminDashboard() {
 
       setRecentSubmissions((recent as unknown as RecentSubmission[]) || []);
     } catch (err) {
-      console.error('Admin dashboard data fetch error:', err);
+      logger.error('Admin dashboard data fetch error:', err);
     } finally {
       setIsLoadingData(false);
     }

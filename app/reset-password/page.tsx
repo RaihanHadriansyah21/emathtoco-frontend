@@ -1,14 +1,17 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import Logo from '../Emathtoco.png';
-import { Lock, Eye, EyeOff, Loader2, CheckCircle2, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, Loader2, CheckCircle2, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PageTransition from '@/components/ui/PageTransition';
+import { isStrongPassword, PASSWORD_REQUIREMENTS } from '@/lib/security/password';
 
 const getErrorFromURL = () => {
     if (typeof window === 'undefined') return null;
@@ -50,13 +53,13 @@ export default function ResetPasswordPage() {
         const verifyRecoverySession = async () => {
             try {
                 // Debug log
-                console.log("RECOVERY URL:", window.location.href);
-                console.log("CURRENT PATH:", window.location.pathname);
+                logger.debug("RECOVERY URL:", window.location.href);
+                logger.debug("CURRENT PATH:", window.location.pathname);
 
                 // Check for errors in the URL redirect first (e.g. invalid/expired recovery links)
                 const urlError = getErrorFromURL();
                 if (urlError) {
-                    console.log("Detected error in recovery URL params:", urlError);
+                    logger.debug("Detected error in recovery URL params:", urlError);
                     if (isSubscribed) {
                         setErrorMessage(urlError);
                         setIsChecking(false);
@@ -66,7 +69,7 @@ export default function ResetPasswordPage() {
 
                 // 1. Initial check (if session is already established on mount)
                 const { data: { session } } = await supabase.auth.getSession();
-                console.log("INITIAL SESSION CHECK:", session);
+                logger.debug("INITIAL SESSION CHECK:", session);
                 
                 if (session) {
                     if (isSubscribed) {
@@ -82,7 +85,7 @@ export default function ResetPasswordPage() {
                 const isRecoveryFlow = hash.includes('type=recovery') || hash.includes('access_token=') || search.includes('type=recovery');
 
                 if (isRecoveryFlow) {
-                    console.log("Recovery URL parameters detected. Polling for session initialization...");
+                    logger.debug("Recovery URL parameters detected. Polling for session initialization...");
                     
                     // Poll getSession up to 3 seconds (30 attempts * 100ms)
                     for (let i = 0; i < 30; i++) {
@@ -91,7 +94,7 @@ export default function ResetPasswordPage() {
 
                         const { data: { session: polledSession } } = await supabase.auth.getSession();
                         if (polledSession) {
-                            console.log("Session resolved via polling:", polledSession);
+                            logger.debug("Session resolved via polling:", polledSession);
                             if (isSubscribed) {
                                 setHasSession(true);
                                 setIsChecking(false);
@@ -107,7 +110,7 @@ export default function ResetPasswordPage() {
                     setIsChecking(false);
                 }
             } catch (err) {
-                console.error("Error in verifyRecoverySession:", err);
+                logger.error("Error in verifyRecoverySession:", err);
                 if (isSubscribed) {
                     setErrorMessage('Terjadi gangguan saat memvalidasi sesi pemulihan.');
                     setIsChecking(false);
@@ -119,10 +122,10 @@ export default function ResetPasswordPage() {
 
         // Listen for auth event changes to update page state dynamically
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            console.log("AUTH EVENT:", event);
-            console.log("SESSION:", session);
-            console.log("CURRENT PATH:", window.location.pathname);
-            console.log("RECOVERY URL:", window.location.href);
+            logger.debug("AUTH EVENT:", event);
+            logger.debug("SESSION:", session);
+            logger.debug("CURRENT PATH:", window.location.pathname);
+            logger.debug("RECOVERY URL:", window.location.href);
 
             if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
                 if (isSubscribed) {
@@ -148,9 +151,8 @@ export default function ResetPasswordPage() {
             return;
         }
 
-        const alnumRegex = /^(?=.*[a-zA-Z])(?=.*\d).{6,}$/;
-        if (!alnumRegex.test(newPassword)) {
-            setErrorMessage('Password baru harus minimal 6 karakter dan mengandung kombinasi huruf dan angka (alfanumerik)!');
+        if (!isStrongPassword(newPassword)) {
+            setErrorMessage(`Password baru ${PASSWORD_REQUIREMENTS}.`);
             return;
         }
 
@@ -179,12 +181,11 @@ export default function ResetPasswordPage() {
                 try {
                     await supabase.auth.signOut();
                 } catch (err) {
-                    console.error("Error signing out:", err);
+                    logger.error("Error signing out:", err);
                 }
-                document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
                 router.push('/login');
             }, 3000);
-        } catch (err) {
+        } catch {
             setErrorMessage('Terjadi kesalahan pada sistem. Silakan coba kembali.');
             setIsLoading(false);
         }

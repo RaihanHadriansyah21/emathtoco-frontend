@@ -1,5 +1,6 @@
 'use client'
 
+import { logger } from '@/lib/logger';
 import React, { Suspense, lazy, ComponentProps, Component, ErrorInfo, ReactNode } from 'react'
 const Spline = lazy(() => import('@splinetool/react-spline'))
 
@@ -9,12 +10,11 @@ interface SplineSceneProps {
   scene: string
   className?: string
   onLoad?: SplineProps['onLoad']
-  onError?: (error: any) => void
+  onError?: SplineProps['onError']
 }
 
 interface ErrorBoundaryProps {
   fallback: ReactNode
-  onError?: (error: any) => void
   children: ReactNode
 }
 
@@ -27,15 +27,12 @@ class SplineErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySta
     hasError: false
   }
 
-  public static getDerivedStateFromError(_: Error): ErrorBoundaryState {
+  public static getDerivedStateFromError(): ErrorBoundaryState {
     return { hasError: true }
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Spline rendering error caught:", error, errorInfo)
-    if (this.props.onError) {
-      this.props.onError(error)
-    }
+    logger.error("Spline rendering error caught:", error, errorInfo)
   }
 
   public render() {
@@ -55,10 +52,7 @@ export function SplineScene({ scene, className, onLoad, onError }: SplineScenePr
   )
 
   return (
-    <SplineErrorBoundary 
-      fallback={fallbackSpinner}
-      onError={onError}
-    >
+    <SplineErrorBoundary fallback={fallbackSpinner}>
       <Suspense fallback={fallbackSpinner}>
         <Spline
           scene={scene}

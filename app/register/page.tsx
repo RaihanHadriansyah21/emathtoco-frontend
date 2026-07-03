@@ -9,6 +9,7 @@ import Logo from '../Emathtoco.png';
 import { ArrowLeft, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PageTransition from '@/components/ui/PageTransition';
+import { isStrongPassword, PASSWORD_REQUIREMENTS } from '@/lib/security/password';
 
 export default function RegisterPage() {
     const router = useRouter();
@@ -40,9 +41,8 @@ export default function RegisterPage() {
             return;
         }
 
-        const alnumRegex = /^(?=.*[a-zA-Z])(?=.*\d).{6,}$/;
-        if (!alnumRegex.test(password)) {
-            setErrorMessage('Password harus minimal 6 karakter dan mengandung kombinasi huruf dan angka (alfanumerik).');
+        if (!isStrongPassword(password)) {
+            setErrorMessage(`Password ${PASSWORD_REQUIREMENTS}.`);
             return;
         }
 
@@ -55,7 +55,7 @@ export default function RegisterPage() {
 
         try {
             // Fungsi Sign Up bawaan Supabase
-            const { data, error } = await supabase.auth.signUp({
+            const { error } = await supabase.auth.signUp({
                 email: email,
                 password: password,
             });
@@ -74,7 +74,7 @@ export default function RegisterPage() {
                 router.push('/login');
             }, 2000);
 
-        } catch (err) {
+        } catch {
             setErrorMessage('Terjadi kesalahan pada sistem pendaftaran.');
         } finally {
             setIsLoading(false);

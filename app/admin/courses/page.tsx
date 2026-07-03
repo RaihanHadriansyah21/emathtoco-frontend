@@ -1,10 +1,10 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { BookOpen, Search, Loader2, Plus, Pencil, Trash2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { normalizeRole } from '@/lib/utils';
 import ConfirmModal from '@/app/components/ConfirmModal';
 import { GlassTable, GlassTableHeader, GlassTableRow, EmptyState, ResponsiveTableWrapper } from '@/components/ui/table';
 import PageTransition from '@/components/ui/PageTransition';
@@ -12,6 +12,7 @@ import { PageLoader } from '@/components/ui/loaders';
 import { useToast } from '@/app/hooks/useToast';
 import ToastContainer from '@/app/components/Toast';
 import { apiDelete } from '@/lib/api-client';
+import { getErrorMessage } from '@/lib/errors';
 
 interface Course {
   id: string;
@@ -33,9 +34,8 @@ const iconOptions = [
 const iconMap: Record<string, string> = { security: '🔒', compress: '🗜️', ai: '🤖', network: '📡', math: '📘' };
 
 export default function CourseManagementPage() {
-  const router = useRouter();
   const { toasts, toast, removeToast } = useToast();
-  const [isChecking, setIsChecking] = useState(false);
+  const isChecking = false;
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -62,7 +62,7 @@ export default function CourseManagementPage() {
       if (error) throw error;
       setCourses(data || []);
     } catch (err) {
-      console.error('Error fetching courses:', err);
+      logger.error('Error fetching courses:', err);
     } finally {
       setIsLoading(false);
     }
@@ -100,8 +100,8 @@ export default function CourseManagementPage() {
         if (data) setCourses(prev => [data, ...prev]);
       }
       setShowForm(false);
-    } catch (err: any) {
-      setFormError(err.message || 'Gagal menyimpan mata kuliah.');
+    } catch (err: unknown) {
+      setFormError(getErrorMessage(err, 'Gagal menyimpan mata kuliah.'));
     } finally {
       setIsSaving(false);
     }
@@ -111,7 +111,7 @@ export default function CourseManagementPage() {
     if (!deleteTarget || isDeleting) return;
     setIsDeleting(true);
     try {
-      console.log(`[Delete Course] Sending backend deletion request for course ID: ${deleteTarget.id}`);
+      logger.debug(`[Delete Course] Sending backend deletion request for course ID: ${deleteTarget.id}`);
       const res = await apiDelete(`/admin/course/${deleteTarget.id}`);
       if (!res.ok) {
         let errorMsg = 'Gagal menghapus mata kuliah pada backend.';
@@ -120,16 +120,16 @@ export default function CourseManagementPage() {
           if (errJson && errJson.detail) {
             errorMsg = errJson.detail;
           }
-        } catch (_) {}
+        } catch {}
         throw new Error(errorMsg);
       }
 
       setCourses(prev => prev.filter(c => c.id !== deleteTarget.id));
       toast.success('Hapus Berhasil', `Mata kuliah "${deleteTarget.nama_matkul}" berhasil dihapus beserta seluruh berkas & data terkait.`);
       setDeleteTarget(null);
-    } catch (err: any) {
-      console.error('Error deleting course:', err);
-      toast.error('Gagal Menghapus', err.message || 'Terjadi kesalahan saat menghapus mata kuliah.');
+    } catch (err: unknown) {
+      logger.error('Error deleting course:', err);
+      toast.error('Gagal Menghapus', getErrorMessage(err, 'Terjadi kesalahan saat menghapus mata kuliah.'));
     } finally {
       setIsDeleting(false);
     }

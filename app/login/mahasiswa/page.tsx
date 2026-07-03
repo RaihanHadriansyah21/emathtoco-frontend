@@ -1,5 +1,7 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -137,11 +139,10 @@ export default function MahasiswaLoginPage() {
     const sendLoginAuditLog = async (auditPayload: {
         action: string;
         target: string;
-        details: any;
+        details: Record<string, unknown>;
     }, token?: string) => {
         // Skip audit log entirely if backend is offline
         if (getBackendState() === 'offline') {
-            console.log('[AUDIT] Backend offline — skipping audit log');
             return;
         }
         try {
@@ -152,14 +153,12 @@ export default function MahasiswaLoginPage() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'ngrok-skip-browser-warning': 'true',
                     'Accept': 'application/json',
                     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
                 },
                 body,
                 keepalive: true,
             }).catch(() => {});
-            console.log('[AUDIT DEBUG] keepalive fetch fired');
         } catch {
             // Non-blocking: silently fail
         }
@@ -193,10 +192,9 @@ export default function MahasiswaLoginPage() {
             }
 
             if (data?.session) {
-                console.log('[AUDIT DEBUG] Login success');
-                document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${data.session.expires_in}; SameSite=Lax`;
+                logger.debug('[AUDIT DEBUG] Login success');
 
-                let targetPath = '/';
+                const targetPath = '/';
 
                 try {
                     const { data: profile } = await supabase
@@ -213,7 +211,6 @@ export default function MahasiswaLoginPage() {
                     // ═══════════════════════════════════════════════════════
                     if (role !== 'mahasiswa') {
                         await supabase.auth.signOut();
-                        document.cookie = 'sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
                         const sessionKey = `logged_${data.session.user.id}`;
                         if (typeof window !== 'undefined') {
                             sessionStorage.removeItem(sessionKey);
@@ -226,7 +223,7 @@ export default function MahasiswaLoginPage() {
                     // Session storage guard to prevent duplicate login logging
                     const sessionLoggedKey = `logged_${data.session.user.id}`;
                     if (typeof window !== 'undefined' && !sessionStorage.getItem(sessionLoggedKey)) {
-                        console.log('[AUDIT DEBUG] About to write audit log');
+                        logger.debug('[AUDIT DEBUG] About to write audit log');
                         sessionStorage.setItem(sessionLoggedKey, 'true');
 
                         sendLoginAuditLog({
@@ -234,10 +231,10 @@ export default function MahasiswaLoginPage() {
                             target: 'profil_pengguna',
                             details: { role },
                         }, data.session.access_token);
-                        console.log('[AUDIT DEBUG] Audit log request sent');
+                        logger.debug('[AUDIT DEBUG] Audit log request sent');
                     }
                 } catch (auditErr) {
-                    console.error('[AUDIT] Failed to log user login:', auditErr);
+                    logger.error('[AUDIT] Failed to log user login:', auditErr);
                 }
 
                 // ─────────────────────────────────────────────────────────────
@@ -403,8 +400,9 @@ export default function MahasiswaLoginPage() {
                         className="space-y-4 sm:space-y-5"
                     >
                         <div>
-                            <label className="block text-[10px] sm:text-xs font-bold uppercase tracking-widest text-neutral-400 mb-1.5 sm:mb-2">Email</label>
+                            <label htmlFor="student-email" className="block text-[10px] sm:text-xs font-bold uppercase tracking-widest text-neutral-400 mb-1.5 sm:mb-2">Email</label>
                             <input
+                                id="student-email"
                                 type="email"
                                 placeholder="nama@gmail.com"
                                 value={email}
@@ -415,13 +413,14 @@ export default function MahasiswaLoginPage() {
 
                         <div>
                             <div className="flex justify-between items-center mb-1.5 sm:mb-2">
-                                <label className="block text-[10px] sm:text-xs font-bold uppercase tracking-widest text-neutral-400">Password</label>
+                                <label htmlFor="student-password" className="block text-[10px] sm:text-xs font-bold uppercase tracking-widest text-neutral-400">Password</label>
                                 <Link href="/forgot-password" className="text-[10px] sm:text-xs font-bold text-cyan-400 hover:text-cyan-300 hover:underline transition-all">
                                     Lupa Password?
                                 </Link>
                             </div>
                             <div className="relative">
                                 <input
+                                    id="student-password"
                                     type={showPassword ? "text" : "password"}
                                     placeholder="••••••••"
                                     value={password}
