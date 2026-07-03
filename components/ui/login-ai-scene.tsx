@@ -48,7 +48,7 @@ export default function LoginAIScene() {
 
                 // Fetch using HEAD in CORS mode. This replicates the exact origin/cors
                 // requirements of Spline's internal fetch without transferring the file.
-                console.log("[SplinePrecheck] Initiating precheck for:", splineSceneUrl);
+                logger.info(`[SplinePrecheck] Initiating precheck for: ${splineSceneUrl}`);
                 const response = await fetch(splineSceneUrl, {
                     method: 'HEAD',
                     mode: 'cors',
@@ -57,7 +57,7 @@ export default function LoginAIScene() {
                 
                 clearTimeout(timeoutId);
 
-                console.log("[SplinePrecheck] Success. Status:", response.status, "OK:", response.ok);
+                logger.info(`[SplinePrecheck] Success. Status: ${response.status} OK: ${response.ok}`);
 
                 if (!response.ok) {
                     throw new Error(`Spline CDN returned status ${response.status}`);
@@ -67,7 +67,7 @@ export default function LoginAIScene() {
                     setIsSplineReady(true);
                 }
             } catch (err) {
-                console.error("[SplinePrecheck] Failed with error:", err);
+                logger.warn('[SplinePrecheck] Failed with error:', err);
                 logger.warn('Spline CDN is unreachable or client is offline. Gracefully falling back to static view.', err);
                 if (isMounted) {
                     setHasError(true);

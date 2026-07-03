@@ -1,6 +1,7 @@
 'use client'
 
-import React, { Suspense, lazy, ComponentProps, Component, ErrorInfo, ReactNode } from 'react'
+import React, { Suspense, lazy, ComponentProps, Component, ReactNode } from 'react'
+import { logger } from '@/lib/logger'
 const Spline = lazy(() => import('@splinetool/react-spline'))
 
 type SplineProps = ComponentProps<typeof Spline>
@@ -31,10 +32,10 @@ class SplineErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySta
     return { hasError: true }
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  public componentDidCatch(error: Error) {
     // Suppress console.error by logging as warning to prevent triggering Next.js dev overlay
     const msg = error.message || String(error);
-    console.warn("[SplineErrorBoundary] Suppressed Spline render error:", msg);
+    logger.warn("[SplineErrorBoundary] Suppressed Spline render error:", msg);
     this.props.onError?.(error);
   }
 
