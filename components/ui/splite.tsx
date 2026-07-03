@@ -1,7 +1,7 @@
 'use client'
 
+import { logger } from '@/lib/logger';
 import React, { Suspense, lazy, ComponentProps, Component, ErrorInfo, ReactNode } from 'react'
-
 const Spline = lazy(() => import('@splinetool/react-spline'))
 
 type SplineProps = ComponentProps<typeof Spline>
@@ -16,7 +16,6 @@ interface SplineSceneProps {
 interface ErrorBoundaryProps {
   fallback: ReactNode
   children: ReactNode
-  onError?: (error: Error) => void
 }
 
 interface ErrorBoundaryState {
@@ -33,13 +32,7 @@ class SplineErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Intentionally empty — we do NOT log here because:
-    // 1. logger.error triggers console.error which Next.js dev overlay picks up
-    // 2. logger.warn still appears in terminal causing confusion
-    // The parent (LoginAIScene) handles error state via onError prop.
-    void error
-    void errorInfo
-    this.props.onError?.(error)
+    logger.warn("Spline rendering error caught:", error, errorInfo)
   }
 
   public render() {
@@ -58,30 +51,8 @@ export function SplineScene({ scene, className, onLoad, onError }: SplineScenePr
     </div>
   )
 
-  // Suppress "Failed to fetch" errors from reaching Next.js dev overlay.
-  // React dev mode re-throws ErrorBoundary-caught errors via setTimeout,
-  // which fires a window 'error' event. We intercept it in capture phase
-  // and prevent propagation to the overlay handler.
-  React.useEffect(() => {
-    const suppressSplineError = (event: ErrorEvent) => {
-      if (
-        event.message === 'Failed to fetch' ||
-        event.message?.includes('Failed to fetch') ||
-        event.message?.includes('NetworkError')
-      ) {
-        event.preventDefault()
-        event.stopImmediatePropagation()
-      }
-    }
-    window.addEventListener('error', suppressSplineError, true)
-    return () => window.removeEventListener('error', suppressSplineError, true)
-  }, [])
-
   return (
-    <SplineErrorBoundary
-      fallback={fallbackSpinner}
-      onError={(err) => onError?.(err)}
-    >
+    <SplineErrorBoundary fallback={fallbackSpinner}>
       <Suspense fallback={fallbackSpinner}>
         <Spline
           scene={scene}

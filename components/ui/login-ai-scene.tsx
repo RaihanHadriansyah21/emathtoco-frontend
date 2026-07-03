@@ -41,52 +41,20 @@ export default function LoginAIScene() {
 
         let isMounted = true;
 
-        // Safety-net: catch any Spline-related unhandled rejections (e.g. WASM / texture
-        // fetches) that bypass the connectivity pre-check, so they don't surface in the
-        // Next.js dev overlay.
-        const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-            const msg: string = event.reason?.message ?? String(event.reason ?? '');
-            if (msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('CORS')) {
-                event.preventDefault(); // suppress browser console log
-                logger.warn('[LoginAIScene] Spline unhandled rejection suppressed:', msg);
-                if (isMounted) {
-                    setHasError(true);
-                    setIsLoading(false);
-                }
-            }
-        };
-        window.addEventListener('unhandledrejection', handleUnhandledRejection);
-
         const checkSplineConnectivity = async () => {
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 4000); // 4-second timeout limit
 
-                // Fetch the first 8 bytes of the scene file with CORS mode.
-                // We check BOTH:
-                //   1. response.ok / status — must be 200 or 206 (partial content for range)
-                //   2. content-type — must NOT be text/html (firewall block pages return HTML)
-                const response = await fetch(splineSceneUrl, {
-                    method: 'GET',
-                    mode: 'cors',
-                    signal: controller.signal,
-                    headers: { 'Range': 'bytes=0-7' },
+                // Try to head-request the Spline CDN
+                await fetch(splineSceneUrl, {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    signal: controller.signal
                 });
-
+                
                 clearTimeout(timeoutId);
-
-                // Reject HTTP errors (4xx / 5xx)
-                if (!response.ok && response.status !== 206) {
-                    throw new Error(`Spline CDN returned HTTP ${response.status}`);
-                }
-
-                // Reject HTML responses — firewalls/proxies return block pages as text/html
-                // The real .splinecode binary file will never have a text/html content-type
-                const contentType = response.headers.get('content-type') ?? '';
-                if (contentType.toLowerCase().includes('text/html')) {
-                    throw new Error(`CDN returned HTML (likely a firewall block page), content-type: ${contentType}`);
-                }
-
+                
                 if (isMounted) {
                     setIsSplineReady(true);
                 }
@@ -111,7 +79,6 @@ export default function LoginAIScene() {
         return () => {
             isMounted = false;
             clearTimeout(safeguardTimer);
-            window.removeEventListener('unhandledrejection', handleUnhandledRejection);
         };
     }, []);
 
@@ -187,7 +154,7 @@ export default function LoginAIScene() {
                                 className="w-full h-full"
                                 onLoad={() => setIsLoading(false)}
                                 onError={(err) => {
-                                    logger.warn('[LoginAIScene] Spline unreachable, switching to static fallback:', err);
+                                    logger.warn('[LoginAIScene] Spline loading error:', err);
                                     setHasError(true);
                                     setIsLoading(false);
                                 }}
