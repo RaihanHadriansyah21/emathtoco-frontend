@@ -44,22 +44,22 @@ export default function LoginAIScene() {
         const checkSplineConnectivity = async () => {
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 4000); // 4-second timeout limit
+                const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-                // Fetch the first byte of the scene file using standard CORS.
-                // If blocked by browser, network, or proxy, it will throw an error immediately.
+                // Fetch using HEAD in CORS mode. This replicates the exact origin/cors
+                // requirements of Spline's internal fetch without transferring the file.
+                console.log("[SplinePrecheck] Initiating precheck for:", splineSceneUrl);
                 const response = await fetch(splineSceneUrl, {
-                    method: 'GET',
+                    method: 'HEAD',
                     mode: 'cors',
-                    signal: controller.signal,
-                    headers: {
-                        'Range': 'bytes=0-0'
-                    }
+                    signal: controller.signal
                 });
                 
                 clearTimeout(timeoutId);
 
-                if (!response.ok && response.status !== 206) {
+                console.log("[SplinePrecheck] Success. Status:", response.status, "OK:", response.ok);
+
+                if (!response.ok) {
                     throw new Error(`Spline CDN returned status ${response.status}`);
                 }
                 
@@ -67,6 +67,7 @@ export default function LoginAIScene() {
                     setIsSplineReady(true);
                 }
             } catch (err) {
+                console.error("[SplinePrecheck] Failed with error:", err);
                 logger.warn('Spline CDN is unreachable or client is offline. Gracefully falling back to static view.', err);
                 if (isMounted) {
                     setHasError(true);
