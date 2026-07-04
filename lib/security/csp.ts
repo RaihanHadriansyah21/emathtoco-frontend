@@ -20,7 +20,7 @@ export function buildContentSecurityPolicy({
       "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
-      `connect-src 'self' ${supabaseUrl} wss://${supabaseHost} ${apiOrigin} ws://localhost:* ws://127.0.0.1:* http://localhost:* http://127.0.0.1:* https://prod.spline.design https://*.spline.design https://unpkg.com`,
+      `connect-src 'self' ${supabaseUrl} wss://${supabaseHost} ${apiOrigin} ws://localhost:* ws://127.0.0.1:* http://localhost:* http://127.0.0.1:* https://prod.spline.design https://*.spline.design https://unpkg.com https://www.gstatic.com`,
       "font-src 'self' data:",
       "media-src 'self' data: blob:",
       "worker-src 'self' blob:",
@@ -33,10 +33,10 @@ export function buildContentSecurityPolicy({
 
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'`,
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: blob: ${supabaseUrl} https://prod.spline.design https://*.spline.design`,
-    `connect-src 'self' ${supabaseUrl} wss://${supabaseHost} ${apiOrigin} https://prod.spline.design https://*.spline.design https://unpkg.com`,
+    `connect-src 'self' ${supabaseUrl} wss://${supabaseHost} ${apiOrigin} https://prod.spline.design https://*.spline.design https://unpkg.com https://www.gstatic.com`,
     "font-src 'self' data:",
     `media-src 'self' data: blob: ${supabaseUrl}`,
     "worker-src 'self' blob:",

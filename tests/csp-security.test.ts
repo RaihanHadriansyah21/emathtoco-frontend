@@ -19,6 +19,9 @@ describe("content security policy", () => {
     expect(policy).toContain("object-src 'none'");
     expect(policy).toContain("base-uri 'self'");
     expect(policy).toContain("frame-ancestors 'none'");
+    expect(policy).toContain("'wasm-unsafe-eval'");
+    expect(policy).toContain("https://unpkg.com");
+    expect(policy).toContain("https://www.gstatic.com");
     expect(policy).not.toContain("'unsafe-eval'");
     expect(policy).not.toContain("ngrok");
     expect(policy).not.toContain("ws://");

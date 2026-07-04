@@ -2,7 +2,7 @@
 
 import { logger } from '@/lib/logger';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,16 +19,12 @@ const SplineScene = dynamic(
 export default function LoginAIScene() {
     const [isLoading, setIsLoading] = useState(true);
     const [hasError, setHasError] = useState(false);
-    const [isSplineReady, setIsSplineReady] = useState(false);
 
     // 21st.dev humanoid robot scene (chrome/black full-body robot)
     const splineSceneUrl = 'https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode';
 
-    // ═══════════════════════════════════════════════════════
-    // LOADING & CONNECTIVITY SAFEGUARD
-    // ═══════════════════════════════════════════════════════
-    const isLoadingRef = React.useRef(isLoading);
-    React.useEffect(() => {
+    const isLoadingRef = useRef(isLoading);
+    useEffect(() => {
         isLoadingRef.current = isLoading;
     }, [isLoading]);
 
@@ -41,47 +37,10 @@ export default function LoginAIScene() {
 
         let isMounted = true;
 
-        const checkSplineConnectivity = async () => {
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 4000);
-
-                // Fetch using HEAD in CORS mode. This replicates the exact origin/cors
-                // requirements of Spline's internal fetch without transferring the file.
-                logger.info(`[SplinePrecheck] Initiating precheck for: ${splineSceneUrl}`);
-                const response = await fetch(splineSceneUrl, {
-                    method: 'HEAD',
-                    mode: 'cors',
-                    signal: controller.signal
-                });
-                
-                clearTimeout(timeoutId);
-
-                logger.info(`[SplinePrecheck] Success. Status: ${response.status} OK: ${response.ok}`);
-
-                if (!response.ok) {
-                    throw new Error(`Spline CDN returned status ${response.status}`);
-                }
-                
-                if (isMounted) {
-                    setIsSplineReady(true);
-                }
-            } catch (err) {
-                logger.warn('[SplinePrecheck] Failed with error:', err);
-                logger.warn('Spline CDN is unreachable or client is offline. Gracefully falling back to static view.', err);
-                if (isMounted) {
-                    setHasError(true);
-                    setIsLoading(false);
-                }
-            }
-        };
-
-        checkSplineConnectivity();
-
         const safeguardTimer = setTimeout(() => {
             if (isMounted && isLoadingRef.current) {
-                logger.warn('Spline load timed out (20s safeguard). Falling back to premium static view.');
-                setHasError(true);
+                logger.warn('Spline load exceeded 20 seconds; hiding the loader while the scene continues.');
+                setIsLoading(false);
             }
         }, 20000);
 
@@ -157,18 +116,16 @@ export default function LoginAIScene() {
                             </div>
                         )}
 
-                        {isSplineReady && (
-                            <SplineScene
-                                scene={splineSceneUrl}
-                                className="w-full h-full"
-                                onLoad={() => setIsLoading(false)}
-                                onError={(err) => {
-                                    logger.warn('[LoginAIScene] Spline loading error:', err);
-                                    setHasError(true);
-                                    setIsLoading(false);
-                                }}
-                            />
-                        )}
+                        <SplineScene
+                            scene={splineSceneUrl}
+                            className="w-full h-full"
+                            onLoad={() => setIsLoading(false)}
+                            onError={(err) => {
+                                logger.warn('[LoginAIScene] Spline loading error:', err);
+                                setHasError(true);
+                                setIsLoading(false);
+                            }}
+                        />
                     </div>
                 )}
             </AnimatePresence>
