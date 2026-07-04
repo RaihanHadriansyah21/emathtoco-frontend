@@ -63,6 +63,9 @@ export default function Navbar({
   const role = user?.role || 'mahasiswa';
   
   const normalizedRole = normalizeRole(role);
+
+  // Role-aware home URL: admin -> /admin, dosen -> /dosen, mahasiswa -> /
+  const homeUrl = normalizedRole === 'admin' ? '/admin' : normalizedRole === 'dosen' ? '/dosen' : '/';
   
   useEffect(() => {
     if (user) {
@@ -124,7 +127,7 @@ export default function Navbar({
                   {/* Logo Area */}
                   <div 
                     className="relative w-10 h-10 flex items-center justify-center group cursor-pointer flex-shrink-0" 
-                    onClick={sidebarCollapsed ? onToggleSidebar : () => router.push('/')}
+                    onClick={sidebarCollapsed ? onToggleSidebar : () => router.push(homeUrl)}
                   >
                     <div className={`bg-white border border-slate-200 dark:border-neutral-750/60 rounded-xl p-1.5 shadow-sm dark:shadow-[0_0_12px_rgba(6,182,212,0.08)] flex items-center justify-center transition-all duration-200 scale-100 opacity-100 ${
                       sidebarCollapsed ? 'group-hover:scale-0 group-hover:opacity-0' : 'hover:scale-105'
@@ -175,7 +178,7 @@ export default function Navbar({
                   </button>
                 )}
                 <div
-                  onClick={() => router.push('/')}
+                  onClick={() => router.push(homeUrl)}
                   className="flex items-center gap-2 cursor-pointer select-none flex-shrink-0"
                 >
                   <div className="bg-white border border-slate-200 rounded-lg p-1 shadow-sm flex items-center justify-center flex-shrink-0">
@@ -216,7 +219,7 @@ export default function Navbar({
 
               {/* Logo */}
               <div
-                onClick={() => router.push('/')}
+                onClick={() => router.push(homeUrl)}
                 className="flex items-center gap-2 sm:gap-2.5 cursor-pointer select-none flex-shrink-0"
               >
                 <div className="bg-white border border-slate-200 rounded-lg p-1 sm:p-1.5 shadow-sm flex items-center justify-center flex-shrink-0">
