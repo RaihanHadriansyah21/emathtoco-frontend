@@ -10,7 +10,7 @@ import PageTransition from '@/components/ui/PageTransition';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/app/hooks/useToast';
 import ToastContainer from '@/app/components/Toast';
-import { apiPost } from '@/lib/api-client';
+import { apiGet, apiPost } from '@/lib/api-client';
 import { replaceAnswerImage } from '@/lib/services/answer-upload-service';
 import { getSubmissionStatusPollDelay } from '@/lib/egress-policy';
 import {
@@ -2000,6 +2000,7 @@ export default function UploadWorkspace() {
     const [activeDetailSlot, setActiveDetailSlot] = useState<SlotState | null>(null);
     const [nilaiAkhir, setNilaiAkhir] = useState<number | null>(null);
     const [modelAi, setModelAi] = useState<string | null>(null);
+    const [activeAiJobId, setActiveAiJobId] = useState<string | null>(null);
     const [isAccessDenied, setIsAccessDenied] = useState(false);
     const { toasts, toast, removeToast } = useToast();
 
@@ -2317,6 +2318,88 @@ export default function UploadWorkspace() {
         }
     }, [submissionId, userId]);
 
+    useEffect(() => {
+        if (!submissionId) return;
+        const storedJobId = sessionStorage.getItem(
+            `emathtoco:ai-job:${submissionId}`,
+        );
+        if (storedJobId) {
+            setActiveAiJobId(storedJobId);
+        }
+    }, [submissionId]);
+
+    // Track the exact RQ job returned by auto-run. This gives immediate,
+    // terminal feedback while the lightweight Supabase status polling remains
+    // as a recovery path after reloads or transient network failures.
+    useEffect(() => {
+        if (!activeAiJobId || !submissionId) return;
+
+        let stopped = false;
+        let attempt = 0;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        const delays = [2_000, 3_000, 5_000];
+
+        const clearActiveJob = () => {
+            sessionStorage.removeItem(`emathtoco:ai-job:${submissionId}`);
+            setActiveAiJobId(null);
+        };
+        const schedule = () => {
+            if (stopped) return;
+            const delay = delays[Math.min(attempt, delays.length - 1)];
+            attempt += 1;
+            timer = setTimeout(poll, delay);
+        };
+        const poll = async () => {
+            if (document.visibilityState === 'hidden') {
+                schedule();
+                return;
+            }
+            try {
+                const response = await apiGet(`/jobs/${activeAiJobId}`);
+                if (response.ok) {
+                    const job = await response.json() as {
+                        status: 'queued' | 'started' | 'completed' | 'failed';
+                        error_code?: string | null;
+                        failed?: Record<string, string>;
+                    };
+                    if (job.status === 'completed' || job.status === 'failed') {
+                        stopped = true;
+                        clearActiveJob();
+                        await pollSubmissionStatus();
+
+                        const submissionError = job.failed?.[submissionId];
+                        if (job.status === 'failed' || submissionError) {
+                            toast.error(
+                                'Penilaian AI Gagal',
+                                'Sebagian atau seluruh jawaban tidak dapat diproses.',
+                            );
+                        } else {
+                            toast.success(
+                                'Penilaian AI Selesai',
+                                'Nilai AI sudah tersedia tanpa perlu memuat ulang halaman.',
+                            );
+                        }
+                        return;
+                    }
+                }
+            } catch (error) {
+                logger.warn('AI job status check failed; retrying.', error);
+            }
+            schedule();
+        };
+
+        void poll();
+        return () => {
+            stopped = true;
+            if (timer) clearTimeout(timer);
+        };
+    }, [
+        activeAiJobId,
+        pollSubmissionStatus,
+        submissionId,
+        toast,
+    ]);
+
     // Only the tiny parent status row is polled. Answer rows and signed image
     // URLs are refreshed exclusively after the parent version actually changes.
     useEffect(() => {
@@ -2577,9 +2660,19 @@ export default function UploadWorkspace() {
             try {
                 const autoRunRes = await apiPost(`/submission/${submissionId}/submit`);
                 if (autoRunRes.ok) {
-                    const autoRunData = await autoRunRes.json();
+                    const autoRunData = await autoRunRes.json() as {
+                        auto_run?: boolean;
+                        job_id?: string | null;
+                    };
                     logger.debug('[AI AutoRun] Backend response:', autoRunData);
                     if (autoRunData.auto_run) {
+                        if (autoRunData.job_id) {
+                            sessionStorage.setItem(
+                                `emathtoco:ai-job:${submissionId}`,
+                                autoRunData.job_id,
+                            );
+                            setActiveAiJobId(autoRunData.job_id);
+                        }
                         toast.success('AI Dipicu', 'Pipeline evaluasi AI otomatis berjalan.');
                     }
                 }

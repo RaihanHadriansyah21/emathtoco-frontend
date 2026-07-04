@@ -95,6 +95,8 @@ export default function BatchAIModal({
           status: 'queued' | 'started' | 'completed' | 'failed';
           progress: number;
           error_code?: string | null;
+          completed_ids?: string[];
+          failed?: Record<string, string>;
         };
         const percentage = Math.max(0, Math.min(100, status.progress));
         const processedSections = Math.min(
@@ -105,14 +107,24 @@ export default function BatchAIModal({
           ? null
           : ALL_SECTION_CODES[Math.min(processedSections, 23)];
         const terminal = status.status === 'completed' || status.status === 'failed';
-        const errors = status.status === 'failed'
-          ? [{
-              submissionId: acceptedIds[0],
+        const failedEntries = Object.entries(status.failed ?? {});
+        const errors = failedEntries.length > 0
+          ? failedEntries.map(([submissionId, errorCode]) => ({
+              submissionId,
               sectionCode: currentSection ?? 'S-1A' as const,
               sheetId: 'ALL',
-              message: status.error_code ?? 'AI_JOB_FAILED',
-            }]
-          : [];
+              message: errorCode,
+            }))
+          : status.status === 'failed'
+            ? [{
+                submissionId: acceptedIds[0],
+                sectionCode: currentSection ?? 'S-1A' as const,
+                sheetId: 'ALL',
+                message: status.error_code ?? 'AI_JOB_FAILED',
+              }]
+            : [];
+        const completedCount = status.completed_ids?.length
+          ?? Math.max(0, acceptedIds.length - errors.length);
 
         setProgress({
           jobId: activeJobId,
@@ -129,7 +141,7 @@ export default function BatchAIModal({
           totalSections: 24,
           totalSubmissions: acceptedIds.length,
           processedSubmissions: terminal
-            ? acceptedIds.length
+            ? completedCount + errors.length
             : Math.floor((percentage / 100) * acceptedIds.length),
           errors,
           startedAt,
@@ -138,11 +150,21 @@ export default function BatchAIModal({
 
         if (terminal) {
           setPhase('completed');
+          const completedWithErrors =
+            status.status === 'completed' && errors.length > 0;
           onToast(
-            status.status === 'completed' ? 'success' : 'error',
-            status.status === 'completed' ? 'Batch AI Selesai' : 'Batch AI Gagal',
+            status.status === 'failed'
+              ? 'error'
+              : completedWithErrors
+                ? 'warning'
+                : 'success',
+            status.status === 'failed'
+              ? 'Batch AI Gagal'
+              : completedWithErrors
+                ? 'Batch AI Selesai Sebagian'
+                : 'Batch AI Selesai',
             status.status === 'completed'
-              ? `${acceptedIds.length} tugas selesai diproses.`
+              ? `${completedCount} berhasil, ${errors.length} gagal.`
               : 'Worker menghentikan job setelah retry.',
           );
           onComplete();

@@ -264,6 +264,15 @@ export default function ReviewWorkspace() {
   const isAIProcessing = isAIActive && !isBackendOffline;
 
   useEffect(() => {
+    const storedJobId = sessionStorage.getItem(
+      `emathtoco:ai-job:${submissionId}`,
+    );
+    if (storedJobId) {
+      setActiveJobId(storedJobId);
+    }
+  }, [submissionId]);
+
+  useEffect(() => {
     if (!user) return;
 
     // 1. Verify lecturer role & assignment
@@ -555,13 +564,28 @@ export default function ReviewWorkspace() {
           const job = await response.json() as {
             status: 'queued' | 'started' | 'completed' | 'failed';
             error_code?: string | null;
+            completed_ids?: string[];
+            failed?: Record<string, string>;
           };
           if (job.status === 'completed' || job.status === 'failed') {
             stopped = true;
+            sessionStorage.removeItem(`emathtoco:ai-job:${submissionId}`);
             setActiveJobId(null);
             await loadWorkspaceDetails();
-            if (job.status === 'failed') {
-              setAiErrorMessage(job.error_code || 'AI_JOB_FAILED');
+            const submissionError = job.failed?.[submissionId];
+            if (job.status === 'failed' || submissionError) {
+              const errorCode =
+                submissionError || job.error_code || 'AI_JOB_FAILED';
+              setAiErrorMessage(errorCode);
+              toast.error(
+                'Prediksi AI Gagal',
+                'Worker tidak dapat menyelesaikan seluruh section.',
+              );
+            } else {
+              toast.success(
+                'Prediksi AI Selesai',
+                'Nilai dan hasil setiap section sudah diperbarui.',
+              );
             }
             return;
           }
@@ -581,7 +605,7 @@ export default function ReviewWorkspace() {
         pollingRef.current = null;
       }
     };
-  }, [activeJobId, loadWorkspaceDetails]);
+  }, [activeJobId, loadWorkspaceDetails, submissionId, toast]);
 
   // Handle manual score change
   const handleManualScoreChange = (label: string, value: string) => {
@@ -706,6 +730,10 @@ export default function ReviewWorkspace() {
       if (!queuedJob.job_id || !queuedJob.accepted_ids.includes(submission.id)) {
         throw new Error('Submission tidak diterima oleh antrean AI.');
       }
+      sessionStorage.setItem(
+        `emathtoco:ai-job:${submission.id}`,
+        queuedJob.job_id,
+      );
       setActiveJobId(queuedJob.job_id);
       setIsBackendOffline(false);
     } catch (err: unknown) {

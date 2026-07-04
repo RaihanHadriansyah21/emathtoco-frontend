@@ -16,6 +16,26 @@ interface ResetResult {
   cleanup_job_id?: string | null;
 }
 
+interface ResetErrorResponse {
+  detail?: string;
+  error?: {
+    code?: string;
+  };
+}
+
+function getResetErrorMessage(status: number, body: ResetErrorResponse): string {
+  if (status === 403) {
+    return 'Reset ditolak karena akun ini tidak memiliki akses admin.';
+  }
+  if (status === 401) {
+    return 'Sesi admin sudah berakhir. Silakan masuk kembali.';
+  }
+  if (body.detail === 'DEMO_RESET_FAILED' || body.error?.code === 'INTERNAL_ERROR') {
+    return 'Database menolak operasi reset. Tidak ada data yang diubah.';
+  }
+  return 'Reset ditolak oleh server. Tidak ada data yang diubah.';
+}
+
 const resetOptions = [
   {
     type: 'submissions' as const,
@@ -59,8 +79,18 @@ export default function DemoResetPage() {
     try {
       const response = await apiPost('/admin/reset', {
         reset_type: selectedType,
+      }, {
+        timeoutMs: 60_000,
       });
-      if (!response.ok) throw new Error('Reset ditolak oleh server.');
+      if (!response.ok) {
+        let errorBody: ResetErrorResponse = {};
+        try {
+          errorBody = await response.json() as ResetErrorResponse;
+        } catch {
+          // The status code still provides a safe fallback message.
+        }
+        throw new Error(getResetErrorMessage(response.status, errorBody));
+      }
       const result = await response.json() as ResetResult;
       const lines = [
         'Reset selesai.',
@@ -75,10 +105,12 @@ export default function DemoResetPage() {
       setMessage({ type: 'success', text: lines.join('\n') });
       setSelectedType(null);
       setConfirmText('');
-    } catch {
+    } catch (error) {
       setMessage({
         type: 'error',
-        text: 'Reset gagal. Data tidak diubah sebagian; silakan periksa backend.',
+        text: error instanceof Error
+          ? error.message
+          : 'Reset gagal. Tidak ada data yang diubah.',
       });
     } finally {
       setIsResetting(false);
@@ -161,6 +193,14 @@ export default function DemoResetPage() {
                 className="mt-4 w-full rounded-xl border border-slate-300 dark:border-white/15 bg-transparent px-4 py-3"
                 autoFocus
               />
+              {message?.type === 'error' && (
+                <p
+                  role="alert"
+                  className="mt-3 rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300"
+                >
+                  {message.text}
+                </p>
+              )}
               <div className="mt-5 flex justify-end gap-3">
                 <button
                   type="button"

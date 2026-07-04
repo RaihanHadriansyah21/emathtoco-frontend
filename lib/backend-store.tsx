@@ -93,12 +93,17 @@ export function BackendStatusProvider({ children }: { children: React.ReactNode 
       const nextState = await performHealthCheck();
       if (nextState === 'offline') {
         consecutiveFailuresRef.current += 1;
+        const confirmedState: BackendState =
+          consecutiveFailuresRef.current >= 2 ? 'offline' : 'degraded';
+        setState(confirmedState);
+        updateSnapshot(confirmedState);
+        scheduleNext(confirmedState);
       } else {
         consecutiveFailuresRef.current = 0;
+        setState(nextState);
+        updateSnapshot(nextState);
+        scheduleNext(nextState);
       }
-      setState(nextState);
-      updateSnapshot(nextState);
-      scheduleNext(nextState);
     } finally {
       runningRef.current = false;
     }
