@@ -22,6 +22,7 @@
     "exceljs": "^4.4.0",
     "framer-motion": "^12.40.0",
     "geist": "^1.7.2",
+    "html5-qrcode": "^2.3.8",
     "lucide-react": "^1.16.0",
     "motion": "^12.40.0",
     "next": "16.2.6",

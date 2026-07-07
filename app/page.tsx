@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, QrCode, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { ChevronRight, QrCode, Loader2, CheckCircle, AlertTriangle, Camera, X } from 'lucide-react';
 import Navbar from './components/Navbar';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
@@ -49,6 +49,107 @@ export default function StudentDashboard() {
   const [joinStatus, setJoinStatus] = useState<'idle' | 'joining' | 'success' | 'error'>('idle');
   const [joinMessage, setJoinMessage] = useState('');
   const [joinedCourseId, setJoinedCourseId] = useState<string | null>(null);
+
+  // Device & Camera state
+  const [isMobile, setIsMobile] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const scannerRef = useRef<any>(null);
+
+  // Deteksi device mobile/handphone responsif
+  useEffect(() => {
+    const checkMobile = () => {
+      const hasTouch = window.matchMedia('(pointer: coarse)').matches;
+      const isNarrow = window.innerWidth < 768;
+      setIsMobile(hasTouch || isNarrow);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Fungsi pemrosesan join kelas reusable
+  const executeJoinClass = async (rawInput: string) => {
+    if (!rawInput.trim() || joinStatus === 'joining') return;
+    setJoinStatus('joining');
+    setJoinMessage('Menghubungkan ke kelas...');
+    try {
+      let token = rawInput.trim();
+      try {
+        const url = new URL(token);
+        const urlToken = url.searchParams.get('token');
+        if (urlToken) token = urlToken;
+      } catch {
+        // Bukan URL - gunakan raw token langsung
+      }
+
+      const tokenHash = await sha256Hex(token);
+      const { data, error } = await supabase.rpc('join_class_with_token', {
+        p_token_hash: tokenHash,
+      });
+      if (error) throw error;
+
+      const result = data as { success: boolean; course_id?: string };
+      setJoinedCourseId(result.course_id ?? null);
+      setJoinStatus('success');
+      setJoinMessage('Berhasil masuk ke kelas!');
+      setTokenInput('');
+
+      // Reload courses after 1.5s
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (err) {
+      logger.error('Failed to join class:', err);
+      setJoinStatus('error');
+      setJoinMessage('QR tidak valid, sudah kadaluarsa, atau limit scan habis.');
+    }
+  };
+
+  const startScanner = async () => {
+    setJoinStatus('idle');
+    setJoinMessage('');
+    setShowScanner(true);
+    
+    // Inisialisasi scanner secara dinamis setelah div dirender
+    setTimeout(() => {
+      const { Html5Qrcode } = require('html5-qrcode');
+      const html5QrCode = new Html5Qrcode('qr-reader');
+      scannerRef.current = html5QrCode;
+
+      html5QrCode.start(
+        { facingMode: 'environment' },
+        {
+          fps: 10,
+          qrbox: { width: 220, height: 220 }
+        },
+        async (decodedText: string) => {
+          // Callback sukses
+          setTokenInput(decodedText);
+          stopScanner();
+          await executeJoinClass(decodedText);
+        },
+        () => {
+          // Callback silent fail untuk scanning frame
+        }
+      ).catch((err: any) => {
+        logger.error('Failed to start QR scanner:', err);
+      });
+    }, 300);
+  };
+
+  const stopScanner = () => {
+    if (scannerRef.current) {
+      scannerRef.current.stop().then(() => {
+        scannerRef.current = null;
+        setShowScanner(false);
+      }).catch((err: any) => {
+        logger.error('Failed to stop QR scanner:', err);
+        setShowScanner(false);
+      });
+    } else {
+      setShowScanner(false);
+    }
+  };
 
   useEffect(() => {
     if (loading) return;
@@ -201,59 +302,36 @@ export default function StudentDashboard() {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
-                <input
-                  type="text"
-                  placeholder="Tempelkan link QR atau token di sini..."
-                  value={tokenInput}
-                  onChange={(e) => {
-                    setTokenInput(e.target.value);
-                    if (joinStatus !== 'idle') {
-                      setJoinStatus('idle');
-                      setJoinMessage('');
-                    }
-                  }}
-                  disabled={joinStatus === 'joining'}
-                  className="flex-1 bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-white focus:outline-none focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/10 transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600 disabled:opacity-50"
-                />
+                <div className="flex-1 flex gap-2 min-w-0">
+                  <input
+                    type="text"
+                    placeholder="Tempelkan link QR atau token di sini..."
+                    value={tokenInput}
+                    onChange={(e) => {
+                      setTokenInput(e.target.value);
+                      if (joinStatus !== 'idle') {
+                        setJoinStatus('idle');
+                        setJoinMessage('');
+                      }
+                    }}
+                    disabled={joinStatus === 'joining'}
+                    className="flex-1 bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-white focus:outline-none focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/10 transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600 disabled:opacity-50 min-w-0"
+                  />
+                  {isMobile && (
+                    <button
+                      type="button"
+                      onClick={startScanner}
+                      disabled={joinStatus === 'joining'}
+                      className="flex-shrink-0 flex items-center justify-center bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 p-3.5 rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Scan QR via Kamera"
+                    >
+                      <Camera className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
                 <button
                   type="button"
-                  onClick={async () => {
-                    if (!tokenInput.trim() || joinStatus === 'joining') return;
-                    setJoinStatus('joining');
-                    setJoinMessage('Menghubungkan ke kelas...');
-                    try {
-                      // Extract token from URL or use raw token
-                      let token = tokenInput.trim();
-                      try {
-                        const url = new URL(token);
-                        const urlToken = url.searchParams.get('token');
-                        if (urlToken) token = urlToken;
-                      } catch {
-                        // Not a URL — use as raw token
-                      }
-
-                      const tokenHash = await sha256Hex(token);
-                      const { data, error } = await supabase.rpc('join_class_with_token', {
-                        p_token_hash: tokenHash,
-                      });
-                      if (error) throw error;
-
-                      const result = data as { success: boolean; course_id?: string };
-                      setJoinedCourseId(result.course_id ?? null);
-                      setJoinStatus('success');
-                      setJoinMessage('Berhasil masuk ke kelas!');
-                      setTokenInput('');
-
-                      // Reload courses after 1.5s
-                      setTimeout(() => {
-                        window.location.reload();
-                      }, 1500);
-                    } catch (err) {
-                      logger.error('Failed to join class:', err);
-                      setJoinStatus('error');
-                      setJoinMessage('QR tidak valid, sudah kadaluarsa, atau limit scan habis.');
-                    }
-                  }}
+                  onClick={() => executeJoinClass(tokenInput)}
                   disabled={!tokenInput.trim() || joinStatus === 'joining'}
                   className="flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-5 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 >
@@ -379,6 +457,41 @@ export default function StudentDashboard() {
           </div>
         </main>
       </PageTransition>
+
+      {/* MODAL SCANNER QR CAMERA */}
+      {showScanner && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md px-4">
+          <div className="bg-white/95 dark:bg-[#07070C]/90 border border-slate-200 dark:border-neutral-900 w-full max-w-sm rounded-3xl p-6 relative overflow-hidden shadow-2xl">
+            <button
+              onClick={stopScanner}
+              className="absolute top-4 right-4 p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white transition-all cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-center space-y-2 mb-6">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center justify-center gap-2">
+                <Camera className="w-5 h-5 text-cyan-500" />
+                Scan QR Kelas
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-neutral-500">Arahkan kamera ke QR code join kelas</p>
+            </div>
+
+            <div className="w-full aspect-square bg-black border border-neutral-900 rounded-2xl overflow-hidden flex items-center justify-center relative shadow-inner">
+              <div id="qr-reader" className="w-full h-full object-cover"></div>
+            </div>
+
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={stopScanner}
+                className="w-full bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-neutral-300 font-bold py-3 px-5 rounded-xl text-xs uppercase tracking-widest transition-all cursor-pointer"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
