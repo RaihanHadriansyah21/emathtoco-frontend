@@ -19,6 +19,7 @@ import {
     Mail,
     Cpu,
     Calendar,
+    Trash2,
 } from 'lucide-react';
 import Navbar from '../../../../components/Navbar';
 import ToastContainer from '../../../../components/Toast';
@@ -116,6 +117,7 @@ export default function LecturerStudentRoster() {
     const [isLoadingPrediction, setIsLoadingPrediction] = useState(false);
     const [predictionError, setPredictionError] = useState<string | null>(null);
     const [isFinalizing, setIsFinalizing] = useState(false);
+    const [isRemovingStudent, setIsRemovingStudent] = useState(false);
 
     // Toast Container
     const { toasts, toast, removeToast } = useToast();
@@ -316,6 +318,35 @@ export default function LecturerStudentRoster() {
             toast.error('Error', 'Gagal memfinalisasi penilaian tugas.');
         } finally {
             setIsFinalizing(false);
+        }
+    };
+
+    const handleRemoveStudentFromCourse = async () => {
+        if (!selectedStudent || isRemovingStudent) return;
+
+        const confirmed = window.confirm(
+            `Hapus ${selectedStudent.nama_lengkap} dari kelas ini? Submission mahasiswa di mata kuliah ini juga akan dihapus agar demo dapat diulang.`,
+        );
+        if (!confirmed) return;
+
+        setIsRemovingStudent(true);
+        try {
+            const { error } = await supabase.rpc('remove_student_from_course', {
+                p_student_id: selectedStudent.id,
+                p_course_id: courseId,
+                p_delete_submissions: true,
+            });
+            if (error) throw error;
+
+            toast.success('Mahasiswa dihapus', `${selectedStudent.nama_lengkap} sudah dikeluarkan dari kelas.`);
+            setSelectedStudent(null);
+            setPredictionDetails(null);
+            await fetchRosterData();
+        } catch (err) {
+            logger.error('Failed to remove student from course:', err);
+            toast.error('Gagal', 'Mahasiswa gagal dihapus dari kelas. Pastikan migration database sudah diterapkan.');
+        } finally {
+            setIsRemovingStudent(false);
         }
     };
 
@@ -759,7 +790,7 @@ export default function LecturerStudentRoster() {
                                                             <div className="text-[10px] font-mono font-bold text-slate-400 dark:text-neutral-500">{cleanLabel}</div>
                                                             <div className="text-lg font-extrabold text-purple-600 dark:text-purple-400 font-mono my-0.5">{sec.predicted_score}</div>
                                                             <div className="text-[9px] font-mono text-slate-500 dark:text-neutral-550 leading-tight">
-                                                                Keyakinan: {Math.round(sec.confidence * 100)}% (uncalibrated)
+                                                                Tingkat Keyakinan AI: {Math.round(sec.confidence * 100)}%
                                                             </div>
                                                         </div>
                                                     );
@@ -788,6 +819,23 @@ export default function LecturerStudentRoster() {
                                 </div>
 
                                 <div className="flex flex-col sm:flex-row gap-3">
+                                    <button
+                                        onClick={handleRemoveStudentFromCourse}
+                                        disabled={isRemovingStudent}
+                                        className="inline-flex items-center justify-center gap-1.5 bg-red-500/10 border border-red-500/25 hover:bg-red-500/15 text-red-500 px-5 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {isRemovingStudent ? (
+                                            <>
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                <span>MENGHAPUS...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                                <span>HAPUS DARI KELAS</span>
+                                            </>
+                                        )}
+                                    </button>
                                     {selectedStudent.submission && (
                                         <>
                                             {/* Link to Review Workspace page */}

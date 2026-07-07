@@ -19,6 +19,13 @@ import {
 } from '@/lib/services/review-workflow-service';
 import { getAnswerImageUrls } from '@/lib/storage/answer-image-urls';
 import { getErrorMessage } from '@/lib/errors';
+import {
+  FIXED_SECTION_LABEL,
+  fetchPublishedQuestionSet,
+  groupSectionsByQuestion,
+  type QuestionSection,
+  type QuestionSet,
+} from '@/lib/question-bank';
 
 import { useAuth } from '@/app/components/AuthGate';
 
@@ -225,6 +232,8 @@ export default function ReviewWorkspace() {
   const [isRequestingReupload, setIsRequestingReupload] = useState(false);
   const [isAccessDenied, setIsAccessDenied] = useState(false);
   const [courseId, setCourseId] = useState<string | null>(null);
+  const [questionSet, setQuestionSet] = useState<QuestionSet | null>(null);
+  const [questionSetError, setQuestionSetError] = useState<string | null>(null);
 
   // Sync state to refs for stable useCallback and polling intervals
   const submissionRef = useRef<SubmissionData | null>(null);
@@ -300,6 +309,16 @@ export default function ReviewWorkspace() {
             setIsChecking(false);
             setIsLoadingWorkspace(false);
             return;
+          }
+
+          try {
+            const publishedQuestions = await fetchPublishedQuestionSet(subMeta.mata_kuliah_id);
+            setQuestionSet(publishedQuestions);
+            setQuestionSetError(null);
+          } catch (questionErr) {
+            logger.error('Question bank load error:', questionErr);
+            setQuestionSet(null);
+            setQuestionSetError('Soal tidak dapat dimuat. Periksa paket soal dan akses Supabase.');
           }
         }
 
@@ -903,6 +922,17 @@ export default function ReviewWorkspace() {
         ? "ai_processing"
         : "none";
 
+  const questionSectionsByNumber = React.useMemo(
+    () => questionSet ? groupSectionsByQuestion(questionSet.sections) : new Map<number, QuestionSection[]>(),
+    [questionSet],
+  );
+
+  const questionSectionsByCode = React.useMemo(() => {
+    const mapped = new Map<string, QuestionSection>();
+    questionSet?.sections.forEach((section) => mapped.set(section.section_code, section));
+    return mapped;
+  }, [questionSet]);
+
   logger.debug(
     "AI Button State:",
     {
@@ -1094,18 +1124,49 @@ export default function ReviewWorkspace() {
                 <p className="font-medium leading-relaxed">{successMsg}</p>
               </div>
             )}
+            {questionSetError && (
+              <div className="flex items-start gap-3 bg-amber-950/20 border border-amber-900/50 text-amber-400 p-4 rounded-xl text-sm">
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <p className="font-medium leading-relaxed">{questionSetError}</p>
+              </div>
+            )}
+            {!questionSet && !questionSetError && (
+              <div className="bg-slate-100/80 border border-slate-300 dark:bg-neutral-950/40 dark:border-neutral-900 rounded-2xl p-4 text-xs text-slate-600 dark:text-neutral-400 leading-relaxed">
+                Belum ada paket soal published untuk mata kuliah ini. Review tetap berjalan, tetapi panel soal tidak ditampilkan.
+              </div>
+            )}
+            {questionSet && (
+              <div className="bg-cyan-500/5 border border-cyan-500/20 rounded-2xl p-4 text-xs text-cyan-700 dark:text-cyan-300 leading-relaxed">
+                <span className="font-bold uppercase tracking-wider">Bank Soal Aktif:</span> {questionSet.title}. {FIXED_SECTION_LABEL}
+              </div>
+            )}
 
             <div className="space-y-6">
               {[1, 2, 3, 4].map(numSoal => {
                 const questionSlots = slots.filter(s => s.nomor_soal === numSoal);
+                const groupQuestions = questionSectionsByNumber.get(numSoal) ?? [];
+                const parentPrompt = groupQuestions[0]?.parent_prompt;
                 return (
                   <div key={numSoal} className="bg-white dark:bg-[#0A0A0F]/70 border border-slate-300 dark:border-neutral-900 rounded-2xl p-6 backdrop-blur-md space-y-4">
                     <h3 className="text-sm font-bold text-slate-700 dark:text-neutral-300 tracking-widest border-b border-slate-200 dark:border-neutral-900/60 pb-2 uppercase">
                       Kumpulan Soal {numSoal}
                     </h3>
+                    {parentPrompt && (
+                      <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4">
+                        <div className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-400 mb-2">
+                          Soal Induk
+                        </div>
+                        <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-700 dark:text-neutral-300 font-mono">
+                          {parentPrompt}
+                        </pre>
+                      </div>
+                    )}
 
                     <div className="space-y-6">
-                      {questionSlots.map(slot => (
+                      {questionSlots.map(slot => {
+                        const sectionCode = `S-${slot.label.toUpperCase()}`;
+                        const sectionQuestion = questionSectionsByCode.get(sectionCode);
+                        return (
                         <div
                           key={slot.label}
                           className={`border rounded-xl pt-12 pb-4 px-4 transition-all duration-300 relative flex flex-col md:flex-row gap-4 ${slot.dbStatus === 'reupload_required'
@@ -1129,6 +1190,52 @@ export default function ReviewWorkspace() {
                               </span>
                             )}
                           </div>
+
+                          {sectionQuestion && (
+                            <div className="w-full md:w-56 flex-shrink-0 bg-white/80 border border-slate-200 dark:bg-black/35 dark:border-neutral-900 rounded-xl p-3 space-y-2">
+                              <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-400">
+                                Soal {slot.label.toUpperCase()}
+                              </div>
+                              <p className="text-xs leading-relaxed text-slate-700 dark:text-neutral-300">
+                                {sectionQuestion.question_text}
+                              </p>
+                              {sectionQuestion.helper_text && (
+                                <pre className="whitespace-pre-wrap break-words rounded-lg bg-slate-100 dark:bg-neutral-950 border border-slate-200 dark:border-neutral-900 p-2 text-[11px] leading-relaxed text-slate-600 dark:text-neutral-400 font-mono">
+                                  {sectionQuestion.helper_text}
+                                </pre>
+                              )}
+                              {sectionQuestion.assets.length > 0 && (
+                                <div className="space-y-2">
+                                  {sectionQuestion.assets.map((asset) => (
+                                    <button
+                                      key={asset.id}
+                                      type="button"
+                                      onClick={() => {
+                                        if (!asset.signedUrl) return;
+                                        setModalImageUrl(asset.signedUrl);
+                                        setModalTitle(`Gambar Soal ${slot.label.toUpperCase()}`);
+                                      }}
+                                      className="w-full overflow-hidden rounded-lg border border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black hover:border-cyan-500/40 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                                      disabled={!asset.signedUrl}
+                                    >
+                                      {asset.signedUrl ? (
+                                        <img
+                                          src={asset.signedUrl}
+                                          alt={asset.caption || `Gambar soal ${slot.label.toUpperCase()}`}
+                                          className="w-full max-h-32 object-contain"
+                                          loading="lazy"
+                                        />
+                                      ) : (
+                                        <span className="block p-3 text-[10px] text-slate-500 dark:text-neutral-500">
+                                          Gambar tidak dapat dimuat.
+                                        </span>
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
 
                           {/* Image preview box */}
                           <div className="w-full md:w-32 h-32 bg-slate-50 dark:bg-black border border-slate-300 dark:border-neutral-900 rounded-xl overflow-hidden relative flex-shrink-0 flex items-center justify-center mt-0">
@@ -1166,7 +1273,7 @@ export default function ReviewWorkspace() {
                                   <label className="block text-[10px] font-bold text-slate-700 dark:text-neutral-400 uppercase tracking-wider mb-1">Hasil AI</label>
                                   <div className="w-full bg-slate-100 border border-slate-300 dark:bg-neutral-950/50 dark:border-neutral-900 rounded-xl py-2 px-3 text-slate-800 dark:text-neutral-300 text-xs font-mono font-bold leading-normal">
                                     <div>Nilai AI : {isAIProcessing ? '⏳' : (slot.aiScore !== null ? slot.aiScore : '-')}</div>
-                                    <div>Keyakinan (tidak terkalibrasi) : {isAIProcessing ? '⏳' : (slot.confidence !== null ? `${Math.round(slot.confidence * 100)}%` : '-')}</div>
+                                    <div>Tingkat Keyakinan AI : {isAIProcessing ? '⏳' : (slot.confidence !== null ? `${Math.round(slot.confidence * 100)}%` : '-')}</div>
                                   </div>
                                 </div>
 
@@ -1267,7 +1374,8 @@ export default function ReviewWorkspace() {
                             </div>
                           )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 );

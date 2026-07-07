@@ -4,7 +4,8 @@ import { logger } from '@/lib/logger';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Search, Loader2, ArrowLeft, ArrowRight, Cpu, Download, FileSpreadsheet, Lock, ChevronDown, Users } from 'lucide-react';
+import QRCode from 'qrcode';
+import { Search, Loader2, ArrowLeft, ArrowRight, Cpu, Download, FileSpreadsheet, Lock, ChevronDown, Users, QrCode, Copy, X, BookOpen } from 'lucide-react';
 import { GlassTable, GlassTableHeader, GlassTableRow, ResponsiveTableWrapper } from '@/components/ui/table';
 import Navbar from '../../../components/Navbar';
 import PageTransition from '@/components/ui/PageTransition';
@@ -14,6 +15,7 @@ import ToastContainer from '../../../components/Toast';
 import { useToast } from '@/app/hooks/useToast';
 import { supabase } from '@/lib/supabase';
 import { apiGet } from '@/lib/api-client';
+import { createJoinToken, sha256Hex } from '@/lib/join-token';
 
 import { useAuth } from '@/app/components/AuthGate';
 
@@ -46,6 +48,15 @@ interface Submission {
   lembar_jawaban: AnswerSheet[] | null;
 }
 
+interface JoinQrState {
+  sessionId: string;
+  token: string;
+  link: string;
+  qrDataUrl: string;
+  expiresAt: string;
+  maxUses: number | null;
+}
+
 export default function LecturerCoursePortal() {
   const router = useRouter();
   const params = useParams();
@@ -70,6 +81,12 @@ export default function LecturerCoursePortal() {
   // Batch AI Modal state
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showJoinQrModal, setShowJoinQrModal] = useState(false);
+  const [joinQr, setJoinQr] = useState<JoinQrState | null>(null);
+  const [joinDurationMinutes, setJoinDurationMinutes] = useState('30');
+  const [joinMaxUses, setJoinMaxUses] = useState('60');
+  const [isCreatingJoinQr, setIsCreatingJoinQr] = useState(false);
+  const [isRevokingJoinQr, setIsRevokingJoinQr] = useState(false);
   const { toasts, toast, removeToast } = useToast();
 
   // Polling ref to prevent duplicate intervals (BUG 2 fix)
@@ -269,6 +286,85 @@ export default function LecturerCoursePortal() {
     setShowBatchModal(true);
   };
 
+  const handleCreateJoinQr = async () => {
+    if (isCreatingJoinQr) return;
+    setIsCreatingJoinQr(true);
+
+    try {
+      const duration = Math.min(Math.max(Number(joinDurationMinutes) || 30, 5), 24 * 60);
+      const parsedMaxUses = Number(joinMaxUses);
+      const maxUses = Number.isFinite(parsedMaxUses) && parsedMaxUses > 0
+        ? Math.min(Math.floor(parsedMaxUses), 500)
+        : null;
+      const token = createJoinToken();
+      const tokenHash = await sha256Hex(token);
+      const link = `${window.location.origin}/join-class?token=${encodeURIComponent(token)}`;
+      const expiresAt = new Date(Date.now() + duration * 60_000).toISOString();
+
+      const { data, error } = await supabase.rpc('create_class_join_session', {
+        p_course_id: courseId,
+        p_token_hash: tokenHash,
+        p_expires_at: expiresAt,
+        p_max_uses: maxUses,
+      });
+
+      if (error) throw error;
+
+      const qrDataUrl = await QRCode.toDataURL(link, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#020617',
+          light: '#ffffff',
+        },
+      });
+
+      setJoinQr({
+        sessionId: data.id,
+        token,
+        link,
+        qrDataUrl,
+        expiresAt: data.expires_at ?? expiresAt,
+        maxUses,
+      });
+      toast.success('QR aktif', 'QR join kelas berhasil dibuat.');
+    } catch (err) {
+      logger.error('Failed to create class join QR:', err);
+      toast.error('Gagal', 'QR join kelas gagal dibuat. Pastikan migration database sudah diterapkan.');
+    } finally {
+      setIsCreatingJoinQr(false);
+    }
+  };
+
+  const handleCopyJoinLink = async () => {
+    if (!joinQr) return;
+    try {
+      await navigator.clipboard.writeText(joinQr.link);
+      toast.success('Disalin', 'Link join kelas sudah disalin.');
+    } catch {
+      toast.error('Gagal', 'Browser tidak mengizinkan clipboard. Salin link secara manual.');
+    }
+  };
+
+  const handleRevokeJoinQr = async () => {
+    if (!joinQr || isRevokingJoinQr) return;
+    setIsRevokingJoinQr(true);
+
+    try {
+      const { error } = await supabase.rpc('revoke_class_join_session', {
+        p_join_session_id: joinQr.sessionId,
+      });
+      if (error) throw error;
+      setJoinQr(null);
+      toast.success('QR dicabut', 'QR join kelas sudah dinonaktifkan.');
+    } catch (err) {
+      logger.error('Failed to revoke class join QR:', err);
+      toast.error('Gagal', 'QR join kelas gagal dinonaktifkan.');
+    } finally {
+      setIsRevokingJoinQr(false);
+    }
+  };
+
   // Helper to format date
   const formatDate = (isoString: string) => {
     if (!isoString) return '-';
@@ -405,6 +501,133 @@ export default function LecturerCoursePortal() {
         onToast={(type, title, message) => toast[type](title, message)}
       />
 
+      {showJoinQrModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm cursor-default"
+            aria-label="Tutup modal QR join kelas"
+            onClick={() => setShowJoinQrModal(false)}
+          />
+
+          <div className="relative w-full max-w-2xl bg-white border border-slate-200 dark:bg-[#0A0A0F] dark:border-neutral-800 rounded-3xl shadow-[0_0_60px_rgba(6,182,212,0.08)] overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 dark:border-neutral-900">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center">
+                  <QrCode className="w-5 h-5 text-cyan-500" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">QR Join Kelas</h2>
+                  <p className="text-[11px] text-slate-500 dark:text-neutral-500 font-mono uppercase tracking-wider">
+                    {courseCode || 'COURSE'} • token dibatasi waktu
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowJoinQrModal(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-800 hover:bg-slate-100 dark:text-neutral-500 dark:hover:text-white dark:hover:bg-neutral-900 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 grid grid-cols-1 md:grid-cols-[1fr_220px] gap-6">
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4 text-xs leading-relaxed text-slate-600 dark:text-neutral-300">
+                  Tampilkan QR ini di awal kelas. Mahasiswa scan, login sebagai mahasiswa, lalu otomatis masuk ke mata kuliah ini. Setelah waktu habis atau QR dicabut, token tidak bisa dipakai lagi.
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="space-y-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-500">Berlaku menit</span>
+                    <input
+                      type="number"
+                      min={5}
+                      max={1440}
+                      value={joinDurationMinutes}
+                      onChange={(event) => setJoinDurationMinutes(event.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-white focus:outline-none focus:border-cyan-500/60"
+                    />
+                  </label>
+                  <label className="space-y-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-500">Maksimal scan</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={500}
+                      value={joinMaxUses}
+                      onChange={(event) => setJoinMaxUses(event.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-white focus:outline-none focus:border-cyan-500/60"
+                    />
+                  </label>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCreateJoinQr}
+                  disabled={isCreatingJoinQr}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-5 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isCreatingJoinQr ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
+                  <span>{isCreatingJoinQr ? 'MEMBUAT QR...' : 'BUAT QR BARU'}</span>
+                </button>
+
+                {joinQr && (
+                  <div className="rounded-2xl border border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black/40 p-4 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-neutral-500">Kadaluarsa</span>
+                        <span className="font-mono text-slate-800 dark:text-neutral-200">{formatDate(joinQr.expiresAt)}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-neutral-500">Limit scan</span>
+                        <span className="font-mono text-slate-800 dark:text-neutral-200">{joinQr.maxUses ?? 'Tidak dibatasi'}</span>
+                      </div>
+                    </div>
+                    <div className="rounded-xl bg-white dark:bg-neutral-950 border border-slate-200 dark:border-neutral-900 p-3 text-[11px] font-mono text-slate-600 dark:text-neutral-400 break-all">
+                      {joinQr.link}
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCopyJoinLink}
+                        className="flex-1 flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-cyan-500/40 dark:bg-neutral-950 dark:border-neutral-900 text-slate-700 dark:text-neutral-300 px-4 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        SALIN LINK
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRevokeJoinQr}
+                        disabled={isRevokingJoinQr}
+                        className="flex-1 flex items-center justify-center gap-2 bg-red-500/10 border border-red-500/25 hover:bg-red-500/15 text-red-500 px-4 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isRevokingJoinQr ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                        CABUT QR
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-center">
+                <div className="w-full aspect-square max-w-[220px] rounded-3xl border border-slate-200 dark:border-neutral-900 bg-white p-4 flex items-center justify-center">
+                  {joinQr ? (
+                    <img src={joinQr.qrDataUrl} alt="QR join kelas" className="w-full h-full object-contain" />
+                  ) : (
+                    <div className="text-center text-slate-400 dark:text-neutral-600 space-y-2">
+                      <QrCode className="w-12 h-12 mx-auto" />
+                      <p className="text-xs font-semibold">QR akan muncul setelah dibuat.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Background Glows */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[10%] left-[15%] w-[450px] h-[450px] bg-cyan-500/5 dark:bg-cyan-500/8 rounded-full blur-[120px] animate-float-blue"></div>
@@ -431,13 +654,29 @@ export default function LecturerCoursePortal() {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => router.push(`/dosen/course/${courseId}/students`)}
-            className="flex items-center justify-center gap-2.5 bg-cyan-500/10 border border-cyan-500/35 hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 px-4 py-2.5 rounded-xl text-xs font-bold tracking-wider transition-all duration-200 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99] w-full sm:w-auto self-start sm:self-center"
-          >
-            <Users className="w-4 h-4 text-cyan-500" />
-            <span>MAHASISWA TERDAFTAR</span>
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto self-start sm:self-center">
+            <button
+              onClick={() => setShowJoinQrModal(true)}
+              className="flex items-center justify-center gap-2.5 bg-cyan-500/10 border border-cyan-500/35 hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 px-4 py-2.5 rounded-xl text-xs font-bold tracking-wider transition-all duration-200 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99] w-full sm:w-auto"
+            >
+              <QrCode className="w-4 h-4 text-cyan-500" />
+              <span>QR JOIN KELAS</span>
+            </button>
+            <button
+              onClick={() => router.push(`/dosen/course/${courseId}/questions`)}
+              className="flex items-center justify-center gap-2.5 bg-indigo-500/10 border border-indigo-500/35 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 px-4 py-2.5 rounded-xl text-xs font-bold tracking-wider transition-all duration-200 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99] w-full sm:w-auto"
+            >
+              <BookOpen className="w-4 h-4 text-indigo-500" />
+              <span>KELOLA SOAL</span>
+            </button>
+            <button
+              onClick={() => router.push(`/dosen/course/${courseId}/students`)}
+              className="flex items-center justify-center gap-2.5 bg-cyan-500/10 border border-cyan-500/35 hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 px-4 py-2.5 rounded-xl text-xs font-bold tracking-wider transition-all duration-200 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99] w-full sm:w-auto"
+            >
+              <Users className="w-4 h-4 text-cyan-500" />
+              <span>MAHASISWA TERDAFTAR</span>
+            </button>
+          </div>
         </div>
 
         {/* SUMMARY CARDS */}
