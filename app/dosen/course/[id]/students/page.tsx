@@ -30,6 +30,7 @@ import { apiGet } from '@/lib/api-client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fadeIn, modalTransition } from '@/styles/motion';
 import PageTransition from '@/components/ui/PageTransition';
+import ConfirmModal from '../../../../components/ConfirmModal';
 
 import { useAuth } from '@/app/components/AuthGate';
 
@@ -106,8 +107,10 @@ export default function LecturerStudentRoster() {
     const [students, setStudents] = useState<EnrolledStudent[]>([]);
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [lecturerName, setLecturerName] = useState('');
 
-    // Search & Filters
+    // Modal Konfirmasi Hapus Roster
+    const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterStatus, setFilterStatus] = useState<StudentStatusFilter>('all');
 
@@ -321,15 +324,16 @@ export default function LecturerStudentRoster() {
         }
     };
 
+    const triggerRemoveStudentConfirm = () => {
+        if (!selectedStudent || isRemovingStudent) return;
+        setShowConfirmDeleteModal(true);
+    };
+
     const handleRemoveStudentFromCourse = async () => {
         if (!selectedStudent || isRemovingStudent) return;
 
-        const confirmed = window.confirm(
-            `Hapus ${selectedStudent.nama_lengkap} dari kelas ini? Submission mahasiswa di mata kuliah ini juga akan dihapus agar demo dapat diulang.`,
-        );
-        if (!confirmed) return;
-
         setIsRemovingStudent(true);
+        setShowConfirmDeleteModal(false);
         try {
             const { error } = await supabase.rpc('remove_student_from_course', {
                 p_student_id: selectedStudent.id,
@@ -820,7 +824,7 @@ export default function LecturerStudentRoster() {
 
                                 <div className="flex flex-col sm:flex-row gap-3">
                                     <button
-                                        onClick={handleRemoveStudentFromCourse}
+                                        onClick={triggerRemoveStudentConfirm}
                                         disabled={isRemovingStudent}
                                         className="inline-flex items-center justify-center gap-1.5 bg-red-500/10 border border-red-500/25 hover:bg-red-500/15 text-red-500 px-5 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                     >

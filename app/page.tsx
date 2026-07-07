@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, QrCode, Loader2, CheckCircle, AlertTriangle, Camera, X } from 'lucide-react';
+import { ChevronRight, QrCode, Loader2, CheckCircle, AlertTriangle, Camera, X, RefreshCw } from 'lucide-react';
 import Navbar from './components/Navbar';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
@@ -56,6 +56,8 @@ export default function StudentDashboard() {
   const [zoomRange, setZoomRange] = useState<{ min: number; max: number; step: number } | null>(null);
   const [zoomValue, setZoomValue] = useState<number>(1);
   const [activeTrack, setActiveTrack] = useState<MediaStreamTrack | null>(null);
+  const [availableCameras, setAvailableCameras] = useState<any[]>([]);
+  const [currentCameraIndex, setCurrentCameraIndex] = useState<number>(0);
   const scannerRef = useRef<any>(null);
 
   // Deteksi device mobile/handphone responsif
@@ -115,6 +117,8 @@ export default function StudentDashboard() {
     setZoomRange(null);
     setZoomValue(1);
     setActiveTrack(null);
+    setAvailableCameras([]);
+    setCurrentCameraIndex(0);
     
     // Inisialisasi scanner secara dinamis setelah div dirender
     setTimeout(async () => {
@@ -125,15 +129,18 @@ export default function StudentDashboard() {
 
         // Ambil daftar kamera untuk mencari kamera belakang utama (1x)
         const cameras = await Html5Qrcode.getCameras();
-        let selectedCameraId = { facingMode: 'environment' };
+        let targetCameraId = { facingMode: 'environment' } as any;
 
         if (cameras && cameras.length > 0) {
+          setAvailableCameras(cameras);
+          
           // Cari kamera belakang
           const backCameras = cameras.filter((c: any) => {
             const label = c.label.toLowerCase();
             return label.includes('back') || label.includes('rear') || label.includes('environment');
           });
 
+          let initialCamera = cameras[0];
           if (backCameras.length > 0) {
             // Cari kamera belakang utama (1x) dengan mengabaikan ultra-wide/wide/0.5x/zoom/macro
             const mainCamera = backCameras.find((c: any) => {
@@ -145,50 +152,76 @@ export default function StudentDashboard() {
                      !label.includes('telephoto') && 
                      !label.includes('zoom');
             });
-
-            if (mainCamera) {
-              selectedCameraId = mainCamera.id;
-            } else {
-              selectedCameraId = backCameras[0].id;
-            }
+            initialCamera = mainCamera || backCameras[0];
           }
+
+          const index = cameras.findIndex((c: any) => c.id === initialCamera.id);
+          setCurrentCameraIndex(index !== -1 ? index : 0);
+          targetCameraId = initialCamera.id;
         }
 
-        await html5QrCode.start(
-          selectedCameraId,
-          {
-            fps: 10,
-            qrbox: { width: 220, height: 220 }
-          },
-          async (decodedText: string) => {
-            // Callback sukses
-            setTokenInput(decodedText);
-            stopScanner();
-            await executeJoinClass(decodedText);
-          },
-          () => {
-            // Callback silent fail untuk scanning frame
-          }
-        );
-
-        // Cari active track untuk konfigurasi zoom
-        const track = html5QrCode.getActiveTrack();
-        if (track) {
-          setActiveTrack(track);
-          const capabilities = track.getCapabilities();
-          if (capabilities.zoom) {
-            setZoomRange({
-              min: capabilities.zoom.min || 1,
-              max: capabilities.zoom.max || 10,
-              step: capabilities.zoom.step || 0.1
-            });
-            setZoomValue(capabilities.zoom.min || 1);
-          }
-        }
+        await startQrWithDevice(html5QrCode, targetCameraId);
       } catch (err) {
         logger.error('Failed to start QR scanner:', err);
       }
     }, 300);
+  };
+
+  const startQrWithDevice = async (html5QrCode: any, deviceId: any) => {
+    try {
+      await html5QrCode.start(
+        deviceId,
+        {
+          fps: 10,
+          qrbox: { width: 220, height: 220 }
+        },
+        async (decodedText: string) => {
+          // Callback sukses
+          setTokenInput(decodedText);
+          stopScanner();
+          await executeJoinClass(decodedText);
+        },
+        () => {
+          // Callback silent fail untuk scanning frame
+        }
+      );
+
+      // Cari active track untuk konfigurasi zoom
+      const track = html5QrCode.getActiveTrack();
+      if (track) {
+        setActiveTrack(track);
+        const capabilities = track.getCapabilities();
+        if (capabilities.zoom) {
+          setZoomRange({
+            min: capabilities.zoom.min || 1,
+            max: capabilities.zoom.max || 10,
+            step: capabilities.zoom.step || 0.1
+          });
+          setZoomValue(capabilities.zoom.min || 1);
+        } else {
+          setZoomRange(null);
+        }
+      }
+    } catch (err) {
+      logger.error('Failed to start camera device:', err);
+    }
+  };
+
+  const switchCamera = async () => {
+    if (availableCameras.length <= 1 || !scannerRef.current) return;
+
+    const nextIndex = (currentCameraIndex + 1) % availableCameras.length;
+    setCurrentCameraIndex(nextIndex);
+    const nextDevice = availableCameras[nextIndex];
+
+    setActiveTrack(null);
+    setZoomRange(null);
+    try {
+      await scannerRef.current.stop();
+      await startQrWithDevice(scannerRef.current, nextDevice.id);
+    } catch (err) {
+      logger.error('Failed to switch camera:', err);
+    }
   };
 
   const handleZoomChange = async (val: number) => {
@@ -207,6 +240,8 @@ export default function StudentDashboard() {
   const stopScanner = () => {
     setActiveTrack(null);
     setZoomRange(null);
+    setAvailableCameras([]);
+    setCurrentCameraIndex(0);
     if (scannerRef.current) {
       scannerRef.current.stop().then(() => {
         scannerRef.current = null;
@@ -548,6 +583,16 @@ export default function StudentDashboard() {
 
             <div className="w-full aspect-square bg-black border border-neutral-900 rounded-2xl overflow-hidden flex items-center justify-center relative shadow-inner">
               <div id="qr-reader" className="w-full h-full object-cover"></div>
+              {availableCameras.length > 1 && (
+                <button
+                  type="button"
+                  onClick={switchCamera}
+                  className="absolute bottom-3 right-3 p-2.5 rounded-xl bg-black/60 hover:bg-black/80 backdrop-blur-md text-white border border-white/10 hover:border-white/20 transition-all cursor-pointer"
+                  title="Ganti Kamera"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
             {zoomRange && (
