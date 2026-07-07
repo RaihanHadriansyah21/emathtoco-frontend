@@ -2,7 +2,7 @@
 
 import { logger } from '@/lib/logger';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronRight, QrCode, Loader2, CheckCircle, AlertTriangle, Camera, X } from 'lucide-react';
 import Navbar from './components/Navbar';
