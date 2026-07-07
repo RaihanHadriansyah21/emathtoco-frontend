@@ -53,6 +53,9 @@ export default function StudentDashboard() {
   // Device & Camera state
   const [isMobile, setIsMobile] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [zoomRange, setZoomRange] = useState<{ min: number; max: number; step: number } | null>(null);
+  const [zoomValue, setZoomValue] = useState<number>(1);
+  const [activeTrack, setActiveTrack] = useState<MediaStreamTrack | null>(null);
   const scannerRef = useRef<any>(null);
 
   // Deteksi device mobile/handphone responsif
@@ -109,35 +112,101 @@ export default function StudentDashboard() {
     setJoinStatus('idle');
     setJoinMessage('');
     setShowScanner(true);
+    setZoomRange(null);
+    setZoomValue(1);
+    setActiveTrack(null);
     
     // Inisialisasi scanner secara dinamis setelah div dirender
-    setTimeout(() => {
-      const { Html5Qrcode } = require('html5-qrcode');
-      const html5QrCode = new Html5Qrcode('qr-reader');
-      scannerRef.current = html5QrCode;
+    setTimeout(async () => {
+      try {
+        const { Html5Qrcode } = require('html5-qrcode');
+        const html5QrCode = new Html5Qrcode('qr-reader');
+        scannerRef.current = html5QrCode;
 
-      html5QrCode.start(
-        { facingMode: 'environment' },
-        {
-          fps: 10,
-          qrbox: { width: 220, height: 220 }
-        },
-        async (decodedText: string) => {
-          // Callback sukses
-          setTokenInput(decodedText);
-          stopScanner();
-          await executeJoinClass(decodedText);
-        },
-        () => {
-          // Callback silent fail untuk scanning frame
+        // Ambil daftar kamera untuk mencari kamera belakang utama (1x)
+        const cameras = await Html5Qrcode.getCameras();
+        let selectedCameraId = { facingMode: 'environment' };
+
+        if (cameras && cameras.length > 0) {
+          // Cari kamera belakang
+          const backCameras = cameras.filter((c: any) => {
+            const label = c.label.toLowerCase();
+            return label.includes('back') || label.includes('rear') || label.includes('environment');
+          });
+
+          if (backCameras.length > 0) {
+            // Cari kamera belakang utama (1x) dengan mengabaikan ultra-wide/wide/0.5x/zoom/macro
+            const mainCamera = backCameras.find((c: any) => {
+              const label = c.label.toLowerCase();
+              return !label.includes('ultra') && 
+                     !label.includes('wide') && 
+                     !label.includes('0.5') && 
+                     !label.includes('macro') && 
+                     !label.includes('telephoto') && 
+                     !label.includes('zoom');
+            });
+
+            if (mainCamera) {
+              selectedCameraId = mainCamera.id;
+            } else {
+              selectedCameraId = backCameras[0].id;
+            }
+          }
         }
-      ).catch((err: any) => {
+
+        await html5QrCode.start(
+          selectedCameraId,
+          {
+            fps: 10,
+            qrbox: { width: 220, height: 220 }
+          },
+          async (decodedText: string) => {
+            // Callback sukses
+            setTokenInput(decodedText);
+            stopScanner();
+            await executeJoinClass(decodedText);
+          },
+          () => {
+            // Callback silent fail untuk scanning frame
+          }
+        );
+
+        // Cari active track untuk konfigurasi zoom
+        const track = html5QrCode.getActiveTrack();
+        if (track) {
+          setActiveTrack(track);
+          const capabilities = track.getCapabilities();
+          if (capabilities.zoom) {
+            setZoomRange({
+              min: capabilities.zoom.min || 1,
+              max: capabilities.zoom.max || 10,
+              step: capabilities.zoom.step || 0.1
+            });
+            setZoomValue(capabilities.zoom.min || 1);
+          }
+        }
+      } catch (err) {
         logger.error('Failed to start QR scanner:', err);
-      });
+      }
     }, 300);
   };
 
+  const handleZoomChange = async (val: number) => {
+    setZoomValue(val);
+    if (activeTrack) {
+      try {
+        await activeTrack.applyConstraints({
+          advanced: [{ zoom: val }]
+        } as any);
+      } catch (err) {
+        logger.error('Failed to apply zoom constraints:', err);
+      }
+    }
+  };
+
   const stopScanner = () => {
+    setActiveTrack(null);
+    setZoomRange(null);
     if (scannerRef.current) {
       scannerRef.current.stop().then(() => {
         scannerRef.current = null;
@@ -480,6 +549,24 @@ export default function StudentDashboard() {
             <div className="w-full aspect-square bg-black border border-neutral-900 rounded-2xl overflow-hidden flex items-center justify-center relative shadow-inner">
               <div id="qr-reader" className="w-full h-full object-cover"></div>
             </div>
+
+            {zoomRange && (
+              <div className="mt-4 space-y-1.5 px-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="flex justify-between text-[10px] font-bold text-slate-500 dark:text-neutral-500 uppercase tracking-widest leading-none">
+                  <span>Zoom: {zoomValue.toFixed(1)}x</span>
+                  <span>Maks: {zoomRange.max.toFixed(1)}x</span>
+                </div>
+                <input
+                  type="range"
+                  min={zoomRange.min}
+                  max={zoomRange.max}
+                  step={zoomRange.step}
+                  value={zoomValue}
+                  onChange={(e) => handleZoomChange(Number(e.target.value))}
+                  className="w-full h-1.5 bg-slate-200 dark:bg-neutral-850 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                />
+              </div>
+            )}
 
             <div className="mt-6 flex justify-center">
               <button
