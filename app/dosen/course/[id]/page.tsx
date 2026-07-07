@@ -203,6 +203,70 @@ export default function LecturerCoursePortal() {
     }
   }, [courseId]);
 
+  // Real-time tracking of active QR session (expired / limit reached / revoked)
+  useEffect(() => {
+    if (!joinQr) return;
+
+    // 1. Timer countdown untuk memantau waktu expired
+    const checkExpiryInterval = setInterval(() => {
+      const isExpired = new Date(joinQr.expiresAt).getTime() <= Date.now();
+      if (isExpired) {
+        clearInterval(checkExpiryInterval);
+        toast.info('QR Kadaluarsa', 'Waktu berlaku QR join kelas telah habis.');
+        setJoinQr(null);
+        setShowJoinQrModal(false);
+      }
+    }, 1000);
+
+    // 2. Supabase Realtime Subscription untuk memantau limit scan / revoked dari db
+    const channel = supabase
+      .channel(`active_qr_session_${joinQr.sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'class_join_sessions',
+          filter: `id=eq.${joinQr.sessionId}`
+        },
+        (payload: any) => {
+          const updatedSession = payload.new;
+          if (updatedSession) {
+            // Jika status revoked berubah menjadi true
+            if (updatedSession.revoked) {
+              toast.info('QR Dicabut', 'Sesi QR join kelas telah dinonaktifkan.');
+              setJoinQr(null);
+              setShowJoinQrModal(false);
+              return;
+            }
+            
+            // Jika limit scan tercapai
+            const maxUses = updatedSession.max_uses;
+            const currentUses = updatedSession.current_uses;
+            if (maxUses !== null && currentUses >= maxUses) {
+              toast.info('Limit Tercapai', 'Kuota maksimal scan QR join kelas telah terpenuhi.');
+              
+              // Panggil RPC revoke untuk mengamankan data
+              supabase.rpc('revoke_class_join_session', {
+                p_join_session_id: joinQr.sessionId
+              }).then(({ error: rpcErr }) => {
+                if (rpcErr) logger.error("Auto-revoke failed:", rpcErr);
+              });
+
+              setJoinQr(null);
+              setShowJoinQrModal(false);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(checkExpiryInterval);
+      supabase.removeChannel(channel);
+    };
+  }, [joinQr, toast]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -333,8 +397,15 @@ export default function LecturerCoursePortal() {
     if (isCreatingJoinQr) return;
     setIsCreatingJoinQr(true);
 
+    const durationNum = Number(joinDurationMinutes);
+    if (isNaN(durationNum) || durationNum < 5) {
+      toast.error('Validasi Gagal', 'Durasi minimal QR join kelas adalah 5 menit.');
+      setIsCreatingJoinQr(false);
+      return;
+    }
+
     try {
-      const duration = Math.min(Math.max(Number(joinDurationMinutes) || 30, 5), 24 * 60);
+      const duration = Math.min(durationNum, 24 * 60);
       const parsedMaxUses = Number(joinMaxUses);
       const maxUses = Number.isFinite(parsedMaxUses) && parsedMaxUses > 0
         ? Math.min(Math.floor(parsedMaxUses), 500)
