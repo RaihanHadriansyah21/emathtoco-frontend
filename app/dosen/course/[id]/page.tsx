@@ -83,6 +83,7 @@ export default function LecturerCoursePortal() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showJoinQrModal, setShowJoinQrModal] = useState(false);
   const [joinQr, setJoinQr] = useState<JoinQrState | null>(null);
+  const [isLoadingJoinQr, setIsLoadingJoinQr] = useState(false);
   const [joinDurationMinutes, setJoinDurationMinutes] = useState('30');
   const [joinMaxUses, setJoinMaxUses] = useState('60');
   const [isCreatingJoinQr, setIsCreatingJoinQr] = useState(false);
@@ -161,6 +162,47 @@ export default function LecturerCoursePortal() {
     }
   }, [courseId]);
 
+  // Load active QR join session from database so it persists across modal close/reopen
+  const loadActiveJoinSession = useCallback(async () => {
+    setIsLoadingJoinQr(true);
+    try {
+      const { data: sessions, error } = await supabase
+        .from('class_join_sessions')
+        .select('id, token_raw, expires_at, max_uses, current_uses')
+        .eq('course_id', courseId)
+        .eq('revoked', false)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (sessions && sessions.length > 0) {
+        const session = sessions[0];
+        if (session.token_raw) {
+          const link = `${window.location.origin}/join-class?token=${encodeURIComponent(session.token_raw)}`;
+          const qrDataUrl = await QRCode.toDataURL(link, {
+            width: 300,
+            margin: 2,
+            color: { dark: '#020617', light: '#ffffff' },
+          });
+          setJoinQr({
+            sessionId: session.id,
+            token: session.token_raw,
+            link,
+            qrDataUrl,
+            expiresAt: session.expires_at,
+            maxUses: session.max_uses,
+          });
+        }
+      }
+    } catch (err) {
+      logger.error('Failed to load active join session:', err);
+    } finally {
+      setIsLoadingJoinQr(false);
+    }
+  }, [courseId]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -221,7 +263,8 @@ export default function LecturerCoursePortal() {
                 : "Gagal memuat statistik mahasiswa.";
               toast.error("Gagal", userFriendlyMsg);
             }),
-          fetchSubmissions()
+          fetchSubmissions(),
+          loadActiveJoinSession()
         ]);
       } catch (err) {
         logger.error('Dosen verification error:', err);
@@ -231,7 +274,7 @@ export default function LecturerCoursePortal() {
       }
     };
     verifyAccess();
-  }, [user, courseId, fetchSubmissions, toast]);
+  }, [user, courseId, fetchSubmissions, loadActiveJoinSession, toast]);
  
   // Polling logic when any submission is 'processing' (BUG 2 fix)
   useEffect(() => {
@@ -306,6 +349,7 @@ export default function LecturerCoursePortal() {
         p_token_hash: tokenHash,
         p_expires_at: expiresAt,
         p_max_uses: maxUses,
+        p_token_raw: token,
       });
 
       if (error) throw error;
@@ -613,7 +657,12 @@ export default function LecturerCoursePortal() {
 
               <div className="flex items-center justify-center">
                 <div className="w-full aspect-square max-w-[220px] rounded-3xl border border-slate-200 dark:border-neutral-900 bg-white p-4 flex items-center justify-center">
-                  {joinQr ? (
+                  {isLoadingJoinQr ? (
+                    <div className="text-center text-slate-400 dark:text-neutral-500 space-y-2">
+                      <Loader2 className="w-10 h-10 mx-auto animate-spin text-cyan-500" />
+                      <p className="text-xs font-semibold">Memuat QR aktif...</p>
+                    </div>
+                  ) : joinQr ? (
                     <img src={joinQr.qrDataUrl} alt="QR join kelas" className="w-full h-full object-contain" />
                   ) : (
                     <div className="text-center text-slate-400 dark:text-neutral-600 space-y-2">

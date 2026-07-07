@@ -4,12 +4,13 @@ import { logger } from '@/lib/logger';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, QrCode, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import Navbar from './components/Navbar';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
 import PageTransition from '@/components/ui/PageTransition';
 import { GlassCard } from '@/components/ui/card';
+import { sha256Hex } from '@/lib/join-token';
 
 import { useAuth } from './components/AuthGate';
 import BackendStatusBanner from './components/BackendStatusBanner';
@@ -42,6 +43,12 @@ export default function StudentDashboard() {
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
   const [courseError, setCourseError] = useState<string | null>(null);
   const [reuploadWarnings, setReuploadWarnings] = useState<Record<string, { count: number; firstSlot: string }>>({});
+
+  // Join Kelas state
+  const [tokenInput, setTokenInput] = useState('');
+  const [joinStatus, setJoinStatus] = useState<'idle' | 'joining' | 'success' | 'error'>('idle');
+  const [joinMessage, setJoinMessage] = useState('');
+  const [joinedCourseId, setJoinedCourseId] = useState<string | null>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -163,6 +170,102 @@ export default function StudentDashboard() {
           <div className="mb-10">
             <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Selamat Datang Kembali!</h1>
             <p className="text-slate-500 dark:text-neutral-400 mt-2">Silakan pilih mata kuliah di bawah ini untuk memulai pengumpulan lembar jawaban tugas.</p>
+          </div>
+
+          {/* JOIN KELAS SECTION */}
+          <div className="mb-8">
+            <div className="bg-white/95 dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl p-5 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
+                  <QrCode className="w-5 h-5 text-cyan-500" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold tracking-widest text-slate-800 dark:text-white uppercase">Join Kelas</h2>
+                  <p className="text-xs text-slate-500 dark:text-neutral-500">Tempelkan link QR atau token dari dosen</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="text"
+                  placeholder="Tempelkan link QR atau token di sini..."
+                  value={tokenInput}
+                  onChange={(e) => {
+                    setTokenInput(e.target.value);
+                    if (joinStatus !== 'idle') {
+                      setJoinStatus('idle');
+                      setJoinMessage('');
+                    }
+                  }}
+                  disabled={joinStatus === 'joining'}
+                  className="flex-1 bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-white focus:outline-none focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/10 transition-all placeholder:text-slate-400 dark:placeholder:text-neutral-600 disabled:opacity-50"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!tokenInput.trim() || joinStatus === 'joining') return;
+                    setJoinStatus('joining');
+                    setJoinMessage('Menghubungkan ke kelas...');
+                    try {
+                      // Extract token from URL or use raw token
+                      let token = tokenInput.trim();
+                      try {
+                        const url = new URL(token);
+                        const urlToken = url.searchParams.get('token');
+                        if (urlToken) token = urlToken;
+                      } catch {
+                        // Not a URL — use as raw token
+                      }
+
+                      const tokenHash = await sha256Hex(token);
+                      const { data, error } = await supabase.rpc('join_class_with_token', {
+                        p_token_hash: tokenHash,
+                      });
+                      if (error) throw error;
+
+                      const result = data as { success: boolean; course_id?: string };
+                      setJoinedCourseId(result.course_id ?? null);
+                      setJoinStatus('success');
+                      setJoinMessage('Berhasil masuk ke kelas!');
+                      setTokenInput('');
+
+                      // Reload courses after 1.5s
+                      setTimeout(() => {
+                        window.location.reload();
+                      }, 1500);
+                    } catch (err) {
+                      logger.error('Failed to join class:', err);
+                      setJoinStatus('error');
+                      setJoinMessage('QR tidak valid, sudah kadaluarsa, atau limit scan habis.');
+                    }
+                  }}
+                  disabled={!tokenInput.trim() || joinStatus === 'joining'}
+                  className="flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-5 py-3 rounded-xl text-xs font-extrabold tracking-wider transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  {joinStatus === 'joining' ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <QrCode className="w-4 h-4" />
+                  )}
+                  <span>{joinStatus === 'joining' ? 'BERGABUNG...' : 'JOIN'}</span>
+                </button>
+              </div>
+
+              {joinMessage && (
+                <div className={`flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl ${
+                  joinStatus === 'success'
+                    ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                    : joinStatus === 'error'
+                      ? 'bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400'
+                      : 'bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-400'
+                }`}>
+                  {joinStatus === 'success' && <CheckCircle className="w-3.5 h-3.5" />}
+                  {joinStatus === 'error' && <AlertTriangle className="w-3.5 h-3.5" />}
+                  {joinStatus === 'joining' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {joinMessage}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-4">
