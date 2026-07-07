@@ -212,6 +212,38 @@ export default function AuditLogPage() {
   // Badge Status Categorization — setiap action memiliki warna berbeda
   const getActionTheme = (action: string) => {
     const act = (action || '').toUpperCase();
+
+    // SYSTEM RESET — Red (Bahaya!)
+    if (act === 'SYSTEM_RESET') {
+      return {
+        badge: 'text-red-500 bg-red-500/10 border-red-500/20 dark:text-red-400 dark:bg-red-400/10 dark:border-red-400/20 font-bold',
+        text: 'danger'
+      };
+    }
+
+    // AI FAILED — Rose/Red (Gagal / Bahaya)
+    if (act === 'AI_PROCESS_FAILED') {
+      return {
+        badge: 'text-rose-500 bg-rose-500/10 border-rose-500/20 dark:text-rose-400 dark:bg-rose-400/10 dark:border-rose-400/20',
+        text: 'danger'
+      };
+    }
+
+    // STUDENT REMOVED FROM COURSE — Red (Bahaya / Menghapus data)
+    if (act === 'STUDENT_REMOVED_FROM_COURSE') {
+      return {
+        badge: 'text-red-500 bg-red-500/10 border-red-500/20 dark:text-red-450 dark:bg-red-400/10 dark:border-red-400/20 font-bold',
+        text: 'danger'
+      };
+    }
+
+    // ANSWER DELETED — Red (Bahaya / Menghapus data)
+    if (act === 'ANSWER_DELETED' || act === 'ANSWER_DELETED_BY_LECTURER') {
+      return {
+        badge: 'text-rose-500 bg-rose-500/10 border-rose-500/20 dark:text-rose-400 dark:bg-rose-400/10 dark:border-rose-400/20 font-bold',
+        text: 'danger'
+      };
+    }
     
     // LOGIN — Indigo (Admin)
     if (act === 'ADMIN_LOGIN') {
@@ -253,26 +285,18 @@ export default function AuditLogPage() {
       };
     }
     
-    // AI FAILED — Rose
-    if (act === 'AI_PROCESS_FAILED') {
-      return {
-        badge: 'text-rose-500 bg-rose-500/10 border-rose-500/20 dark:text-rose-400 dark:bg-rose-400/10 dark:border-rose-400/20',
-        text: 'danger'
-      };
-    }
-    
-    // SYSTEM RESET — Red
-    if (act === 'SYSTEM_RESET') {
-      return {
-        badge: 'text-red-500 bg-red-500/10 border-red-500/20 dark:text-red-400 dark:bg-red-400/10 dark:border-red-400/20',
-        text: 'danger'
-      };
-    }
-    
-    // FINALISASI / FINAL SCORE — Emerald (aligned with success color token)
+    // FINALISASI / FINAL SCORE — Emerald (success)
     if (act === 'FINAL_SCORE_SUBMITTED') {
       return {
         badge: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20 dark:text-emerald-400 dark:bg-emerald-400/10 dark:border-emerald-400/20',
+        text: 'success'
+      };
+    }
+
+    // QR JOIN CREATED — Emerald (Hijau aman)
+    if (act === 'QR_JOIN_CREATED') {
+      return {
+        badge: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20 dark:text-emerald-450 dark:bg-emerald-400/10 dark:border-emerald-400/20',
         text: 'success'
       };
     }
@@ -280,7 +304,15 @@ export default function AuditLogPage() {
     // SUBMISSION — Sky
     if (act === 'SUBMISSION_SUBMITTED' || act === 'ANSWER_UPLOADED') {
       return {
-        badge: 'text-sky-500 bg-sky-500/10 border-sky-500/20 dark:text-sky-400 dark:bg-sky-400/10 dark:border-sky-400/20',
+        badge: 'text-sky-500 bg-sky-500/10 border-sky-500/20 dark:text-sky-450 dark:bg-sky-400/10 dark:border-sky-400/20',
+        text: 'info'
+      };
+    }
+
+    // QR JOIN USED — Cyan
+    if (act === 'QR_JOIN_USED') {
+      return {
+        badge: 'text-cyan-500 bg-cyan-500/10 border-cyan-500/20 dark:text-cyan-400 dark:bg-cyan-400/10 dark:border-cyan-400/20',
         text: 'info'
       };
     }
@@ -289,6 +321,14 @@ export default function AuditLogPage() {
     if (act === 'REUPLOAD_REQUESTED' || act === 'ANSWER_REPLACED') {
       return {
         badge: 'text-amber-500 bg-amber-500/10 border-amber-500/20 dark:text-amber-400 dark:bg-amber-400/10 dark:border-amber-400/20',
+        text: 'warning'
+      };
+    }
+
+    // QR JOIN REVOKED — Amber / Yellow
+    if (act === 'QR_JOIN_REVOKED') {
+      return {
+        badge: 'text-amber-650 bg-amber-500/10 border-amber-500/20 dark:text-amber-450 dark:bg-amber-400/10 dark:border-amber-400/20',
         text: 'warning'
       };
     }
@@ -301,16 +341,8 @@ export default function AuditLogPage() {
       };
     }
     
-    // DELETE — Pink
-    if (act === 'ANSWER_DELETED') {
-      return {
-        badge: 'text-pink-500 bg-pink-500/10 border-pink-500/20 dark:text-pink-400 dark:bg-pink-400/10 dark:border-pink-400/20',
-        text: 'danger'
-      };
-    }
-    
     // MODEL CHANGED / SETTINGS — Orange
-    if (act === 'MODEL_CHANGED' || act === 'AI_MODEL_SELECTED' || act === 'SYSTEM_SETTING_CHANGED') {
+    if (act === 'MODEL_CHANGED' || act === 'AI_MODEL_SELECTED' || act === 'SYSTEM_SETTING_CHANGED' || act === 'ACTIVE_MODEL_CHANGED') {
       return {
         badge: 'text-orange-500 bg-orange-500/10 border-orange-500/20 dark:text-orange-400 dark:bg-orange-400/10 dark:border-orange-400/20',
         text: 'config'

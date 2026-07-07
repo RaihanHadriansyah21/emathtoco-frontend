@@ -52,7 +52,22 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     if (loading) return;
-    if (!user || normalizeRole(user.role) !== 'mahasiswa') {
+    
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+
+    const role = normalizeRole(user.role);
+    if (role === 'admin') {
+      router.replace('/admin');
+      return;
+    }
+    if (role === 'dosen') {
+      router.replace('/dosen');
+      return;
+    }
+    if (role !== 'mahasiswa') {
       setIsLoadingCourses(false);
       return;
     }
