@@ -889,6 +889,19 @@ export default function LecturerStudentRoster() {
                     )}
                 </AnimatePresence>
             </main>
+
+            {/* Modal Konfirmasi Hapus Mahasiswa yang Elegan */}
+            <ConfirmModal
+                isOpen={showConfirmDeleteModal}
+                onClose={() => setShowConfirmDeleteModal(false)}
+                onConfirm={handleRemoveStudentFromCourse}
+                title="Hapus Mahasiswa dari Kelas"
+                message={`Apakah Anda yakin ingin mengeluarkan ${selectedStudent?.nama_lengkap || 'mahasiswa'} dari kelas ini? Seluruh data pengumpulan tugas/submission mahasiswa ini di mata kuliah ini juga akan dihapus secara permanen agar demo dapat diulang.`}
+                confirmLabel="Hapus Permanen"
+                cancelLabel="Batal"
+                variant="danger"
+                isLoading={isRemovingStudent}
+            />
         </div>
         </PageTransition>
     );
