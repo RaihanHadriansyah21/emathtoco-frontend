@@ -215,9 +215,16 @@ export default function BatchAIModal({
       if (!res.ok) {
         let errMsg = 'Terjadi kesalahan koneksi ke server.';
         try {
-          const errJson = await res.json();
-          if (errJson && errJson.detail) errMsg = errJson.detail;
-        } catch {}
+          const errJson = await res.json() as { detail?: unknown };
+          const detail = errJson?.detail;
+          if (Array.isArray(detail)) {
+            // FastAPI 422: detail is [{type, loc, msg, input, ctx}, ...]
+            const first = detail[0] as Record<string, unknown> | undefined;
+            errMsg = typeof first?.msg === 'string' ? first.msg : `Validasi gagal (${res.status})`;
+          } else if (typeof detail === 'string') {
+            errMsg = detail;
+          }
+        } catch { /* ignore parse errors */ }
         onToast('error', 'Gagal Memulai Batch', errMsg);
         setIsStarting(false);
         return;
