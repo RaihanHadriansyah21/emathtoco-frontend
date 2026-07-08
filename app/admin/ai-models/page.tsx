@@ -196,6 +196,13 @@ export default function AIModelInventoryPage() {
 
       // Aggregate by model
       const map = new Map<string, { count: number; scores: number[]; finalized: number }>();
+      
+      // Initialize supported AI models to ensure they always display
+      const supportedModels = ['MobileNetV2', 'DenseNet121', 'InceptionV3'];
+      supportedModels.forEach(modelName => {
+        map.set(modelName, { count: 0, scores: [], finalized: 0 });
+      });
+
       (data || []).forEach(sub => {
         const name = sub.model_ai || 'Belum Diproses';
         const entry = map.get(name) || { count: 0, scores: [], finalized: 0 };
@@ -205,12 +212,17 @@ export default function AIModelInventoryPage() {
         map.set(name, entry);
       });
 
-      const stats: ModelStat[] = Array.from(map.entries()).map(([name, entry]) => ({
-        model_name: name,
-        count: entry.count,
-        avg_score: entry.scores.length > 0 ? Math.round((entry.scores.reduce((a, b) => a + b, 0) / entry.scores.length) * 100) / 100 : null,
-        finalized_count: entry.finalized,
-      })).sort((a, b) => b.count - a.count);
+      const stats: ModelStat[] = Array.from(map.entries())
+        .map(([name, entry]) => ({
+          model_name: name,
+          count: entry.count,
+          avg_score: entry.scores.length > 0 ? Math.round((entry.scores.reduce((a, b) => a + b, 0) / entry.scores.length) * 100) / 100 : null,
+          finalized_count: entry.finalized,
+        }))
+        .sort((a, b) => {
+          if (b.count !== a.count) return b.count - a.count;
+          return a.model_name.localeCompare(b.model_name);
+        });
 
       setModels(stats);
     } catch (err) {
