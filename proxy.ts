@@ -1,14 +1,15 @@
-import { createServerClient } from '@supabase/ssr';
-import { NextResponse, type NextRequest } from 'next/server';
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
 
-import { publicEnv } from '@/lib/env';
-import { buildContentSecurityPolicy } from '@/lib/security/csp';
+import { publicEnv } from "@/lib/env";
+import { buildContentSecurityPolicy } from "@/lib/security/csp";
 
 const publicPrefixes = [
-  '/login',
-  '/forgot-password',
-  '/reset-password',
-  '/register',
+  "/login",
+  "/forgot-password",
+  "/reset-password",
+  "/register",
+  "/join-class",
 ];
 
 function createNonce(): string {
@@ -21,11 +22,11 @@ export async function proxy(request: NextRequest) {
     nonce,
     supabaseUrl: publicEnv.supabaseUrl,
     apiUrl: publicEnv.apiUrl,
-    production: process.env.NODE_ENV === 'production',
+    production: process.env.NODE_ENV === "production",
   });
   const requestHeaders = new Headers(request.headers);
-  requestHeaders.set('x-nonce', nonce);
-  requestHeaders.set('Content-Security-Policy', csp);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("Content-Security-Policy", csp);
 
   let response = NextResponse.next({
     request: { headers: requestHeaders },
@@ -56,22 +57,22 @@ export async function proxy(request: NextRequest) {
 
   const { data, error } = await supabase.auth.getClaims();
   const isPublic = publicPrefixes.some((prefix) =>
-    request.nextUrl.pathname.startsWith(prefix)
+    request.nextUrl.pathname.startsWith(prefix),
   );
 
   if ((error || !data?.claims?.sub) && !isPublic) {
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = '/login';
-    redirectUrl.search = '';
+    redirectUrl.pathname = "/login";
+    redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
   }
 
-  response.headers.set('Content-Security-Policy', csp);
+  response.headers.set("Content-Security-Policy", csp);
   return response;
 }
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2)$).*)',
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2)$).*)",
   ],
 };

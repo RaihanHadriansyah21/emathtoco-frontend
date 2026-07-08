@@ -57,6 +57,14 @@ interface JoinQrState {
   maxUses: number | null;
 }
 
+interface ClassJoinSessionUpdatePayload {
+  new: {
+    revoked?: boolean;
+    max_uses: number | null;
+    current_uses: number | null;
+  };
+}
+
 export default function LecturerCoursePortal() {
   const router = useRouter();
   const params = useParams();
@@ -229,7 +237,7 @@ export default function LecturerCoursePortal() {
           table: 'class_join_sessions',
           filter: `id=eq.${joinQr.sessionId}`
         },
-        (payload: any) => {
+        (payload: ClassJoinSessionUpdatePayload) => {
           const updatedSession = payload.new;
           if (updatedSession) {
             // Jika status revoked berubah menjadi true
@@ -242,7 +250,7 @@ export default function LecturerCoursePortal() {
             
             // Jika limit scan tercapai
             const maxUses = updatedSession.max_uses;
-            const currentUses = updatedSession.current_uses;
+            const currentUses = updatedSession.current_uses ?? 0;
             if (maxUses !== null && currentUses >= maxUses) {
               toast.info('Limit Tercapai', 'Kuota maksimal scan QR join kelas telah terpenuhi.');
               

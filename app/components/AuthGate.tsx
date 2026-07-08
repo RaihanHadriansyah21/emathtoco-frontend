@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   createContext,
@@ -7,12 +7,13 @@ import {
   useEffect,
   useMemo,
   useState,
-} from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+} from "react";
+import { usePathname, useRouter } from "next/navigation";
 
-import { supabase } from '@/lib/supabase';
-import { normalizeRole } from '@/lib/utils';
-import FullscreenLoader from './FullscreenLoader';
+import { supabase } from "@/lib/supabase";
+import { logger } from "@/lib/logger";
+import { normalizeRole } from "@/lib/utils";
+import FullscreenLoader from "./FullscreenLoader";
 
 export interface UserProfile {
   id: string;
@@ -35,10 +36,11 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 const publicPrefixes = [
-  '/login',
-  '/forgot-password',
-  '/reset-password',
-  '/register',
+  "/login",
+  "/forgot-password",
+  "/reset-password",
+  "/register",
+  "/join-class",
 ];
 const AUTH_CHECK_TIMEOUT_MS = 3000;
 
@@ -47,7 +49,7 @@ async function getCurrentUserWithTimeout() {
     supabase.auth.getUser(),
     new Promise<never>((_, reject) => {
       window.setTimeout(
-        () => reject(new Error('AUTH_CHECK_TIMEOUT')),
+        () => reject(new Error("AUTH_CHECK_TIMEOUT")),
         AUTH_CHECK_TIMEOUT_MS,
       );
     }),
@@ -72,9 +74,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       }
 
       const { data: profile, error: profileError } = await supabase
-        .from('profil_pengguna')
-        .select('nama_lengkap, role, foto_profil_url')
-        .eq('id', data.user.id)
+        .from("profil_pengguna")
+        .select("nama_lengkap, role, foto_profil_url")
+        .eq("id", data.user.id)
         .maybeSingle();
 
       if (profileError) {
@@ -83,12 +85,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
       setUser({
         id: data.user.id,
-        email: data.user.email ?? '',
-        nama_lengkap: profile?.nama_lengkap ?? 'User',
-        role: normalizeRole(profile?.role ?? 'mahasiswa'),
+        email: data.user.email ?? "",
+        nama_lengkap: profile?.nama_lengkap ?? "User",
+        role: normalizeRole(profile?.role ?? "mahasiswa"),
         foto_profil_url: profile?.foto_profil_url ?? null,
       });
-    } catch {
+    } catch (error) {
+      logger.warn("AuthGate refresh failed; clearing local user state.", error);
       setUser(null);
     } finally {
       setLoading(false);
@@ -101,21 +104,21 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT') {
+      if (event === "SIGNED_OUT") {
         setUser(null);
         setLoading(false);
         if (!publicPrefixes.some((prefix) => pathname.startsWith(prefix))) {
-          router.replace('/login');
+          router.replace("/login");
         }
         return;
       }
 
-      if (event === 'PASSWORD_RECOVERY') {
-        router.replace('/reset-password');
+      if (event === "PASSWORD_RECOVERY") {
+        router.replace("/reset-password");
         return;
       }
 
-      if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+      if (event === "SIGNED_IN" || event === "USER_UPDATED") {
         void refresh();
       }
     });
@@ -133,8 +136,6 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={context}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={context}>{children}</AuthContext.Provider>
   );
 }

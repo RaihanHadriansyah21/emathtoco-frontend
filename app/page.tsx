@@ -24,6 +24,36 @@ interface MataKuliah {
   created_at?: string;
 }
 
+type CameraDevice = {
+  id: string;
+  label: string;
+};
+
+type QrCameraConfig = string | MediaTrackConstraints;
+
+type Html5QrcodeScanner = {
+  start: (
+    cameraConfig: QrCameraConfig,
+    config: { fps: number; qrbox: { width: number; height: number } },
+    qrCodeSuccessCallback: (decodedText: string) => void | Promise<void>,
+    qrCodeErrorCallback?: () => void,
+  ) => Promise<unknown>;
+  stop: () => Promise<unknown>;
+  getActiveTrack?: () => MediaStreamTrack | null;
+};
+
+type ZoomCapabilities = MediaTrackCapabilities & {
+  zoom?: {
+    min?: number;
+    max?: number;
+    step?: number;
+  };
+};
+
+type ZoomConstraint = MediaTrackConstraintSet & {
+  zoom: number;
+};
+
 const iconMap: Record<string, string> = {
   security: "🔒",
   compress: "🗜️",
@@ -48,7 +78,6 @@ export default function StudentDashboard() {
   const [tokenInput, setTokenInput] = useState('');
   const [joinStatus, setJoinStatus] = useState<'idle' | 'joining' | 'success' | 'error'>('idle');
   const [joinMessage, setJoinMessage] = useState('');
-  const [joinedCourseId, setJoinedCourseId] = useState<string | null>(null);
 
   // Device & Camera state
   const [isMobile, setIsMobile] = useState(false);
@@ -56,9 +85,9 @@ export default function StudentDashboard() {
   const [zoomRange, setZoomRange] = useState<{ min: number; max: number; step: number } | null>(null);
   const [zoomValue, setZoomValue] = useState<number>(1);
   const [activeTrack, setActiveTrack] = useState<MediaStreamTrack | null>(null);
-  const [availableCameras, setAvailableCameras] = useState<any[]>([]);
+  const [availableCameras, setAvailableCameras] = useState<CameraDevice[]>([]);
   const [currentCameraIndex, setCurrentCameraIndex] = useState<number>(0);
-  const scannerRef = useRef<any>(null);
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
   // Deteksi device mobile/handphone responsif
   useEffect(() => {
@@ -93,8 +122,10 @@ export default function StudentDashboard() {
       });
       if (error) throw error;
 
-      const result = data as { success: boolean; course_id?: string };
-      setJoinedCourseId(result.course_id ?? null);
+      const result = data as { success?: boolean };
+      if (result.success === false) {
+        throw new Error('JOIN_CLASS_FAILED');
+      }
       setJoinStatus('success');
       setJoinMessage('Berhasil masuk ke kelas!');
       setTokenInput('');
@@ -123,19 +154,19 @@ export default function StudentDashboard() {
     // Inisialisasi scanner secara dinamis setelah div dirender
     setTimeout(async () => {
       try {
-        const { Html5Qrcode } = require('html5-qrcode');
+        const { Html5Qrcode } = await import('html5-qrcode');
         const html5QrCode = new Html5Qrcode('qr-reader');
         scannerRef.current = html5QrCode;
 
         // Ambil daftar kamera untuk mencari kamera belakang utama (1x)
-        const cameras = await Html5Qrcode.getCameras();
-        let targetCameraId = { facingMode: 'environment' } as any;
+        const cameras = (await Html5Qrcode.getCameras()) as CameraDevice[];
+        let targetCameraId: QrCameraConfig = { facingMode: 'environment' };
 
         if (cameras && cameras.length > 0) {
           setAvailableCameras(cameras);
           
           // Cari kamera belakang
-          const backCameras = cameras.filter((c: any) => {
+          const backCameras = cameras.filter((c) => {
             const label = c.label.toLowerCase();
             return label.includes('back') || label.includes('rear') || label.includes('environment');
           });
@@ -143,7 +174,7 @@ export default function StudentDashboard() {
           let initialCamera = cameras[0];
           if (backCameras.length > 0) {
             // Cari kamera belakang utama (1x) dengan mengabaikan ultra-wide/wide/0.5x/zoom/macro
-            const mainCamera = backCameras.find((c: any) => {
+            const mainCamera = backCameras.find((c) => {
               const label = c.label.toLowerCase();
               return !label.includes('ultra') && 
                      !label.includes('wide') && 
@@ -155,7 +186,7 @@ export default function StudentDashboard() {
             initialCamera = mainCamera || backCameras[0];
           }
 
-          const index = cameras.findIndex((c: any) => c.id === initialCamera.id);
+          const index = cameras.findIndex((c) => c.id === initialCamera.id);
           setCurrentCameraIndex(index !== -1 ? index : 0);
           targetCameraId = initialCamera.id;
         }
@@ -167,7 +198,7 @@ export default function StudentDashboard() {
     }, 300);
   };
 
-  const startQrWithDevice = async (html5QrCode: any, deviceId: any) => {
+  const startQrWithDevice = async (html5QrCode: Html5QrcodeScanner, deviceId: QrCameraConfig) => {
     try {
       await html5QrCode.start(
         deviceId,
@@ -187,17 +218,18 @@ export default function StudentDashboard() {
       );
 
       // Cari active track untuk konfigurasi zoom
-      const track = html5QrCode.getActiveTrack();
+      const track = html5QrCode.getActiveTrack?.() ?? null;
       if (track) {
         setActiveTrack(track);
-        const capabilities = track.getCapabilities();
-        if (capabilities.zoom) {
+        const capabilities = track.getCapabilities() as ZoomCapabilities;
+        const zoom = capabilities.zoom;
+        if (zoom) {
           setZoomRange({
-            min: capabilities.zoom.min || 1,
-            max: capabilities.zoom.max || 10,
-            step: capabilities.zoom.step || 0.1
+            min: zoom.min || 1,
+            max: zoom.max || 10,
+            step: zoom.step || 0.1
           });
-          setZoomValue(capabilities.zoom.min || 1);
+          setZoomValue(zoom.min || 1);
         } else {
           setZoomRange(null);
         }
@@ -229,8 +261,8 @@ export default function StudentDashboard() {
     if (activeTrack) {
       try {
         await activeTrack.applyConstraints({
-          advanced: [{ zoom: val }]
-        } as any);
+          advanced: [{ zoom: val } as ZoomConstraint]
+        });
       } catch (err) {
         logger.error('Failed to apply zoom constraints:', err);
       }
@@ -246,7 +278,7 @@ export default function StudentDashboard() {
       scannerRef.current.stop().then(() => {
         scannerRef.current = null;
         setShowScanner(false);
-      }).catch((err: any) => {
+      }).catch((err: unknown) => {
         logger.error('Failed to stop QR scanner:', err);
         setShowScanner(false);
       });
@@ -370,7 +402,7 @@ export default function StudentDashboard() {
       }
     };
     getDashboardData();
-  }, [user, loading]);
+  }, [user, loading, router]);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans relative overflow-hidden">

@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# E-MATHTOCO Frontend
 
-## Getting Started
+Frontend web E-MATHTOCO memakai Next.js 16, TypeScript, Tailwind CSS, Supabase SSR/client, dan integrasi FastAPI backend.
 
-First, run the development server:
+## Lokasi penting
 
-```bash
+- App: `D:\PTA\Emathtoco_Project\Emathtoco_FrontEnd\Emathtoco_Web`
+- Dokumentasi utama: `D:\PTA\Emathtoco_Project\Emathtoco_AgentDocs`
+- Backend: `D:\PTA\Emathtoco_Project\Emathoco_BackEnd`
+- Supabase utama: `https://hkxxhactpwiqdzecrbxw.supabase.co`
+
+## Perintah lokal
+
+```powershell
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Validasi sebelum push:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```powershell
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment utama
 
-## Learn More
+Minimal `.env.local`:
 
-To learn more about Next.js, take a look at the following resources:
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://hkxxhactpwiqdzecrbxw.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable-key>
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Untuk uji Vercel + backend lokal, `NEXT_PUBLIC_API_URL` dapat diarahkan ke URL HTTPS ngrok aktif. Untuk VPS, gunakan domain Caddy `https://api.<VPS-IP-dashed>.sslip.io`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Catatan arsitektur
 
-## Deploy on Vercel
+- Auth memakai Supabase SSR dan `proxy.ts`, bukan cookie manual `sb-access-token`.
+- UI mahasiswa tetap upload 24 section.
+- Review dosen menampilkan jawaban mahasiswa dan Soal (section) privat.
+- Prediksi AI dipicu ke FastAPI, lalu diproses Redis/RQ worker.
+- Jangan simpan service-role key di frontend.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Mulai baca dokumentasi dari `Emathtoco_AgentDocs/Brain/INDEX.md` sebelum mengubah flow besar.

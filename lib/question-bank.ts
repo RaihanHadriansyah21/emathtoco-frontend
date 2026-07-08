@@ -1,7 +1,11 @@
-import { supabase } from '@/lib/supabase';
-import { SECTION_CODES, type SectionCode, getMaxScoreForSection } from '@/lib/domain-contract';
+import { supabase } from "@/lib/supabase";
+import {
+  SECTION_CODES,
+  type SectionCode,
+  getMaxScoreForSection,
+} from "@/lib/domain-contract";
 
-export type QuestionSetStatus = 'draft' | 'published' | 'archived';
+export type QuestionSetStatus = "draft" | "published" | "archived";
 
 export interface QuestionAsset {
   id: string;
@@ -38,7 +42,7 @@ export interface QuestionSet {
   academic_year: string | null;
   semester: string | null;
   status: QuestionSetStatus;
-  format_version: 'fixed_4x6_v1';
+  format_version: "fixed_4x6_v1";
   published_at: string | null;
   updated_at: string;
   sections: QuestionSection[];
@@ -49,11 +53,11 @@ export interface ImageDimensions {
   height: number;
 }
 
-type QuestionSetRow = Omit<QuestionSet, 'sections'>;
-type QuestionSectionRow = Omit<QuestionSection, 'assets'>;
+type QuestionSetRow = Omit<QuestionSet, "sections">;
+type QuestionSectionRow = Omit<QuestionSection, "assets">;
 
 export const FIXED_SECTION_LABEL =
-  'Untuk demo sidang, format soal dikunci 4 soal × 6 bagian. Format jumlah soal lain tersedia pada pengembangan berikutnya.';
+  "Untuk demo sidang, format soal dikunci 4 soal × 6 bagian. Format jumlah soal lain tersedia pada pengembangan berikutnya.";
 
 export const SECTION_META = SECTION_CODES.map((sectionCode, index) => {
   const [, numberText, partLabel] = sectionCode.match(/^S-(\d)([A-F])$/) ?? [];
@@ -67,7 +71,9 @@ export const SECTION_META = SECTION_CODES.map((sectionCode, index) => {
   };
 });
 
-export function groupSectionsByQuestion(sections: QuestionSection[]): Map<number, QuestionSection[]> {
+export function groupSectionsByQuestion(
+  sections: QuestionSection[],
+): Map<number, QuestionSection[]> {
   const grouped = new Map<number, QuestionSection[]>();
   for (const section of sections) {
     const current = grouped.get(section.question_number) ?? [];
@@ -83,12 +89,14 @@ export function groupSectionsByQuestion(sections: QuestionSection[]): Map<number
   return grouped;
 }
 
-async function attachSignedUrls(assets: QuestionAsset[]): Promise<QuestionAsset[]> {
+async function attachSignedUrls(
+  assets: QuestionAsset[],
+): Promise<QuestionAsset[]> {
   if (assets.length === 0) return assets;
 
   const paths = assets.map((asset) => asset.file_path);
   const { data, error } = await supabase.storage
-    .from('question-assets')
+    .from("question-assets")
     .createSignedUrls(paths, 60 * 30);
 
   if (error || !data) {
@@ -108,8 +116,9 @@ async function attachSignedUrls(assets: QuestionAsset[]): Promise<QuestionAsset[
 
 async function hydrateQuestionSet(row: QuestionSetRow): Promise<QuestionSet> {
   const { data: sectionRows, error: sectionsError } = await supabase
-    .from('question_sections')
-    .select(`
+    .from("question_sections")
+    .select(
+      `
       id,
       question_set_id,
       section_code,
@@ -120,15 +129,17 @@ async function hydrateQuestionSet(row: QuestionSetRow): Promise<QuestionSet> {
       helper_text,
       max_score,
       sort_order
-    `)
-    .eq('question_set_id', row.id)
-    .order('sort_order', { ascending: true });
+    `,
+    )
+    .eq("question_set_id", row.id)
+    .order("sort_order", { ascending: true });
 
   if (sectionsError) throw sectionsError;
 
   const { data: assetRows, error: assetsError } = await supabase
-    .from('question_assets')
-    .select(`
+    .from("question_assets")
+    .select(
+      `
       id,
       question_set_id,
       section_code,
@@ -139,13 +150,16 @@ async function hydrateQuestionSet(row: QuestionSetRow): Promise<QuestionSet> {
       height,
       caption,
       created_at
-    `)
-    .eq('question_set_id', row.id)
-    .order('created_at', { ascending: true });
+    `,
+    )
+    .eq("question_set_id", row.id)
+    .order("created_at", { ascending: true });
 
   if (assetsError) throw assetsError;
 
-  const signedAssets = await attachSignedUrls((assetRows ?? []) as QuestionAsset[]);
+  const signedAssets = await attachSignedUrls(
+    (assetRows ?? []) as QuestionAsset[],
+  );
   const assetsBySection = new Map<string, QuestionAsset[]>();
   for (const asset of signedAssets) {
     const current = assetsBySection.get(asset.section_code) ?? [];
@@ -153,10 +167,12 @@ async function hydrateQuestionSet(row: QuestionSetRow): Promise<QuestionSet> {
     assetsBySection.set(asset.section_code, current);
   }
 
-  const sections = ((sectionRows ?? []) as QuestionSectionRow[]).map((section) => ({
-    ...section,
-    assets: assetsBySection.get(section.section_code) ?? [],
-  }));
+  const sections = ((sectionRows ?? []) as QuestionSectionRow[]).map(
+    (section) => ({
+      ...section,
+      assets: assetsBySection.get(section.section_code) ?? [],
+    }),
+  );
 
   return {
     ...row,
@@ -164,10 +180,13 @@ async function hydrateQuestionSet(row: QuestionSetRow): Promise<QuestionSet> {
   };
 }
 
-export async function fetchPublishedQuestionSet(courseId: string): Promise<QuestionSet | null> {
+export async function fetchPublishedQuestionSet(
+  courseId: string,
+): Promise<QuestionSet | null> {
   const { data, error } = await supabase
-    .from('question_sets')
-    .select(`
+    .from("question_sets")
+    .select(
+      `
       id,
       course_id,
       title,
@@ -177,9 +196,10 @@ export async function fetchPublishedQuestionSet(courseId: string): Promise<Quest
       format_version,
       published_at,
       updated_at
-    `)
-    .eq('course_id', courseId)
-    .eq('status', 'published')
+    `,
+    )
+    .eq("course_id", courseId)
+    .eq("status", "published")
     .maybeSingle();
 
   if (error) throw error;
@@ -188,10 +208,13 @@ export async function fetchPublishedQuestionSet(courseId: string): Promise<Quest
   return hydrateQuestionSet(data as QuestionSetRow);
 }
 
-export async function fetchEditableQuestionSet(courseId: string): Promise<QuestionSet | null> {
+export async function fetchEditableQuestionSet(
+  courseId: string,
+): Promise<QuestionSet | null> {
   const { data, error } = await supabase
-    .from('question_sets')
-    .select(`
+    .from("question_sets")
+    .select(
+      `
       id,
       course_id,
       title,
@@ -201,11 +224,12 @@ export async function fetchEditableQuestionSet(courseId: string): Promise<Questi
       format_version,
       published_at,
       updated_at
-    `)
-    .eq('course_id', courseId)
-    .in('status', ['draft', 'published'])
-    .order('status', { ascending: true })
-    .order('updated_at', { ascending: false })
+    `,
+    )
+    .eq("course_id", courseId)
+    .in("status", ["draft", "published"])
+    .order("status", { ascending: true })
+    .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -215,20 +239,24 @@ export async function fetchEditableQuestionSet(courseId: string): Promise<Questi
   return hydrateQuestionSet(data as QuestionSetRow);
 }
 
-export async function createBlankQuestionSet(courseId: string, title: string): Promise<QuestionSet> {
+export async function createBlankQuestionSet(
+  courseId: string,
+  title: string,
+): Promise<QuestionSet> {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError) throw userError;
 
   const { data: setRow, error: setError } = await supabase
-    .from('question_sets')
+    .from("question_sets")
     .insert({
       course_id: courseId,
       title,
-      status: 'draft',
-      format_version: 'fixed_4x6_v1',
+      status: "draft",
+      format_version: "fixed_4x6_v1",
       created_by: userData.user?.id ?? null,
     })
-    .select(`
+    .select(
+      `
       id,
       course_id,
       title,
@@ -238,7 +266,8 @@ export async function createBlankQuestionSet(courseId: string, title: string): P
       format_version,
       published_at,
       updated_at
-    `)
+    `,
+    )
     .single();
 
   if (setError) throw setError;
@@ -248,15 +277,15 @@ export async function createBlankQuestionSet(courseId: string, title: string): P
     section_code: meta.sectionCode,
     question_number: meta.questionNumber,
     part_label: meta.partLabel,
-    parent_prompt: '',
-    question_text: '',
+    parent_prompt: "",
+    question_text: "",
     helper_text: null,
     max_score: meta.maxScore,
     sort_order: meta.sortOrder,
   }));
 
   const { error: sectionsError } = await supabase
-    .from('question_sections')
+    .from("question_sections")
     .insert(sectionRows);
 
   if (sectionsError) throw sectionsError;
@@ -266,46 +295,52 @@ export async function createBlankQuestionSet(courseId: string, title: string): P
 
 export async function updateQuestionSection(
   sectionId: string,
-  values: Pick<QuestionSection, 'parent_prompt' | 'question_text' | 'helper_text'>,
+  values: Pick<
+    QuestionSection,
+    "parent_prompt" | "question_text" | "helper_text"
+  >,
 ): Promise<void> {
   const { error } = await supabase
-    .from('question_sections')
+    .from("question_sections")
     .update({
       parent_prompt: values.parent_prompt,
       question_text: values.question_text,
       helper_text: values.helper_text || null,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', sectionId);
+    .eq("id", sectionId);
 
   if (error) throw error;
 }
 
 export async function publishQuestionSet(questionSetId: string): Promise<void> {
-  const { error } = await supabase.rpc('publish_question_set', {
+  const { error } = await supabase.rpc("publish_question_set", {
     p_question_set_id: questionSetId,
   });
   if (error) throw error;
 }
 
 export function validateQuestionImage(file: File): string | null {
-  const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
+  const allowed = new Set(["image/jpeg", "image/png", "image/webp"]);
   if (!allowed.has(file.type)) {
-    return 'File harus berupa gambar PNG, JPG/JPEG, atau WEBP.';
+    return "File harus berupa gambar PNG, JPG/JPEG, atau WEBP.";
   }
   if (file.size > 2 * 1024 * 1024) {
-    return 'Ukuran gambar maksimal 2 MB.';
+    return "Ukuran gambar maksimal 2 MB.";
   }
   return null;
 }
 
-export async function readImageDimensions(file: File): Promise<ImageDimensions> {
+export async function readImageDimensions(
+  file: File,
+): Promise<ImageDimensions> {
   const objectUrl = URL.createObjectURL(file);
   try {
     return await new Promise<ImageDimensions>((resolve, reject) => {
       const image = new Image();
-      image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
-      image.onerror = () => reject(new Error('Gambar tidak dapat dibaca.'));
+      image.onload = () =>
+        resolve({ width: image.naturalWidth, height: image.naturalHeight });
+      image.onerror = () => reject(new Error("Gambar tidak dapat dibaca."));
       image.src = objectUrl;
     });
   } finally {
@@ -325,20 +360,21 @@ export async function uploadQuestionAsset(params: {
 
   const dimensions = await readImageDimensions(params.file);
   if (dimensions.width > 2000 || dimensions.height > 2000) {
-    throw new Error('Dimensi gambar maksimal 2000×2000 piksel.');
+    throw new Error("Dimensi gambar maksimal 2000×2000 piksel.");
   }
 
-  const extension = params.file.type === 'image/png'
-    ? 'png'
-    : params.file.type === 'image/webp'
-      ? 'webp'
-      : 'jpg';
+  const extension =
+    params.file.type === "image/png"
+      ? "png"
+      : params.file.type === "image/webp"
+        ? "webp"
+        : "jpg";
   const filePath = `${params.courseId}/${params.questionSetId}/${params.sectionCode}/${crypto.randomUUID()}.${extension}`;
 
   const { error: uploadError } = await supabase.storage
-    .from('question-assets')
+    .from("question-assets")
     .upload(filePath, params.file, {
-      cacheControl: '3600',
+      cacheControl: "3600",
       contentType: params.file.type,
       upsert: false,
     });
@@ -347,7 +383,7 @@ export async function uploadQuestionAsset(params: {
 
   const { data: userData } = await supabase.auth.getUser();
   const { error: metadataError } = await supabase
-    .from('question_assets')
+    .from("question_assets")
     .insert({
       question_set_id: params.questionSetId,
       section_code: params.sectionCode,
@@ -360,20 +396,32 @@ export async function uploadQuestionAsset(params: {
       uploaded_by: userData.user?.id ?? null,
     });
 
-  if (metadataError) throw metadataError;
+  if (metadataError) {
+    // Metadata insert gagal setelah file berhasil ter-upload — bersihkan file
+    // storage supaya tidak menyisakan object orphan yang tidak tercatat di DB.
+    await supabase.storage
+      .from("question-assets")
+      .remove([filePath])
+      .catch(() => undefined);
+    throw metadataError;
+  }
 }
 
 export async function deleteQuestionAsset(asset: QuestionAsset): Promise<void> {
+  // Hapus row metadata DULU, baru file storage. Jika penghapusan storage gagal
+  // di langkah kedua, hasilnya adalah file storage orphan (aman, bisa dibersihkan
+  // belakangan) — bukan row DB yang menunjuk ke file yang sudah tidak ada
+  // (broken reference yang bisa membuat UI mencoba memuat gambar yang hilang).
+  const { error: metadataError } = await supabase
+    .from("question_assets")
+    .delete()
+    .eq("id", asset.id);
+
+  if (metadataError) throw metadataError;
+
   const { error: storageError } = await supabase.storage
-    .from('question-assets')
+    .from("question-assets")
     .remove([asset.file_path]);
 
   if (storageError) throw storageError;
-
-  const { error: metadataError } = await supabase
-    .from('question_assets')
-    .delete()
-    .eq('id', asset.id);
-
-  if (metadataError) throw metadataError;
 }

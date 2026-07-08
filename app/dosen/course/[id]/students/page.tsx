@@ -107,8 +107,6 @@ export default function LecturerStudentRoster() {
     const [students, setStudents] = useState<EnrolledStudent[]>([]);
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
-    const [lecturerName, setLecturerName] = useState('');
-
     // Modal Konfirmasi Hapus Roster
     const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');

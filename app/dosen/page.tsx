@@ -51,6 +51,7 @@ export default function LecturerDashboard() {
 
   const fetchData = async (userId: string) => {
     setIsLoading(true);
+    setErrorMsg(null);
     try {
       // Fetch assigned course IDs
       const { data: assignments, error: assignErr } = await supabase
@@ -65,7 +66,6 @@ export default function LecturerDashboard() {
       if (courseIds.length === 0) {
         setCourses([]);
         setSubmissionsStats([]);
-        setIsLoading(false);
         return;
       }
 
@@ -87,11 +87,10 @@ export default function LecturerDashboard() {
 
       if (subsError) throw subsError;
       setSubmissionsStats(subsData || []);
-
-      setIsLoading(false);
     } catch (err) {
       logger.error('Error loading lecturer dashboard data:', err);
       setErrorMsg('Gagal mengambil data kelas dan pengumpulan tugas.');
+    } finally {
       setIsLoading(false);
     }
   };
