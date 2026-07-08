@@ -1169,15 +1169,15 @@ export default function ReviewWorkspace() {
                         return (
                         <div
                           key={slot.label}
-                          className={`border rounded-xl pt-12 pb-4 px-4 transition-all duration-300 relative flex flex-col md:flex-row gap-4 ${slot.dbStatus === 'reupload_required'
+                          className={`border rounded-2xl pt-14 pb-6 px-6 transition-all duration-300 relative flex flex-col gap-6 ${slot.dbStatus === 'reupload_required'
                             ? 'bg-amber-500/5 dark:bg-amber-950/10 border-amber-500/30 border-dashed'
                             : slot.hasSheet
-                              ? 'bg-slate-50/70 dark:bg-[#0D0D14]/80 border-slate-300 dark:border-neutral-900/80 hover:border-cyan-500/30'
+                              ? 'bg-slate-50/70 dark:bg-[#0D0D14]/85 border-slate-300 dark:border-neutral-900/80 hover:border-cyan-500/30'
                               : 'bg-slate-100/50 border-slate-300 dark:bg-neutral-950/20 dark:border-neutral-950 opacity-40 select-none'
                             }`}
                         >
                           {/* Label Section Code */}
-                          <div className="absolute top-4 left-4 flex items-center gap-2 flex-wrap">
+                          <div className="absolute top-4 left-6 flex items-center gap-2 flex-wrap">
                             <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded uppercase ${slot.dbStatus === 'reupload_required'
                               ? 'bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400'
                               : 'bg-slate-100 dark:bg-neutral-950 border border-slate-300 dark:border-neutral-900 text-slate-700 dark:text-neutral-400'
@@ -1191,186 +1191,207 @@ export default function ReviewWorkspace() {
                             )}
                           </div>
 
-                          {sectionQuestion && (
-                            <div className="w-full md:w-56 flex-shrink-0 bg-white/80 border border-slate-200 dark:bg-black/35 dark:border-neutral-900 rounded-xl p-3 space-y-2">
-                              <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-400">
-                                Soal {slot.label.toUpperCase()}
-                              </div>
-                              <p className="text-xs leading-relaxed text-slate-700 dark:text-neutral-300">
-                                {sectionQuestion.question_text}
-                              </p>
-                              {sectionQuestion.helper_text && (
-                                <pre className="whitespace-pre-wrap break-words rounded-lg bg-slate-100 dark:bg-neutral-950 border border-slate-200 dark:border-neutral-900 p-2 text-[11px] leading-relaxed text-slate-600 dark:text-neutral-400 font-mono">
-                                  {sectionQuestion.helper_text}
-                                </pre>
-                              )}
-                              {sectionQuestion.assets.length > 0 && (
-                                <div className="space-y-2">
-                                  {sectionQuestion.assets.map((asset) => (
-                                    <button
-                                      key={asset.id}
-                                      type="button"
-                                      onClick={() => {
-                                        if (!asset.signedUrl) return;
-                                        setModalImageUrl(asset.signedUrl);
-                                        setModalTitle(`Gambar Soal ${slot.label.toUpperCase()}`);
-                                      }}
-                                      className="w-full overflow-hidden rounded-lg border border-slate-200 dark:border-neutral-900 bg-slate-50 dark:bg-black hover:border-cyan-500/40 transition-colors cursor-pointer disabled:cursor-not-allowed"
-                                      disabled={!asset.signedUrl}
-                                    >
-                                      {asset.signedUrl ? (
-                                        <img
-                                          src={asset.signedUrl}
-                                          alt={asset.caption || `Gambar soal ${slot.label.toUpperCase()}`}
-                                          className="w-full max-h-32 object-contain"
-                                          loading="lazy"
-                                        />
-                                      ) : (
-                                        <span className="block p-3 text-[10px] text-slate-500 dark:text-neutral-500">
-                                          Gambar tidak dapat dimuat.
-                                        </span>
-                                      )}
-                                    </button>
-                                  ))}
+                          {/* Top Row: Question Details & Answer Image side by side */}
+                          <div className="flex flex-col lg:flex-row gap-6 w-full">
+                            {/* Question Details */}
+                            {sectionQuestion ? (
+                              <div className="w-full lg:w-[65%] bg-white/80 border border-slate-200 dark:bg-black/35 dark:border-neutral-900 rounded-xl p-4 space-y-2">
+                                <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-400">
+                                  Soal {slot.label.toUpperCase()}
                                 </div>
-                              )}
-                            </div>
-                          )}
+                                <p className="text-xs leading-relaxed text-slate-700 dark:text-neutral-300">
+                                  {sectionQuestion.question_text}
+                                </p>
+                                {sectionQuestion.helper_text && (
+                                  <pre className="whitespace-pre-wrap break-words rounded-lg bg-slate-100 dark:bg-neutral-950 border border-slate-200 dark:border-neutral-900 p-2.5 text-[11px] leading-relaxed text-slate-600 dark:text-neutral-400 font-mono">
+                                    {sectionQuestion.helper_text}
+                                  </pre>
+                                )}
+                                {sectionQuestion.assets.length > 0 && (
+                                  <div className="grid grid-cols-2 gap-2 mt-2">
+                                    {sectionQuestion.assets.map((asset) => (
+                                      <button
+                                        key={asset.id}
+                                        type="button"
+                                        onClick={() => {
+                                          if (!asset.signedUrl) return;
+                                          setModalImageUrl(asset.signedUrl);
+                                          setModalTitle(`Gambar Soal ${slot.label.toUpperCase()}`);
+                                        }}
+                                        className="overflow-hidden rounded-lg border border-slate-205 dark:border-neutral-900 bg-slate-50 dark:bg-black hover:border-cyan-500/40 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                                        disabled={!asset.signedUrl}
+                                      >
+                                        {asset.signedUrl ? (
+                                          <img
+                                            src={asset.signedUrl}
+                                            alt={asset.caption || `Gambar soal ${slot.label.toUpperCase()}`}
+                                            className="w-full max-h-24 object-contain"
+                                            loading="lazy"
+                                          />
+                                        ) : (
+                                          <span className="block p-2 text-[9px] text-slate-500 dark:text-neutral-500">
+                                            Gambar tidak dapat dimuat.
+                                          </span>
+                                        )}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ) : null}
 
-                          {/* Image preview box */}
-                          <div className="w-full md:w-32 h-32 bg-slate-50 dark:bg-black border border-slate-300 dark:border-neutral-900 rounded-xl overflow-hidden relative flex-shrink-0 flex items-center justify-center mt-0">
-                            {slot.hasSheet && slot.fileUrl ? (
-                              <div className="group/card w-full h-full relative cursor-pointer" onClick={() => {
-                                setModalImageUrl(slot.fileUrl);
-                                setModalTitle(`Section ${slot.label.toUpperCase()}`);
-                              }}>
-                                <img
-                                  src={slot.fileUrl}
-                                  alt={`Slot ${slot.label}`}
-                                  loading="lazy"
-                                  decoding="async"
-                                  fetchPriority="low"
-                                  className="w-full h-full object-cover opacity-80 group-hover/card:opacity-100 transition-opacity duration-300"
-                                />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/card:opacity-100 flex items-center justify-center transition-all">
-                                  <Eye className="w-5 h-5 text-white" />
-                                </div>
+                            {/* Answer Sheet Preview */}
+                            <div className={`w-full ${sectionQuestion ? 'lg:w-[35%]' : 'w-full'} flex flex-col gap-2`}>
+                              <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-500 dark:text-neutral-450">
+                                Lembar Jawaban
                               </div>
-                            ) : (
-                              <div className="flex flex-col items-center gap-1 opacity-50">
-                                <Lock className="w-5 h-5 text-slate-450 dark:text-neutral-600" />
-                                <span className="text-[9px] font-mono text-slate-500 dark:text-neutral-600">Locked</span>
+                              <div className="w-full h-44 bg-slate-50 dark:bg-black border border-slate-300 dark:border-neutral-900/80 rounded-xl overflow-hidden relative flex items-center justify-center">
+                                {slot.hasSheet && slot.fileUrl ? (
+                                  <div className="group/card w-full h-full relative cursor-pointer" onClick={() => {
+                                    setModalImageUrl(slot.fileUrl);
+                                    setModalTitle(`Section ${slot.label.toUpperCase()}`);
+                                  }}>
+                                    <img
+                                      src={slot.fileUrl}
+                                      alt={`Slot ${slot.label}`}
+                                      loading="lazy"
+                                      decoding="async"
+                                      fetchPriority="low"
+                                      className="w-full h-full object-contain opacity-90 group-hover/card:opacity-100 transition-opacity duration-300 p-2"
+                                    />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/card:opacity-100 flex items-center justify-center transition-all">
+                                      <Eye className="w-5 h-5 text-white" />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col items-center gap-1.5 opacity-55">
+                                    <Lock className="w-5 h-5 text-slate-450 dark:text-neutral-600" />
+                                    <span className="text-[9px] font-mono text-slate-500 dark:text-neutral-600 uppercase tracking-wider">Locked</span>
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            </div>
                           </div>
 
-                          {/* Inputs and Feedback */}
+                          {/* Bottom Row: Inputs, final score, feedback */}
                           {slot.hasSheet ? (
-                            <div className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-6">
-                              {/* Left parameters */}
-                              <div className="space-y-3">
-                                <div>
-                                  <label className="block text-[10px] font-bold text-slate-700 dark:text-neutral-400 uppercase tracking-wider mb-1">Hasil AI</label>
-                                  <div className="w-full bg-slate-100 border border-slate-300 dark:bg-neutral-950/50 dark:border-neutral-900 rounded-xl py-2 px-3 text-slate-800 dark:text-neutral-300 text-xs font-mono font-bold leading-normal">
-                                    <div>Nilai AI : {isAIProcessing ? '⏳' : (slot.aiScore !== null ? slot.aiScore : '-')}</div>
-                                    <div>Tingkat Keyakinan AI : {isAIProcessing ? '⏳' : (slot.confidence !== null ? `${Math.round(slot.confidence * 100)}%` : '-')}</div>
+                            <div className="w-full bg-slate-100/40 dark:bg-neutral-950/20 border border-slate-200 dark:border-neutral-900/60 rounded-xl p-4 mt-2">
+                              <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                                {/* Left parameters: Hasil AI & Nilai Manual */}
+                                <div className="md:col-span-4 space-y-4">
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-slate-700 dark:text-neutral-400 uppercase tracking-wider mb-1">Hasil AI</label>
+                                    <div className="w-full bg-slate-100 border border-slate-250 dark:bg-[#0A0A0F]/60 dark:border-neutral-900 rounded-xl py-2 px-3 text-slate-800 dark:text-neutral-300 text-xs font-mono leading-normal space-y-1">
+                                      <div className="flex justify-between">
+                                        <span>Nilai AI:</span>
+                                        <span className="font-extrabold text-cyan-600 dark:text-cyan-400">{isAIProcessing ? '⏳' : (slot.aiScore !== null ? slot.aiScore : '-')}</span>
+                                      </div>
+                                      <div className="flex justify-between border-t border-slate-200 dark:border-neutral-900/40 pt-1">
+                                        <span>Confidence:</span>
+                                        <span className="font-bold text-slate-600 dark:text-neutral-400">{isAIProcessing ? '⏳' : (slot.confidence !== null ? `${Math.round(slot.confidence * 100)}%` : '-')}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-slate-700 dark:text-neutral-400 uppercase tracking-wider mb-1">Nilai Manual</label>
+                                    <input
+                                      type="number"
+                                      placeholder="Belum diatur"
+                                      value={slot.manualScore !== null ? slot.manualScore : ''}
+                                      onChange={(e) => handleManualScoreChange(slot.label, e.target.value)}
+                                      disabled={isReadOnly || isAIProcessing}
+                                      className="w-full bg-slate-50 border border-slate-300 dark:bg-black dark:border-neutral-900 hover:border-slate-400 dark:hover:border-neutral-800 focus:border-cyan-500 dark:focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/10 rounded-xl py-2 px-3 text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-neutral-600 text-sm font-mono focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+                                    />
+                                    <span className="text-[10px] text-slate-500 dark:text-neutral-500 mt-1 block">
+                                      Maksimal nilai: {slot.label.toLowerCase().endsWith('f') ? '5' : '4'}
+                                    </span>
                                   </div>
                                 </div>
 
-                                <div>
-                                  <label className="block text-[10px] font-bold text-slate-700 dark:text-neutral-400 uppercase tracking-wider mb-1">Nilai Manual</label>
-                                  <input
-                                    type="number"
-                                    placeholder="Belum diatur"
-                                    value={slot.manualScore !== null ? slot.manualScore : ''}
-                                    onChange={(e) => handleManualScoreChange(slot.label, e.target.value)}
-                                    disabled={isReadOnly || isAIProcessing}
-                                    className="w-full bg-slate-50 border border-slate-300 dark:bg-black dark:border-neutral-900 hover:border-slate-400 dark:hover:border-neutral-800 focus:border-cyan-500 dark:focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/10 rounded-xl py-2 px-3 text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-neutral-600 text-sm font-mono focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-                                  />
-                                  <span className="text-[10px] text-slate-600 dark:text-neutral-500 mt-1 block">
-                                    Maksimal nilai: {slot.label.toLowerCase().endsWith('f') ? '5' : '4'}
+                                {/* Center final score */}
+                                <div className="md:col-span-3 flex flex-col justify-between">
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-cyan-800 dark:text-cyan-400 uppercase tracking-wider mb-1">Nilai Akhir Bagian</label>
+                                    <input
+                                      type="number"
+                                      placeholder="0"
+                                      value={slot.finalScore !== null ? slot.finalScore : ''}
+                                      onChange={(e) => handleFinalScoreChange(slot.label, e.target.value)}
+                                      disabled={isReadOnly || isAIProcessing}
+                                      className="w-full bg-slate-50 border border-cyan-500/50 hover:border-cyan-600 dark:bg-black dark:border-cyan-500/20 dark:hover:border-cyan-500/40 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 rounded-xl py-2 px-3 text-cyan-800 dark:text-cyan-400 text-base font-mono font-extrabold focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+                                    />
+                                    <span className="text-[10px] text-slate-500 dark:text-neutral-500 mt-1 block">
+                                      Maksimal nilai: {slot.label.toLowerCase().endsWith('f') ? '5' : '4'}
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 dark:text-neutral-500 leading-normal hidden md:inline-block">
+                                    *Nilai ini akan disimpan sebagai skor final bagian.
                                   </span>
                                 </div>
-                              </div>
 
-                              {/* Center final score */}
-                              <div className="flex flex-col justify-between">
-                                <div>
-                                  <label className="block text-[10px] font-bold text-cyan-800 dark:text-cyan-400 uppercase tracking-wider mb-1">Nilai Akhir Bagian</label>
-                                  <input
-                                    type="number"
-                                    placeholder="0"
-                                    value={slot.finalScore !== null ? slot.finalScore : ''}
-                                    onChange={(e) => handleFinalScoreChange(slot.label, e.target.value)}
-                                    disabled={isReadOnly || isAIProcessing}
-                                    className="w-full bg-slate-50 border border-cyan-500/50 hover:border-cyan-600 dark:bg-black dark:border-cyan-500/20 dark:hover:border-cyan-500/40 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20 rounded-xl py-2 px-3 text-cyan-800 dark:text-cyan-400 text-base font-mono font-extrabold focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
-                                  />
-                                  <span className="text-[10px] text-slate-600 dark:text-neutral-500 mt-1 block">
-                                    Maksimal nilai: {slot.label.toLowerCase().endsWith('f') ? '5' : '4'}
-                                  </span>
+                                {/* Right Feedback + Reupload */}
+                                <div className="md:col-span-5 flex flex-col justify-between h-full">
+                                  <div className="flex-grow flex flex-col">
+                                    <label className="block text-[10px] font-bold text-slate-700 dark:text-neutral-400 uppercase tracking-wider mb-1">Feedback Dosen</label>
+                                    <textarea
+                                      placeholder="Tulis koreksi atau arahan..."
+                                      value={slot.feedback}
+                                      onChange={(e) => handleFeedbackChange(slot.label, e.target.value)}
+                                      disabled={isReadOnly || slot.dbStatus === 'reupload_required' || isAIProcessing}
+                                      rows={3}
+                                      className="w-full bg-slate-50 border border-slate-300 dark:bg-black dark:border-neutral-900 hover:border-slate-400 dark:hover:border-neutral-800 text-slate-800 dark:text-neutral-200 placeholder:text-slate-400 dark:placeholder:text-neutral-600 text-xs focus:outline-none resize-none flex-grow rounded-xl p-3 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    />
+                                  </div>
+
+                                  <div className="mt-2.5">
+                                    {/* Reupload Request Button */}
+                                    {!isReadOnly && slot.dbStatus !== 'reupload_required' && (
+                                      <button
+                                        onClick={() => openReuploadModal(slot.label)}
+                                        disabled={isAIProcessing}
+                                        className="flex items-center gap-1.5 text-[10px] font-bold text-amber-600 dark:text-amber-400/80 hover:text-amber-500 dark:hover:text-amber-400 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        <RotateCcw className="w-3 h-3" />
+                                        Request Reupload
+                                      </button>
+                                    )}
+
+                                    {/* Rejection indicator for already-rejected sections */}
+                                    {slot.dbStatus === 'reupload_required' && (
+                                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">
+                                        <p className="text-[10px] font-bold text-amber-500 dark:text-amber-400 uppercase tracking-wider mb-1">⚠ Upload Ulang Diminta</p>
+                                        {slot.rejectionReason && (
+                                          <p className="text-xs text-amber-300/80 leading-relaxed">&ldquo;{slot.rejectionReason}&rdquo;</p>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {/* Catat reupload sebelumnya */}
+                                    {slot.wasReuploaded && slot.rejectionReason && slot.dbStatus !== 'reupload_required' && (
+                                      <div className="bg-slate-100 border border-slate-250 dark:bg-neutral-900 dark:border-neutral-800 rounded-lg p-2.5">
+                                        <p className="text-[10px] font-bold text-slate-500 dark:text-neutral-500 uppercase tracking-wider mb-1">Catatan Reupload Sebelumnya</p>
+                                        <p className="text-xs text-slate-600 dark:text-neutral-400 leading-relaxed">&ldquo;{slot.rejectionReason}&rdquo;</p>
+                                        {slot.lastReuploadAt && (
+                                          <p className="text-[9px] text-slate-400 dark:text-neutral-500 font-mono mt-1.5">
+                                            Reuploaded: {new Date(slot.lastReuploadAt).toLocaleString('id-ID', {
+                                              day: 'numeric',
+                                              month: 'short',
+                                              year: 'numeric',
+                                              hour: '2-digit',
+                                              minute: '2-digit'
+                                            })}
+                                          </p>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                                <span className="text-[10px] text-slate-600 dark:text-neutral-500 leading-normal hidden md:inline-block">
-                                  *Nilai ini akan disimpan sebagai skor final bagian.
-                                </span>
-                              </div>
-
-                              {/* Right Feedback + Reupload */}
-                              <div className="flex flex-col">
-                                <label className="block text-[10px] font-bold text-slate-700 dark:text-neutral-400 uppercase tracking-wider mb-1">Feedback Dosen</label>
-                                <textarea
-                                  placeholder="Tulis koreksi atau arahan..."
-                                  value={slot.feedback}
-                                  onChange={(e) => handleFeedbackChange(slot.label, e.target.value)}
-                                  disabled={isReadOnly || slot.dbStatus === 'reupload_required' || isAIProcessing}
-                                  rows={3}
-                                  className="w-full bg-slate-50 border border-slate-300 dark:bg-black dark:border-neutral-900 hover:border-slate-400 dark:hover:border-neutral-800 text-slate-800 dark:text-neutral-200 placeholder:text-slate-400 dark:placeholder:text-neutral-600 text-xs focus:outline-none resize-none flex-grow disabled:opacity-40 disabled:cursor-not-allowed"
-                                />
-
-                                {/* Reupload Request Button */}
-                                {!isReadOnly && slot.dbStatus !== 'reupload_required' && (
-                                  <button
-                                    onClick={() => openReuploadModal(slot.label)}
-                                    disabled={isAIProcessing}
-                                    className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-amber-600 dark:text-amber-400/70 hover:text-amber-700 dark:hover:text-amber-400 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                  >
-                                    <RotateCcw className="w-3 h-3" />
-                                    Request Reupload
-                                  </button>
-                                )}
-
-                                {/* Rejection indicator for already-rejected sections */}
-                                {slot.dbStatus === 'reupload_required' && (
-                                  <div className="mt-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">
-                                    <p className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">⚠ Upload Ulang Diminta</p>
-                                    {slot.rejectionReason && (
-                                      <p className="text-xs text-amber-300/70 leading-relaxed">&ldquo;{slot.rejectionReason}&rdquo;</p>
-                                    )}
-                                  </div>
-                                )}
-
-                                {/* Catat reupload sebelumnya */}
-                                {slot.wasReuploaded && slot.rejectionReason && slot.dbStatus !== 'reupload_required' && (
-                                  <div className="mt-2 bg-slate-100 border border-slate-250 dark:bg-neutral-900 dark:border-neutral-800 rounded-lg p-2.5">
-                                    <p className="text-[10px] font-bold text-slate-500 dark:text-neutral-500 uppercase tracking-wider mb-1">Catatan Reupload Sebelumnya</p>
-                                    <p className="text-xs text-slate-600 dark:text-neutral-400 leading-relaxed">&ldquo;{slot.rejectionReason}&rdquo;</p>
-                                    {slot.lastReuploadAt && (
-                                      <p className="text-[9px] text-slate-400 dark:text-neutral-500 font-mono mt-1.5">
-                                        Reuploaded: {new Date(slot.lastReuploadAt).toLocaleString('id-ID', {
-                                          day: 'numeric',
-                                          month: 'short',
-                                          year: 'numeric',
-                                          hour: '2-digit',
-                                          minute: '2-digit'
-                                        })}
-                                      </p>
-                                    )}
-                                  </div>
-                                )}
                               </div>
                             </div>
                           ) : (
-                            <div className="flex-grow flex items-center">
-                              <span className="text-xs text-slate-400 dark:text-neutral-600 italic">Mahasiswa belum mengunggah lembar jawaban pada bagian ini.</span>
+                            <div className="w-full bg-slate-100/40 dark:bg-neutral-950/20 border border-slate-200 dark:border-neutral-900/60 rounded-xl p-4 mt-2 flex items-center justify-center">
+                              <span className="text-xs text-slate-400 dark:text-neutral-500 italic">Mahasiswa belum mengunggah lembar jawaban pada bagian ini.</span>
                             </div>
                           )}
                         </div>
@@ -1400,7 +1421,7 @@ export default function ReviewWorkspace() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-wider block">NIM / NIP</span>
+                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-wider block">NIM</span>
                     <span className="text-sm font-mono text-slate-700 dark:text-neutral-300">{Array.isArray(submission?.mahasiswa) ? submission?.mahasiswa[0]?.nim_nip : submission?.mahasiswa?.nim_nip || '-'}</span>
                   </div>
                   <div>
