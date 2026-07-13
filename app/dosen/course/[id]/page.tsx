@@ -861,7 +861,7 @@ export default function LecturerCoursePortal() {
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold transition-colors ${
                     active
                       ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400'
-                      : 'bg-slate-100 dark:bg-neutral-900 text-slate-500 dark:text-neutral-550 group-hover:bg-slate-200 dark:group-hover:bg-neutral-800'
+                      : 'bg-slate-100 dark:bg-neutral-900 text-slate-500 dark:text-neutral-400 group-hover:bg-slate-200 dark:group-hover:bg-neutral-800'
                   }`}>
                     [{tab.count}]
                   </span>

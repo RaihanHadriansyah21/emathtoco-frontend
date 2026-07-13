@@ -668,7 +668,7 @@ export default function ProfilePage() {
                                     />
                                 </div>
                             ) : (
-                                <div className="w-[120px] h-[120px] rounded-full bg-neutral-900 border border-neutral-850 animate-pulse" />
+                                <div className="w-[120px] h-[120px] rounded-full bg-neutral-900 border border-neutral-800 animate-pulse" />
                             )}
                         </div>
 

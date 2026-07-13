@@ -164,8 +164,8 @@ export default function SystemSettingsPage() {
       {/* Setelan Observabilitas */}
       <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md p-6 space-y-4">
         <div>
-          <h2 className="text-xs font-bold text-slate-550 dark:text-neutral-405 uppercase tracking-widest">Setelan Aplikasi (Observabilitas)</h2>
-          <p className="text-[10px] text-slate-450 dark:text-neutral-500 mt-1">Sesuaikan perilaku observability dan otomasi sistem di bawah ini.</p>
+          <h2 className="text-xs font-bold text-slate-500 dark:text-neutral-405 uppercase tracking-widest">Setelan Aplikasi (Observabilitas)</h2>
+          <p className="text-[10px] text-slate-500 dark:text-neutral-500 mt-1">Sesuaikan perilaku observability dan otomasi sistem di bawah ini.</p>
         </div>
         
         <div className="flex items-center justify-between border-t border-slate-100 dark:border-neutral-900/40 pt-4">

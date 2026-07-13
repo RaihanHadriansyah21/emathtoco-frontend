@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Loader2, Play, CheckCircle, Save, AlertTriangle, Eye, X, Lock, RotateCcw } from 'lucide-react';
+import { Loader2, Play, CheckCircle, AlertTriangle, Eye, X, Lock, RotateCcw } from 'lucide-react';
 import Navbar from '../../../components/Navbar';
 import PageTransition from '@/components/ui/PageTransition';
 import { supabase } from '@/lib/supabase';
@@ -146,6 +146,20 @@ const areSlotsEqual = (arr1: SlotState[], arr2: SlotState[]): boolean => {
   return true;
 };
 
+const buildReviewSignature = (slots: SlotState[], model: string): string => JSON.stringify({
+  model,
+  scores: slots
+    .filter((slot) => slot.hasSheet && slot.sheetId)
+    .map((slot) => ({
+      label: slot.label,
+      manualScore: slot.manualScore,
+      finalScore: slot.finalScore,
+      feedback: slot.feedback,
+    })),
+});
+
+type AutoSaveStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
+
 export default function ReviewWorkspace() {
   const router = useRouter();
   const params = useParams();
@@ -219,6 +233,8 @@ export default function ReviewWorkspace() {
 
   // Editing Action States
   const [isSaving, setIsSaving] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<AutoSaveStatus>('idle');
+  const [autoSaveMessage, setAutoSaveMessage] = useState('Perubahan nilai dan feedback akan tersimpan otomatis.');
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -241,7 +257,12 @@ export default function ReviewWorkspace() {
   const totalAIScoreRef = useRef<number | null>(null);
   const selectedModelRef = useRef(selectedModel);
   const isPredictingRef = useRef(isPredicting);
+  const isSavingRef = useRef(isSaving);
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoSaveReadyRef = useRef(false);
+  const lastSavedReviewSignatureRef = useRef('');
+  const pendingAutoSaveRef = useRef(false);
 
   useEffect(() => {
     submissionRef.current = submission;
@@ -263,6 +284,10 @@ export default function ReviewWorkspace() {
     isPredictingRef.current = isPredicting;
   }, [isPredicting]);
 
+  useEffect(() => {
+    isSavingRef.current = isSaving;
+  }, [isSaving]);
+
   const isAIActive = isPredicting ||
     submission?.ai_status === 'processing' ||
     submission?.ai_status === 'ai_pending' ||
@@ -271,6 +296,12 @@ export default function ReviewWorkspace() {
     (submission?.status_submit as string) === 'diproses_ai';
 
   const isAIProcessing = isAIActive && !isBackendOffline;
+  const needsPassiveReviewRefresh = !!submission && !activeJobId && !isBackendOffline && (
+    submission.status_submit === 'processing_ai' ||
+    submission.ai_status === 'processing' ||
+    submission.ai_status === 'ai_pending' ||
+    submission.ai_status === 'ai_running'
+  );
 
   useEffect(() => {
     const storedJobId = sessionStorage.getItem(
@@ -345,6 +376,10 @@ export default function ReviewWorkspace() {
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
         pollingRef.current = null;
+      }
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
       }
       if (successTimeoutRef.current) {
         clearTimeout(successTimeoutRef.current);
@@ -546,6 +581,16 @@ export default function ReviewWorkspace() {
         setSlots(resolvedSlots);
       }
 
+      lastSavedReviewSignatureRef.current = buildReviewSignature(
+        resolvedSlots,
+        formattedSub.model_ai || selectedModelRef.current,
+      );
+      autoSaveReadyRef.current = true;
+      if (!isSavingRef.current) {
+        setAutoSaveStatus('saved');
+        setAutoSaveMessage('Data review sinkron dengan database.');
+      }
+
     } catch (err) {
       logger.error('Error loading review workspace:', err);
       if (isFirstLoad) {
@@ -625,6 +670,30 @@ export default function ReviewWorkspace() {
       }
     };
   }, [activeJobId, loadWorkspaceDetails, submissionId, toast]);
+
+  // Passive refresh covers the common demo flow where AI/batch is started from
+  // the course dashboard, then the lecturer opens a review page while the worker
+  // is still processing. In that case this page does not own a job_id, so it
+  // must still re-fetch until the submission leaves the pending/processing state.
+  useEffect(() => {
+    if (!needsPassiveReviewRefresh) return;
+
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== 'hidden') {
+        void loadWorkspaceDetails();
+      }
+    };
+
+    const intervalId = window.setInterval(refreshIfVisible, 4000);
+    window.addEventListener('focus', refreshIfVisible);
+    document.addEventListener('visibilitychange', refreshIfVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshIfVisible);
+      document.removeEventListener('visibilitychange', refreshIfVisible);
+    };
+  }, [loadWorkspaceDetails, needsPassiveReviewRefresh]);
 
   // Handle manual score change
   const handleManualScoreChange = (label: string, value: string) => {
@@ -787,33 +856,6 @@ export default function ReviewWorkspace() {
     }
   };
 
-  // Save Draft logic
-  const saveDraftReview = async () => {
-    if (!submission || isSaving || isPredicting) return;
-    setIsSaving(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
-
-    try {
-      const reviewPayload = buildReviewPayload(slots);
-      await saveSubmissionReview(
-        submission.id,
-        reviewPayload,
-        selectedModel,
-      );
-
-      setSuccessMsg('Draf review berhasil disimpan.');
-
-      // Reload details to ensure data integrity
-      loadWorkspaceDetails();
-    } catch (err) {
-      logger.error('Error saving review draft:', err);
-      setErrorMsg('Terjadi kesalahan saat menyimpan draf review.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   // Finalize Submission logic
   const finalizeAssessment = async () => {
     if (!submission) return;
@@ -851,6 +893,10 @@ export default function ReviewWorkspace() {
 
   // Handle reupload request for a specific section
   const openReuploadModal = (slotLabel: string) => {
+    if (isAIProcessing) {
+      toast.info('Review Dikunci', 'AI sedang memproses jawaban. Tunggu sampai proses selesai.');
+      return;
+    }
     setReuploadTargetSlot(slotLabel);
     setReuploadReason('');
     setShowReuploadModal(true);
@@ -862,6 +908,7 @@ export default function ReviewWorkspace() {
       || !reuploadTargetSlot
       || !reuploadReason.trim()
       || isRequestingReupload
+      || isAIProcessing
     ) return;
 
     const targetSlot = slots.find(s => s.label === reuploadTargetSlot);
@@ -903,7 +950,7 @@ export default function ReviewWorkspace() {
       case 'failed':
         return { icon: '❌', text: 'Gagal', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' };
       case 'offline':
-        return { icon: '🔌', text: 'Backend Offline', color: 'text-red-450 dark:text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/30' };
+        return { icon: '🔌', text: 'Backend Offline', color: 'text-red-400 dark:text-red-400', bg: 'bg-red-500/15', border: 'border-red-500/30' };
       default:
         return { icon: '⏳', text: 'Menunggu AI', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' };
     }
@@ -921,6 +968,114 @@ export default function ReviewWorkspace() {
       : (isAIActive && !isBackendOffline)
         ? "ai_processing"
         : "none";
+
+  const performAutoSave = useCallback(async () => {
+    const currentSubmission = submissionRef.current;
+    if (!currentSubmission || !autoSaveReadyRef.current) return;
+
+    const aiStillRunning =
+      currentSubmission.status_submit === 'processing_ai' ||
+      currentSubmission.ai_status === 'processing' ||
+      currentSubmission.ai_status === 'ai_pending' ||
+      currentSubmission.ai_status === 'ai_running' ||
+      isPredictingRef.current;
+
+    if (
+      currentSubmission.status_submit === 'finalized' ||
+      currentSubmission.ai_status === 'finalized' ||
+      aiStillRunning
+    ) {
+      return;
+    }
+
+    if (isSavingRef.current) {
+      pendingAutoSaveRef.current = true;
+      return;
+    }
+
+    const signature = buildReviewSignature(slotsRef.current, selectedModelRef.current);
+    if (signature === lastSavedReviewSignatureRef.current) return;
+
+    isSavingRef.current = true;
+    setIsSaving(true);
+    setAutoSaveStatus('saving');
+    setAutoSaveMessage('Menyimpan perubahan otomatis...');
+    setErrorMsg(null);
+
+    try {
+      const reviewPayload = buildReviewPayload(slotsRef.current);
+      await saveSubmissionReview(
+        currentSubmission.id,
+        reviewPayload,
+        selectedModelRef.current,
+      );
+
+      lastSavedReviewSignatureRef.current = signature;
+      setAutoSaveStatus('saved');
+      setAutoSaveMessage(`Tersimpan otomatis ${new Date().toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })}.`);
+    } catch (err) {
+      logger.error('Error auto-saving review draft:', err);
+      setAutoSaveStatus('error');
+      setAutoSaveMessage('Autosave gagal. Perubahan tetap di layar; periksa koneksi lalu ubah lagi untuk mencoba ulang.');
+    } finally {
+      isSavingRef.current = false;
+      setIsSaving(false);
+
+      if (pendingAutoSaveRef.current) {
+        pendingAutoSaveRef.current = false;
+        if (autoSaveTimerRef.current) {
+          clearTimeout(autoSaveTimerRef.current);
+        }
+        autoSaveTimerRef.current = setTimeout(() => {
+          void performAutoSave();
+        }, 600);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (
+      !submission ||
+      !autoSaveReadyRef.current ||
+      isLoadingWorkspace ||
+      isReadOnly ||
+      isAIProcessing
+    ) {
+      return;
+    }
+
+    const signature = buildReviewSignature(slots, selectedModel);
+    if (signature === lastSavedReviewSignatureRef.current) return;
+
+    setAutoSaveStatus('dirty');
+    setAutoSaveMessage('Ada perubahan belum tersimpan. Autosave akan berjalan sebentar lagi.');
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      void performAutoSave();
+    }, 1200);
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+    };
+  }, [
+    slots,
+    selectedModel,
+    submission,
+    isLoadingWorkspace,
+    isReadOnly,
+    isAIProcessing,
+    performAutoSave,
+  ]);
 
   const questionSectionsByNumber = React.useMemo(
     () => questionSet ? groupSectionsByQuestion(questionSet.sections) : new Map<number, QuestionSection[]>(),
@@ -1043,7 +1198,7 @@ export default function ReviewWorkspace() {
                 onChange={(e) => setReuploadReason(e.target.value)}
                 placeholder="Contoh: Gambar blur, jawaban tidak sesuai, halaman salah, file rusak..."
                 rows={3}
-                className="w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-800 hover:border-slate-350 dark:hover:border-neutral-700 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 rounded-xl p-3 text-slate-800 dark:text-neutral-200 text-sm focus:outline-none resize-none placeholder:text-slate-400 dark:placeholder:text-neutral-600"
+                className="w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-800 hover:border-slate-300 dark:hover:border-neutral-700 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 rounded-xl p-3 text-slate-800 dark:text-neutral-200 text-sm focus:outline-none resize-none placeholder:text-slate-400 dark:placeholder:text-neutral-600"
               />
             </div>
 
@@ -1103,7 +1258,7 @@ export default function ReviewWorkspace() {
         <div className="max-w-xl mx-auto px-4 py-20 text-center">
           <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-400 p-5 rounded-2xl">
             <p className="font-semibold">{errorMsg}</p>
-            <button onClick={() => router.push(courseId ? `/dosen/course/${courseId}` : "/dosen")} className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 dark:bg-neutral-900 dark:text-white dark:hover:bg-neutral-850 dark:border-transparent rounded-xl text-sm font-bold transition-all cursor-pointer">Kembali ke Dashboard</button>
+            <button onClick={() => router.push(courseId ? `/dosen/course/${courseId}` : "/dosen")} className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 dark:bg-neutral-900 dark:text-white dark:hover:bg-neutral-800 dark:border-transparent rounded-xl text-sm font-bold transition-all cursor-pointer">Kembali ke Dashboard</button>
           </div>
         </div>
       ) : (
@@ -1227,6 +1382,8 @@ export default function ReviewWorkspace() {
                                             alt={asset.caption || `Gambar soal ${slot.label.toUpperCase()}`}
                                             className="w-full max-h-24 object-contain"
                                             loading="lazy"
+                                            decoding="async"
+                                            fetchPriority="low"
                                           />
                                         ) : (
                                           <span className="block p-2 text-[9px] text-slate-500 dark:text-neutral-500">
@@ -1242,7 +1399,7 @@ export default function ReviewWorkspace() {
 
                             {/* Answer Sheet Preview */}
                             <div className={`w-full ${sectionQuestion ? 'lg:w-[35%]' : 'w-full'} flex flex-col gap-2`}>
-                              <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-500 dark:text-neutral-450">
+                              <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-500 dark:text-neutral-400">
                                 Lembar Jawaban
                               </div>
                               <div className="w-full h-44 bg-slate-50 dark:bg-black border border-slate-300 dark:border-neutral-900/80 rounded-xl overflow-hidden relative flex items-center justify-center">
@@ -1265,7 +1422,7 @@ export default function ReviewWorkspace() {
                                   </div>
                                 ) : (
                                   <div className="flex flex-col items-center gap-1.5 opacity-55">
-                                    <Lock className="w-5 h-5 text-slate-450 dark:text-neutral-600" />
+                                    <Lock className="w-5 h-5 text-slate-500 dark:text-neutral-600" />
                                     <span className="text-[9px] font-mono text-slate-500 dark:text-neutral-600 uppercase tracking-wider">Locked</span>
                                   </div>
                                 )}
@@ -1474,7 +1631,7 @@ export default function ReviewWorkspace() {
                     value={selectedModel}
                     onChange={(e) => setSelectedModel(e.target.value)}
                     disabled={isReadOnly || isAIProcessing}
-                    className={`w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 hover:border-slate-350 dark:hover:border-neutral-800 text-slate-700 dark:text-neutral-300 rounded-xl p-3 text-sm focus:outline-none cursor-pointer ${(isReadOnly || isAIProcessing) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    className={`w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 hover:border-slate-300 dark:hover:border-neutral-800 text-slate-700 dark:text-neutral-300 rounded-xl p-3 text-sm focus:outline-none cursor-pointer ${(isReadOnly || isAIProcessing) ? 'opacity-60 cursor-not-allowed' : ''}`}
                   >
                     <option value="MobileNetV2">MobileNetV2 (Ringan & Cepat)</option>
                     <option value="DenseNet121">DenseNet121</option>
@@ -1514,7 +1671,7 @@ export default function ReviewWorkspace() {
                         <span className="text-lg flex-shrink-0">❌</span>
                         <div className="space-y-0.5 flex-grow">
                           <div className="text-xs font-bold text-red-800 dark:text-red-400">Prediksi gagal</div>
-                          <div className="text-[11px] text-red-650 dark:text-red-500">
+                          <div className="text-[11px] text-red-700 dark:text-red-500">
                             {aiErrorMessage}
                           </div>
                         </div>
@@ -1618,18 +1775,35 @@ export default function ReviewWorkspace() {
 
               {!isReadOnly ? (
                 <div className="space-y-3">
-                  <button
-                    onClick={saveDraftReview}
-                    disabled={isSaving || isFinalizing || isAIProcessing}
-                    className="w-full flex items-center justify-center gap-2 border border-slate-200 hover:border-slate-350 hover:bg-slate-50 dark:border-neutral-800 dark:hover:border-neutral-700 dark:hover:bg-white/5 text-slate-700 dark:text-neutral-300 py-3 rounded-xl transition-all text-xs font-extrabold tracking-widest cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isSaving ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-slate-400 dark:text-neutral-400" />
-                    ) : (
-                      <Save className="w-4 h-4" />
-                    )}
-                    <span>SIMPAN DRAF REVIEW</span>
-                  </button>
+                  <div className={`rounded-xl border p-3 text-xs leading-relaxed ${
+                    isAIProcessing
+                      ? 'bg-purple-50 border-purple-200 text-purple-800 dark:bg-purple-950/20 dark:border-purple-900/50 dark:text-purple-200'
+                      : autoSaveStatus === 'error'
+                        ? 'bg-red-50 border-red-200 text-red-800 dark:bg-red-950/20 dark:border-red-900/50 dark:text-red-200'
+                        : autoSaveStatus === 'dirty'
+                          ? 'bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/20 dark:border-amber-900/50 dark:text-amber-200'
+                          : 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-900/50 dark:text-emerald-200'
+                  }`}>
+                    <div className="flex items-start gap-2">
+                      {isSaving || autoSaveStatus === 'saving' ? (
+                        <Loader2 className="w-4 h-4 animate-spin mt-0.5 flex-shrink-0" />
+                      ) : autoSaveStatus === 'error' ? (
+                        <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      )}
+                      <div>
+                        <p className="font-extrabold uppercase tracking-wider">
+                          {isAIProcessing ? 'Review Dikunci Sementara' : 'Autosave Review'}
+                        </p>
+                        <p className="mt-0.5">
+                          {isAIProcessing
+                            ? 'AI sedang memproses jawaban. Nilai dan feedback tidak dapat diubah sampai proses selesai.'
+                            : autoSaveMessage}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
 
                   <button
                     onClick={finalizeAssessment}
@@ -1644,7 +1818,7 @@ export default function ReviewWorkspace() {
                   </button>
                 </div>
               ) : (
-                <div className="border border-emerald-550/20 bg-emerald-50 dark:bg-emerald-500/5 p-4 rounded-xl text-center">
+                <div className="border border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/5 p-4 rounded-xl text-center">
                   <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-widest block">🏁 Penilaian Telah Final</span>
                   <span className="text-[10px] text-slate-500 dark:text-neutral-400 mt-1 block">Nilai akhir telah dikunci secara permanen dan dipublikasikan ke mahasiswa.</span>
                 </div>

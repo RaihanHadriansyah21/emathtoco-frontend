@@ -309,7 +309,7 @@ function LoginPageContent() {
                                         <h2 className="text-lg font-bold text-white mb-1.5 tracking-wide group-hover:text-cyan-300 transition-colors duration-200">Mahasiswa</h2>
                                         <p className="text-neutral-400 text-xs leading-relaxed mb-5">Unggah jawaban, lihat hasil penilaian AI, dan pantau progres tugas.</p>
 
-                                        <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-450 group-hover:text-cyan-400 transition-colors duration-250">
+                                        <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-400 group-hover:text-cyan-400 transition-colors duration-250">
                                             <span>Masuk sebagai Mahasiswa</span>
                                             <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition-transform duration-200" />
                                         </div>
@@ -332,7 +332,7 @@ function LoginPageContent() {
                                         <h2 className="text-lg font-bold text-white mb-1.5 tracking-wide group-hover:text-indigo-300 transition-colors duration-200">Dosen</h2>
                                         <p className="text-neutral-400 text-xs leading-relaxed mb-5">Kelola kelas, pantau mahasiswa, dan review hasil AI.</p>
 
-                                        <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-450 group-hover:text-indigo-400 transition-colors duration-250">
+                                        <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-400 group-hover:text-indigo-400 transition-colors duration-250">
                                             <span>Masuk sebagai Dosen</span>
                                             <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition-transform duration-200" />
                                         </div>

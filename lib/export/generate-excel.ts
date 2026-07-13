@@ -173,14 +173,30 @@ export async function generateExportExcel(filters: ExportFilters): Promise<{
 
   // 2. Setup workbook and sheet
   const workbook = new ExcelJS.Workbook();
+  workbook.views = [
+    {
+      x: 0,
+      y: 0,
+      width: 16000,
+      height: 9000,
+      firstSheet: 0,
+      activeTab: 0,
+      visibility: 'visible',
+    },
+  ];
   const sheet = workbook.addWorksheet('Rekap Nilai');
 
-  // Configure grid lines and frozen rows (freeze first 11 rows)
+  // Configure grid lines, frozen rows, and default Excel zoom.
+  // 77% keeps the 31-column recap readable on normal laptop screens when opened.
   sheet.views = [
     {
       state: 'frozen',
       ySplit: 11,
+      topLeftCell: 'A12',
+      activeCell: 'A12',
       showGridLines: true,
+      zoomScale: 77,
+      zoomScaleNormal: 77,
     },
   ];
 

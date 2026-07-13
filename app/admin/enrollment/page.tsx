@@ -363,7 +363,7 @@ export default function EnrollmentPage() {
                               setStudentSearchQuery('');
                               setIsStudentDropdownOpen(false);
                             }}
-                            className="w-full text-left py-2.5 px-4 text-sm text-slate-700 dark:text-neutral-350 hover:bg-slate-100 dark:hover:bg-neutral-900 transition-colors flex flex-col cursor-pointer"
+                            className="w-full text-left py-2.5 px-4 text-sm text-slate-700 dark:text-neutral-300 hover:bg-slate-100 dark:hover:bg-neutral-900 transition-colors flex flex-col cursor-pointer"
                           >
                             <span className="font-semibold text-slate-900 dark:text-white">{s.nama_lengkap}</span>
                             <span className="text-xs text-slate-500 dark:text-neutral-500">NIM: {s.nim_nip} | Kelas: {s.kelas}</span>

@@ -534,7 +534,7 @@ export default function LecturerStudentRoster() {
                     <select
                         value={filterStatus}
                         onChange={(e) => setFilterStatus(e.target.value as StudentStatusFilter)}
-                        className="bg-slate-50 dark:bg-black border border-slate-200 dark:border-neutral-900 rounded-xl py-3 px-4 text-sm text-slate-700 dark:text-neutral-350 focus:outline-none focus:border-cyan-500/60 cursor-pointer"
+                        className="bg-slate-50 dark:bg-black border border-slate-200 dark:border-neutral-900 rounded-xl py-3 px-4 text-sm text-slate-700 dark:text-neutral-300 focus:outline-none focus:border-cyan-500/60 cursor-pointer"
                     >
                         <option value="all">Semua Status</option>
                         <option value="unsubmitted">Belum Mengumpulkan</option>
@@ -564,14 +564,14 @@ export default function LecturerStudentRoster() {
                         <GlassTable className="min-w-[950px]">
                             <GlassTableHeader>
                                 <tr>
-                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 whitespace-nowrap w-[40px]">Foto</th>
-                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 whitespace-nowrap">Mahasiswa</th>
-                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 whitespace-nowrap">Kelas</th>
-                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 text-center whitespace-nowrap">Status Submit</th>
-                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 text-center whitespace-nowrap">Lembar Upload</th>
-                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 text-center whitespace-nowrap">Nilai Final</th>
-                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 whitespace-nowrap">Waktu Submit</th>
-                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 text-right whitespace-nowrap">Aksi</th>
+                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap w-[40px]">Foto</th>
+                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mahasiswa</th>
+                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Kelas</th>
+                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Status Submit</th>
+                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Lembar Upload</th>
+                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Nilai Final</th>
+                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Waktu Submit</th>
+                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right whitespace-nowrap">Aksi</th>
                                 </tr>
                             </GlassTableHeader>
                             <tbody>
@@ -603,7 +603,7 @@ export default function LecturerStudentRoster() {
                                             </td>
 
                                             {/* Class */}
-                                            <td className="py-4 px-6 text-sm font-semibold text-slate-700 dark:text-neutral-350 whitespace-nowrap">{student.kelas}</td>
+                                            <td className="py-4 px-6 text-sm font-semibold text-slate-700 dark:text-neutral-300 whitespace-nowrap">{student.kelas}</td>
 
                                             {/* Submission Status */}
                                             <td className="py-4 px-6 text-center whitespace-nowrap">
@@ -688,7 +688,7 @@ export default function LecturerStudentRoster() {
                                         <p className="text-[11px] text-slate-500 dark:text-neutral-500 font-mono tracking-wider mt-0.5 uppercase">ROSTER MANAGER • {courseCode}</p>
                                     </div>
                                 </div>
-                                <button onClick={() => setSelectedStudent(null)} className="text-slate-400 dark:text-neutral-550 hover:text-slate-700 dark:hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-neutral-900 cursor-pointer">
+                                <button onClick={() => setSelectedStudent(null)} className="text-slate-400 dark:text-neutral-400 hover:text-slate-700 dark:hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-neutral-900 cursor-pointer">
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
@@ -732,11 +732,11 @@ export default function LecturerStudentRoster() {
                                             </div>
                                             {selectedStudent.submission && (
                                                 <>
-                                                    <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-neutral-350">
+                                                    <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-neutral-300">
                                                         <Calendar className="w-4 h-4 text-cyan-500 flex-shrink-0" />
                                                         <span>Dikumpulkan: <strong className="font-semibold text-slate-900 dark:text-white">{formatDate(selectedStudent.submission.waktu_submit)}</strong></span>
                                                     </div>
-                                                    <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-neutral-350">
+                                                    <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-neutral-300">
                                                         <FileText className="w-4 h-4 text-cyan-500 flex-shrink-0" />
                                                         <span>Lembar diunggah: <strong className="font-bold text-cyan-500">{selectedStudent.submission.lembar_jawaban?.length || 0} / 24</strong></span>
                                                     </div>
@@ -759,7 +759,7 @@ export default function LecturerStudentRoster() {
                                     {isLoadingPrediction ? (
                                         <div className="flex items-center justify-center py-10 gap-2.5 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-neutral-900/50 rounded-2xl">
                                             <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
-                                            <span className="text-xs text-slate-500 dark:text-neutral-450 animate-pulse">Memuat hasil prediksi AI...</span>
+                                            <span className="text-xs text-slate-500 dark:text-neutral-400 animate-pulse">Memuat hasil prediksi AI...</span>
                                         </div>
                                     ) : predictionError ? (
                                         <div className="bg-red-950/20 border border-red-900/50 text-red-400 p-4 rounded-xl text-xs flex items-center gap-2">
@@ -791,14 +791,14 @@ export default function LecturerStudentRoster() {
                                                         >
                                                             <div className="text-[10px] font-mono font-bold text-slate-400 dark:text-neutral-500">{cleanLabel}</div>
                                                             <div className="text-lg font-extrabold text-purple-600 dark:text-purple-400 font-mono my-0.5">{sec.predicted_score}</div>
-                                                            <div className="text-[9px] font-mono text-slate-500 dark:text-neutral-550 leading-tight">
+                                                            <div className="text-[9px] font-mono text-slate-500 dark:text-neutral-400 leading-tight">
                                                                 Tingkat Keyakinan AI: {Math.round(sec.confidence * 100)}%
                                                             </div>
                                                         </div>
                                                     );
                                                 })}
                                                 {predictionDetails.sections.length === 0 && (
-                                                    <div className="col-span-full py-4 text-center text-xs text-slate-500 dark:text-neutral-550">Tidak ada lembar jawaban terprediksi untuk tugas ini.</div>
+                                                    <div className="col-span-full py-4 text-center text-xs text-slate-500 dark:text-neutral-400">Tidak ada lembar jawaban terprediksi untuk tugas ini.</div>
                                                 )}
                                             </div>
                                         </div>
@@ -814,7 +814,7 @@ export default function LecturerStudentRoster() {
                             <div className="px-6 py-4 border-t border-slate-100 dark:border-neutral-900 bg-slate-50 dark:bg-black/60 flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
                                 <div>
                                     {selectedStudent.submission && (
-                                        <span className="text-[10px] font-mono font-bold text-slate-450 dark:text-neutral-500 uppercase tracking-wider block">
+                                        <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-neutral-500 uppercase tracking-wider block">
                                             ID: {selectedStudent.submission.id}
                                         </span>
                                     )}
@@ -876,7 +876,7 @@ export default function LecturerStudentRoster() {
                                     )}
                                     <button
                                         onClick={() => setSelectedStudent(null)}
-                                        className="bg-slate-200 dark:bg-neutral-900 border border-slate-350 dark:border-neutral-800 text-slate-800 dark:text-neutral-400 hover:bg-slate-300 dark:hover:bg-neutral-850 px-5 py-3 rounded-xl text-xs font-bold tracking-wider transition-all cursor-pointer text-center"
+                                        className="bg-slate-200 dark:bg-neutral-900 border border-slate-300 dark:border-neutral-800 text-slate-800 dark:text-neutral-400 hover:bg-slate-300 dark:hover:bg-neutral-800 px-5 py-3 rounded-xl text-xs font-bold tracking-wider transition-all cursor-pointer text-center"
                                     >
                                         TUTUP
                                     </button>

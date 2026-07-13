@@ -8,7 +8,7 @@ export function PageLoader({ message = 'Memuat halaman...' }: { message?: string
     <div className="w-full h-full min-h-[70vh] flex flex-col items-center justify-center font-sans p-6">
       <div className="flex flex-col items-center gap-3">
         <Loader2 className="w-10 h-10 text-cyan-500 dark:text-cyan-400 animate-spin" />
-        <p className="text-slate-500 dark:text-neutral-450 text-sm animate-pulse">{message}</p>
+        <p className="text-slate-500 dark:text-neutral-400 text-sm animate-pulse">{message}</p>
       </div>
     </div>
   );
@@ -39,7 +39,7 @@ export function CardLoader({ count = 3 }: { count?: number }) {
 export function TableLoader({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
   return (
     <div className="w-full overflow-hidden rounded-xl border border-slate-200 dark:border-neutral-900 animate-pulse bg-white/50 dark:bg-black/10">
-      <div className="h-12 border-b border-slate-200 dark:border-neutral-850 bg-slate-50/50 dark:bg-black/30 flex items-center px-6 gap-4">
+      <div className="h-12 border-b border-slate-200 dark:border-neutral-800 bg-slate-50/50 dark:bg-black/30 flex items-center px-6 gap-4">
         {Array.from({ length: cols }).map((_, idx) => (
           <div key={idx} className="h-4 bg-slate-200 dark:bg-neutral-900 rounded flex-1"></div>
         ))}

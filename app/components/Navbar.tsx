@@ -258,14 +258,14 @@ export default function Navbar({
         {/* Right section: Theme Toggle + Profile Dropdown */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Theme Toggle Button */}
-          <AnimatedThemeToggle className="w-10 h-10 rounded-xl border border-slate-250 hover:border-slate-350 dark:border-neutral-800 text-slate-650 hover:text-slate-800 dark:text-neutral-450 dark:hover:text-white dark:hover:border-cyan-500/40 transition-all flex items-center justify-center" />
+          <AnimatedThemeToggle className="w-10 h-10 rounded-xl border border-slate-250 hover:border-slate-300 dark:border-neutral-800 text-slate-600 hover:text-slate-800 dark:text-neutral-400 dark:hover:text-white dark:hover:border-cyan-500/40 transition-all flex items-center justify-center" />
 
           {/* Profile Dropdown */}
           <div className="relative flex-shrink-0" ref={dropdownRef}>
             {/* Trigger Button */}
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="h-10 flex items-center gap-1.5 sm:gap-2.5 px-2.5 sm:px-3 rounded-xl bg-slate-100 border border-slate-250 hover:border-slate-350 dark:bg-black/40 dark:border-neutral-800 dark:hover:border-cyan-500/40 transition-all duration-300 cursor-pointer select-none"
+              className="h-10 flex items-center gap-1.5 sm:gap-2.5 px-2.5 sm:px-3 rounded-xl bg-slate-100 border border-slate-250 hover:border-slate-300 dark:bg-black/40 dark:border-neutral-800 dark:hover:border-cyan-500/40 transition-all duration-300 cursor-pointer select-none"
             >
               {/* Avatar circular */}
               {avatarUrl && !imageError ? (

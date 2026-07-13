@@ -143,7 +143,7 @@ export default function LecturerDashboard() {
                 {[1, 2].map((idx) => (
                   <div key={idx} className="bg-white dark:glass-card border border-slate-200 dark:border-neutral-900 rounded-2xl p-5 flex flex-col justify-between animate-pulse h-44">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-850"></div>
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800"></div>
                       <div className="space-y-2">
                         <div className="h-3 w-16 bg-slate-100 dark:bg-neutral-900 rounded"></div>
                         <div className="h-5 w-40 bg-slate-100 dark:bg-neutral-900 rounded"></div>

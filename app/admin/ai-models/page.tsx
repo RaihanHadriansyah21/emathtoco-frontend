@@ -254,7 +254,7 @@ export default function AIModelInventoryPage() {
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl p-6 shadow-xl backdrop-blur-md space-y-4">
         <div>
-          <h2 className="text-sm font-bold text-slate-700 dark:text-neutral-350 uppercase tracking-widest flex items-center gap-2">
+          <h2 className="text-sm font-bold text-slate-700 dark:text-neutral-300 uppercase tracking-widest flex items-center gap-2">
             <Cpu className="w-4 h-4 text-purple-500 dark:text-purple-400" />
             Konfigurasi Model Aktif (Engine AI)
           </h2>
@@ -270,7 +270,7 @@ export default function AIModelInventoryPage() {
           </div>
         ) : backendError ? (
           <div className="bg-red-500/5 border border-red-500/20 text-red-500 dark:text-red-400 p-4 rounded-xl text-xs space-y-2">
-            <p className="font-semibold text-red-650 dark:text-red-400">Koneksi Backend Gagal:</p>
+            <p className="font-semibold text-red-700 dark:text-red-400">Koneksi Backend Gagal:</p>
             <p>{backendError}</p>
             <button
               onClick={loadBackendModels}
@@ -530,19 +530,19 @@ export default function AIModelInventoryPage() {
             <GlassTable className="min-w-[650px]">
               <GlassTableHeader>
                 <tr>
-                  <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 whitespace-nowrap">Model AI</th>
-                  <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 text-center whitespace-nowrap">Penggunaan</th>
-                  <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 text-center whitespace-nowrap">Rata-rata Nilai</th>
-                  <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-450 text-center whitespace-nowrap">Finalized</th>
+                  <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Model AI</th>
+                  <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Penggunaan</th>
+                  <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Rata-rata Nilai</th>
+                  <th className="py-3.5 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Finalized</th>
                 </tr>
               </GlassTableHeader>
               <tbody>
                 {models.map((m, idx) => (
                   <GlassTableRow key={idx} hoverable={true}>
-                    <td className="py-3.5 px-5 text-sm font-semibold text-slate-850 dark:text-neutral-200 whitespace-nowrap">{m.model_name}</td>
-                    <td className="py-3.5 px-5 text-center text-sm font-mono text-slate-600 dark:text-neutral-450 whitespace-nowrap">{m.count}</td>
+                    <td className="py-3.5 px-5 text-sm font-semibold text-slate-900 dark:text-neutral-200 whitespace-nowrap">{m.model_name}</td>
+                    <td className="py-3.5 px-5 text-center text-sm font-mono text-slate-600 dark:text-neutral-400 whitespace-nowrap">{m.count}</td>
                     <td className="py-3.5 px-5 text-center text-sm font-mono text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{m.avg_score !== null ? m.avg_score : '-'}</td>
-                    <td className="py-3.5 px-5 text-center text-sm font-mono text-slate-650 dark:text-neutral-400 whitespace-nowrap">{m.finalized_count}</td>
+                    <td className="py-3.5 px-5 text-center text-sm font-mono text-slate-600 dark:text-neutral-400 whitespace-nowrap">{m.finalized_count}</td>
                   </GlassTableRow>
                 ))}
               </tbody>

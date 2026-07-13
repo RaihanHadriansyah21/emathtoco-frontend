@@ -204,7 +204,7 @@ export default function ImageDiagnostics() {
 
                     <div 
                         onClick={() => fileInputRef.current?.click()}
-                        className="border-2 border-dashed border-slate-350 dark:border-neutral-800 hover:border-cyan-500/50 dark:hover:border-cyan-500/40 rounded-2xl p-8 text-center cursor-pointer transition-colors bg-slate-50/50 dark:bg-neutral-950/40"
+                        className="border-2 border-dashed border-slate-300 dark:border-neutral-800 hover:border-cyan-500/50 dark:hover:border-cyan-500/40 rounded-2xl p-8 text-center cursor-pointer transition-colors bg-slate-50/50 dark:bg-neutral-950/40"
                     >
                         <ImageIcon className="w-12 h-12 text-slate-400 dark:text-neutral-600 mx-auto mb-3" />
                         <span className="text-sm font-semibold text-slate-600 dark:text-neutral-400 block">Klik untuk memilih gambar lembar jawaban</span>

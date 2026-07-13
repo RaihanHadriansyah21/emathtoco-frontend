@@ -3580,7 +3580,7 @@ export default function UploadWorkspace() {
 
                         <div className="mb-6 space-y-2">
                             <h4 className="text-xs font-bold text-slate-500 dark:text-neutral-500 uppercase tracking-wider">Daftar Bagian Belum Diunggah:</h4>
-                            <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1.5 bg-slate-50 dark:bg-neutral-950/60 border border-slate-200 dark:border-neutral-850 rounded-xl">
+                            <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1.5 bg-slate-50 dark:bg-neutral-950/60 border border-slate-200 dark:border-neutral-800 rounded-xl">
                                 {slots.filter(s => s.status !== 'success').map(s => (
                                     <span key={s.label} className="px-2.5 py-1 text-xs font-mono font-bold bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-md uppercase">
                                         {s.label.toUpperCase()}

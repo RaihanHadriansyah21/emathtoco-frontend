@@ -142,7 +142,7 @@ export default function SettingsPage() {
                     </div>
 
                     {errorMessage && (
-                        <div className="mb-6 flex items-start gap-3 bg-red-50 border border-red-200 text-red-650 p-4 rounded-xl text-sm animate-in fade-in duration-200 dark:bg-red-950/20 dark:border-red-900/50 dark:text-red-400">
+                        <div className="mb-6 flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm animate-in fade-in duration-200 dark:bg-red-950/20 dark:border-red-900/50 dark:text-red-400">
                             <p className="font-medium leading-relaxed">{errorMessage}</p>
                         </div>
                     )}

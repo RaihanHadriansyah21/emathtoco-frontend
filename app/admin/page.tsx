@@ -212,10 +212,10 @@ export default function AdminDashboard() {
                   <GlassTable className="min-w-[650px]">
                     <GlassTableHeader>
                       <tr>
-                        <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-400 whitespace-nowrap">Mahasiswa</th>
-                        <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-400 whitespace-nowrap">Mata Kuliah</th>
-                        <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-400 whitespace-nowrap">Status</th>
-                        <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-550 dark:text-neutral-400 whitespace-nowrap">Waktu</th>
+                        <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mahasiswa</th>
+                        <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mata Kuliah</th>
+                        <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Status</th>
+                        <th className="py-3 px-5 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Waktu</th>
                       </tr>
                     </GlassTableHeader>
                     <tbody>
@@ -229,7 +229,7 @@ export default function AdminDashboard() {
                               <div className="text-sm font-semibold text-slate-800 dark:text-white">{mhs?.nama_lengkap || 'Unknown'}</div>
                               <div className="text-[10px] text-slate-400 dark:text-neutral-500 font-mono mt-0.5">{mhs?.nim_nip || '-'}</div>
                             </td>
-                            <td className="py-3.5 px-5 text-sm text-slate-650 dark:text-neutral-350 whitespace-nowrap">{mk?.nama_matkul || '-'}</td>
+                            <td className="py-3.5 px-5 text-sm text-slate-600 dark:text-neutral-300 whitespace-nowrap">{mk?.nama_matkul || '-'}</td>
                             <td className="py-3.5 px-5 whitespace-nowrap">
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${badge.bg} ${badge.border} ${badge.color}`}>
                                 {badge.icon} {badge.text}

@@ -232,7 +232,7 @@ export default function AuditLogPage() {
     // STUDENT REMOVED FROM COURSE — Red (Bahaya / Menghapus data)
     if (act === 'STUDENT_REMOVED_FROM_COURSE') {
       return {
-        badge: 'text-red-500 bg-red-500/10 border-red-500/20 dark:text-red-450 dark:bg-red-400/10 dark:border-red-400/20 font-bold',
+        badge: 'text-red-500 bg-red-500/10 border-red-500/20 dark:text-red-400 dark:bg-red-400/10 dark:border-red-400/20 font-bold',
         text: 'danger'
       };
     }
@@ -296,7 +296,7 @@ export default function AuditLogPage() {
     // QR JOIN CREATED — Emerald (Hijau aman)
     if (act === 'QR_JOIN_CREATED') {
       return {
-        badge: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20 dark:text-emerald-450 dark:bg-emerald-400/10 dark:border-emerald-400/20',
+        badge: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20 dark:text-emerald-400 dark:bg-emerald-400/10 dark:border-emerald-400/20',
         text: 'success'
       };
     }
@@ -304,7 +304,7 @@ export default function AuditLogPage() {
     // SUBMISSION — Sky
     if (act === 'SUBMISSION_SUBMITTED' || act === 'ANSWER_UPLOADED') {
       return {
-        badge: 'text-sky-500 bg-sky-500/10 border-sky-500/20 dark:text-sky-450 dark:bg-sky-400/10 dark:border-sky-400/20',
+        badge: 'text-sky-500 bg-sky-500/10 border-sky-500/20 dark:text-sky-400 dark:bg-sky-400/10 dark:border-sky-400/20',
         text: 'info'
       };
     }
@@ -328,7 +328,7 @@ export default function AuditLogPage() {
     // QR JOIN REVOKED — Amber / Yellow
     if (act === 'QR_JOIN_REVOKED') {
       return {
-        badge: 'text-amber-650 bg-amber-500/10 border-amber-500/20 dark:text-amber-450 dark:bg-amber-400/10 dark:border-amber-400/20',
+        badge: 'text-amber-600 bg-amber-500/10 border-amber-500/20 dark:text-amber-400 dark:bg-amber-400/10 dark:border-amber-400/20',
         text: 'warning'
       };
     }
@@ -459,7 +459,7 @@ export default function AuditLogPage() {
         <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-6 text-center">
           <ShieldAlert className="w-10 h-10 text-red-500 mx-auto mb-3" />
           <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-2">Tabel Audit Log Belum Tersedia</h3>
-          <p className="text-xs text-slate-550 dark:text-neutral-400 max-w-md mx-auto">
+          <p className="text-xs text-slate-500 dark:text-neutral-400 max-w-md mx-auto">
             Gunakan file migrasi SQL <code className="bg-slate-100 dark:bg-neutral-900/60 px-1.5 py-0.5 rounded text-cyan-600 dark:text-cyan-400">migration_audit_log.sql</code> di Supabase SQL Editor untuk memperbarui skema tabel.
           </p>
         </div>
@@ -468,38 +468,38 @@ export default function AuditLogPage() {
           {/* Sidang / Demo Mode Statistics Cards */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-white dark:bg-[#0A0A0F]/60 border border-slate-200 dark:border-neutral-900/80 rounded-2xl p-4 shadow-lg backdrop-blur-md flex flex-col justify-between">
-              <span className="text-[10px] font-bold text-slate-550 dark:text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
+              <span className="text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
                 <Database className="w-3 h-3 text-cyan-500" /> Total Logs
               </span>
-              <span className="text-2xl font-extrabold text-slate-855 dark:text-white font-mono mt-2">{totalLogsCount}</span>
+              <span className="text-2xl font-extrabold text-slate-900 dark:text-white font-mono mt-2">{totalLogsCount}</span>
             </div>
             
             <div className="bg-white dark:bg-[#0A0A0F]/60 border border-slate-200 dark:border-neutral-900/80 rounded-2xl p-4 shadow-lg backdrop-blur-md flex flex-col justify-between">
-              <span className="text-[10px] font-bold text-slate-550 dark:text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
+              <span className="text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
                 <UserCheck className="w-3 h-3 text-emerald-500" /> Total Login
               </span>
-              <span className="text-2xl font-extrabold text-slate-855 dark:text-white font-mono mt-2">{totalLoginCount}</span>
+              <span className="text-2xl font-extrabold text-slate-900 dark:text-white font-mono mt-2">{totalLoginCount}</span>
             </div>
 
             <div className="bg-white dark:bg-[#0A0A0F]/60 border border-slate-200 dark:border-neutral-900/80 rounded-2xl p-4 shadow-lg backdrop-blur-md flex flex-col justify-between">
-              <span className="text-[10px] font-bold text-slate-550 dark:text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
+              <span className="text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
                 <Cpu className="w-3 h-3 text-purple-500" /> Total AI Run
               </span>
-              <span className="text-2xl font-extrabold text-slate-855 dark:text-white font-mono mt-2">{totalAIRunCount}</span>
+              <span className="text-2xl font-extrabold text-slate-900 dark:text-white font-mono mt-2">{totalAIRunCount}</span>
             </div>
 
             <div className="bg-white dark:bg-[#0A0A0F]/60 border border-slate-200 dark:border-neutral-900/80 rounded-2xl p-4 shadow-lg backdrop-blur-md flex flex-col justify-between">
-              <span className="text-[10px] font-bold text-slate-550 dark:text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
+              <span className="text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
                 <Award className="w-3 h-3 text-amber-500" /> Total Finalisasi
               </span>
-              <span className="text-2xl font-extrabold text-slate-855 dark:text-white font-mono mt-2">{totalFinalizedCount}</span>
+              <span className="text-2xl font-extrabold text-slate-900 dark:text-white font-mono mt-2">{totalFinalizedCount}</span>
             </div>
 
             <div className="bg-white dark:bg-[#0A0A0F]/60 border border-slate-200 dark:border-neutral-900/80 rounded-2xl p-4 col-span-2 md:col-span-1 shadow-lg backdrop-blur-md flex flex-col justify-between">
-              <span className="text-[10px] font-bold text-slate-550 dark:text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
+              <span className="text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
                 <RefreshCcw className="w-3 h-3 text-rose-500" /> Total Reset
               </span>
-              <span className="text-2xl font-extrabold text-slate-855 dark:text-white font-mono mt-2">{totalResetCount}</span>
+              <span className="text-2xl font-extrabold text-slate-900 dark:text-white font-mono mt-2">{totalResetCount}</span>
             </div>
           </div>
 
@@ -518,7 +518,7 @@ export default function AuditLogPage() {
             <select 
               value={actionFilter} 
               onChange={(e) => setActionFilter(e.target.value)}
-              className="bg-slate-50 dark:bg-black border border-slate-200 dark:border-neutral-900 rounded-xl py-2.5 px-4 text-sm text-slate-700 dark:text-neutral-350 focus:outline-none cursor-pointer"
+              className="bg-slate-50 dark:bg-black border border-slate-200 dark:border-neutral-900 rounded-xl py-2.5 px-4 text-sm text-slate-700 dark:text-neutral-300 focus:outline-none cursor-pointer"
             >
               <option value="all">Semua Action</option>
               {uniqueActions.map(a => <option key={a} value={a}>{a}</option>)}
@@ -570,7 +570,7 @@ export default function AuditLogPage() {
                             {log.action}
                           </span>
                         </td>
-                        <td className="py-3.5 px-5 text-xs font-mono text-slate-650 dark:text-neutral-350 whitespace-nowrap">
+                        <td className="py-3.5 px-5 text-xs font-mono text-slate-600 dark:text-neutral-300 whitespace-nowrap">
                           {log.target}
                         </td>
                         <td className="py-3.5 px-5 text-center whitespace-nowrap">
@@ -594,7 +594,7 @@ export default function AuditLogPage() {
               {/* Pagination */}
               {totalPages > 1 && (
                 <div className="border-t border-slate-200 dark:border-neutral-900 px-5 py-3 flex items-center justify-between">
-                  <span className="text-xs text-slate-450 dark:text-neutral-500">
+                  <span className="text-xs text-slate-500 dark:text-neutral-500">
                     {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, totalCount)} dari {totalCount} log
                   </span>
                   <div className="flex items-center gap-2">
@@ -665,29 +665,29 @@ export default function AuditLogPage() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   {/* Waktu */}
-                  <div className="bg-slate-50/50 dark:bg-black/30 border border-slate-100 dark:border-neutral-900/40 rounded-xl p-3 flex items-start gap-2.5">
-                    <Calendar className="w-4 h-4 text-slate-400 dark:text-neutral-500 mt-0.5" />
+                  <div className="bg-slate-50/70 dark:bg-neutral-950/80 border border-slate-100 dark:border-neutral-800 rounded-xl p-3 flex items-start gap-2.5">
+                    <Calendar className="w-4 h-4 text-slate-500 dark:text-neutral-300 mt-0.5" />
                     <div>
-                      <span className="text-[10px] text-slate-450 dark:text-neutral-500 uppercase tracking-widest font-bold">Waktu Kejadian</span>
+                      <span className="text-[10px] text-slate-500 dark:text-neutral-300 uppercase tracking-widest font-bold">Waktu Kejadian</span>
                       <p className="text-xs text-slate-800 dark:text-white font-mono mt-0.5">{formatDate(norm.created_at)}</p>
                     </div>
                   </div>
 
                   {/* Pengguna */}
-                  <div className="bg-slate-50/50 dark:bg-black/30 border border-slate-100 dark:border-neutral-900/40 rounded-xl p-3 flex items-start gap-2.5">
-                    <User className="w-4 h-4 text-slate-400 dark:text-neutral-500 mt-0.5" />
+                  <div className="bg-slate-50/70 dark:bg-neutral-950/80 border border-slate-100 dark:border-neutral-800 rounded-xl p-3 flex items-start gap-2.5">
+                    <User className="w-4 h-4 text-slate-500 dark:text-neutral-300 mt-0.5" />
                     <div>
-                      <span className="text-[10px] text-slate-450 dark:text-neutral-500 uppercase tracking-widest font-bold">Aktor Aksi</span>
+                      <span className="text-[10px] text-slate-500 dark:text-neutral-300 uppercase tracking-widest font-bold">Aktor Aksi</span>
                       <p className="text-xs text-slate-800 dark:text-white font-semibold mt-0.5">{norm.userName}</p>
-                      <p className="text-[9px] text-slate-400 uppercase font-mono tracking-wider">{norm.role}</p>
+                      <p className="text-[9px] text-slate-500 dark:text-neutral-300 uppercase font-mono tracking-wider">{norm.role}</p>
                     </div>
                   </div>
 
                   {/* Action */}
-                  <div className="bg-slate-50/50 dark:bg-black/30 border border-slate-100 dark:border-neutral-900/40 rounded-xl p-3 flex items-start gap-2.5">
-                    <Tag className="w-4 h-4 text-slate-400 dark:text-neutral-500 mt-0.5" />
+                  <div className="bg-slate-50/70 dark:bg-neutral-950/80 border border-slate-100 dark:border-neutral-800 rounded-xl p-3 flex items-start gap-2.5">
+                    <Tag className="w-4 h-4 text-slate-500 dark:text-neutral-300 mt-0.5" />
                     <div>
-                      <span className="text-[10px] text-slate-450 dark:text-neutral-500 uppercase tracking-widest font-bold">Nama Aksi</span>
+                      <span className="text-[10px] text-slate-500 dark:text-neutral-300 uppercase tracking-widest font-bold">Nama Aksi</span>
                       <div className="mt-1">
                         <span className={`inline-block px-2 py-0.5 rounded-md border text-[9px] font-extrabold uppercase tracking-wider ${theme.badge}`}>
                           {norm.action}
@@ -697,10 +697,10 @@ export default function AuditLogPage() {
                   </div>
 
                   {/* Target */}
-                  <div className="bg-slate-50/50 dark:bg-black/30 border border-slate-100 dark:border-neutral-900/40 rounded-xl p-3 flex items-start gap-2.5">
-                    <BookOpen className="w-4 h-4 text-slate-400 dark:text-neutral-500 mt-0.5" />
+                  <div className="bg-slate-50/70 dark:bg-neutral-950/80 border border-slate-100 dark:border-neutral-800 rounded-xl p-3 flex items-start gap-2.5">
+                    <BookOpen className="w-4 h-4 text-slate-500 dark:text-neutral-300 mt-0.5" />
                     <div>
-                      <span className="text-[10px] text-slate-450 dark:text-neutral-500 uppercase tracking-widest font-bold">Objek Sasaran</span>
+                      <span className="text-[10px] text-slate-500 dark:text-neutral-300 uppercase tracking-widest font-bold">Objek Sasaran</span>
                       <p className="text-xs text-slate-800 dark:text-white font-mono mt-0.5">{norm.target}</p>
                     </div>
                   </div>
@@ -708,9 +708,9 @@ export default function AuditLogPage() {
 
                 {/* Detail JSON (hardened JSON parsing) */}
                 <div className="space-y-1.5">
-                  <span className="text-[10px] text-slate-400 dark:text-neutral-500 uppercase tracking-widest font-bold">Metadata / Detail Perubahan (JSON)</span>
-                  <div className="relative bg-slate-50 dark:bg-black/70 border border-slate-200 dark:border-neutral-900 rounded-xl p-4 max-h-[250px] overflow-y-auto font-mono text-xs">
-                    <pre className="text-slate-800 dark:text-neutral-350 leading-relaxed whitespace-pre-wrap">
+                  <span className="text-[10px] text-slate-500 dark:text-neutral-300 uppercase tracking-widest font-bold">Metadata / Detail Perubahan (JSON)</span>
+                  <div className="relative bg-slate-50 dark:bg-neutral-950/90 border border-slate-200 dark:border-neutral-800 rounded-xl p-4 max-h-[250px] overflow-y-auto font-mono text-xs">
+                    <pre className="text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
                       {typeof norm.detail === 'object' && norm.detail !== null
                         ? JSON.stringify(norm.detail, null, 2)
                         : String(norm.detail || '-')}

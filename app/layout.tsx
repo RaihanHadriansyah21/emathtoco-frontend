@@ -27,7 +27,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem storageKey="emathoco-theme">
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem storageKey="emathoco-theme">
           <BackendStatusProvider>
             <AuthGate>
               <ClickSpark

@@ -505,7 +505,7 @@ export default function StudentDashboard() {
                 {[1, 2].map((idx) => (
                   <div key={idx} className="bg-white dark:bg-[#0A0A0F]/80 border border-slate-200 dark:border-neutral-900 rounded-2xl p-5 flex items-center justify-between animate-pulse">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-850"></div>
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800"></div>
                       <div className="space-y-2">
                         <div className="h-3 w-16 bg-slate-100 dark:bg-neutral-900 rounded"></div>
                         <div className="h-5 w-48 bg-slate-100 dark:bg-neutral-900 rounded"></div>
@@ -640,7 +640,7 @@ export default function StudentDashboard() {
                   step={zoomRange.step}
                   value={zoomValue}
                   onChange={(e) => handleZoomChange(Number(e.target.value))}
-                  className="w-full h-1.5 bg-slate-200 dark:bg-neutral-850 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                  className="w-full h-1.5 bg-slate-200 dark:bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
                 />
               </div>
             )}

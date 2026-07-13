@@ -180,7 +180,7 @@ export default function ExportCSVModal({
                 className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all duration-200 flex-shrink-0 ${
                   finalizedOnly
                     ? 'bg-emerald-500/20 border-emerald-500/50'
-                    : 'bg-slate-50 border-slate-250 dark:bg-neutral-950 dark:border-neutral-800 group-hover:border-slate-350 dark:group-hover:border-neutral-700'
+                    : 'bg-slate-50 border-slate-250 dark:bg-neutral-950 dark:border-neutral-800 group-hover:border-slate-300 dark:group-hover:border-neutral-700'
                 }`}
               >
                 {finalizedOnly && <CheckCircle className="w-3 h-3 text-emerald-500 dark:text-emerald-400" />}
@@ -283,7 +283,7 @@ export default function ExportCSVModal({
                     onClick={() => setSelectedModel(m)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       selectedModel === m
-                        ? 'bg-purple-500/10 dark:bg-purple-500/15 border border-purple-500/30 text-purple-650 dark:text-purple-400'
+                        ? 'bg-purple-500/10 dark:bg-purple-500/15 border border-purple-500/30 text-purple-700 dark:text-purple-400'
                         : 'bg-slate-100 border border-slate-205 dark:bg-neutral-950 dark:border-neutral-800 text-slate-500 dark:text-neutral-400 hover:border-slate-300 dark:hover:border-neutral-700 hover:bg-slate-200 dark:hover:bg-neutral-900'
                     }`}
                   >

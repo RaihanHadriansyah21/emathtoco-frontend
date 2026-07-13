@@ -49,7 +49,7 @@ interface GlassTableHeaderProps {
 
 export function GlassTableHeader({ children, className = '' }: GlassTableHeaderProps) {
   return (
-    <thead className={`sticky top-0 z-10 border-b border-slate-200 dark:border-neutral-850 bg-slate-50/80 dark:bg-[#0A0A0F]/90 backdrop-blur-sm ${className}`}>
+    <thead className={`sticky top-0 z-10 border-b border-slate-200 dark:border-neutral-800 bg-slate-50/80 dark:bg-[#0A0A0F]/90 backdrop-blur-sm ${className}`}>
       {children}
     </thead>
   );
@@ -99,7 +99,7 @@ export function EmptyState({
         {icon || <Inbox className="w-6 h-6" />}
       </div>
       <h3 className="text-sm font-bold text-slate-800 dark:text-neutral-200 mb-1">{title}</h3>
-      <p className="text-xs text-slate-500 dark:text-neutral-450 max-w-xs leading-relaxed">{description}</p>
+      <p className="text-xs text-slate-500 dark:text-neutral-400 max-w-xs leading-relaxed">{description}</p>
     </div>
   );
 }
