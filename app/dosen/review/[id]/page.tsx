@@ -956,7 +956,10 @@ export default function ReviewWorkspace() {
     }
   };
 
-  const isReadOnly = submission?.ai_status === 'finalized' || submission?.status_submit === 'finalized';
+  const isFinalized =
+    String(submission?.ai_status || '').toLowerCase() === 'finalized' ||
+    String(submission?.status_submit || '').toLowerCase() === 'finalized';
+  const isReadOnly = isFinalized;
 
   const isProcessing = isPredicting || (isAIActive && !isBackendOffline);
   const submissionStatus = submission?.status_submit;
@@ -1689,15 +1692,26 @@ export default function ReviewWorkspace() {
                 <button
                   onClick={runAISimulation}
                   disabled={isAIProcessing || isReadOnly}
-                  className={`w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-600 hover:via-blue-600 hover:to-indigo-700 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all duration-300 shadow-lg shadow-cyan-500/10 text-sm tracking-widest cursor-pointer active:scale-[0.99] ${(isAIProcessing || isReadOnly) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  aria-disabled={isAIProcessing || isReadOnly}
+                  className={`w-full flex items-center justify-center gap-2 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all duration-300 text-sm tracking-widest ${
+                    isReadOnly
+                      ? 'bg-slate-300 dark:bg-neutral-800 text-slate-500 dark:text-neutral-500 border border-slate-300 dark:border-neutral-700 cursor-not-allowed shadow-none'
+                      : isAIProcessing
+                        ? 'bg-gradient-to-r from-slate-400 to-slate-500 dark:from-neutral-800 dark:to-neutral-700 opacity-70 cursor-not-allowed shadow-none'
+                        : 'bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-600 hover:via-blue-600 hover:to-indigo-700 shadow-lg shadow-cyan-500/10 cursor-pointer active:scale-[0.99]'
+                  }`}
                 >
-                  {isPredicting || isAIProcessing ? (
+                  {isReadOnly ? (
+                    <Lock className="w-4 h-4" />
+                  ) : isPredicting || isAIProcessing ? (
                     <Loader2 className="w-4 h-4 animate-spin text-white" />
                   ) : (
                     <Play className="w-4 h-4 fill-white" />
                   )}
                   <span>
-                    {isPredicting
+                    {isReadOnly
+                      ? 'PENILAIAN TELAH FINAL'
+                      : isPredicting
                       ? 'Memulai Prediksi...'
                       : isAIProcessing
                         ? 'Model sedang memproses jawaban...'
