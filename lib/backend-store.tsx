@@ -36,7 +36,7 @@ function updateSnapshot(state: BackendState) {
 
 async function performHealthCheck(): Promise<BackendState> {
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 4000);
+  const timeoutId = window.setTimeout(() => controller.abort(), 8000);
 
   try {
     const response = await fetch(`${API_URL}/health/ready`, {
@@ -94,7 +94,7 @@ export function BackendStatusProvider({ children }: { children: React.ReactNode 
       if (nextState === 'offline') {
         consecutiveFailuresRef.current += 1;
         const confirmedState: BackendState =
-          consecutiveFailuresRef.current >= 2 ? 'offline' : 'degraded';
+          consecutiveFailuresRef.current >= 3 ? 'offline' : 'degraded';
         setState(confirmedState);
         updateSnapshot(confirmedState);
         scheduleNext(confirmedState);

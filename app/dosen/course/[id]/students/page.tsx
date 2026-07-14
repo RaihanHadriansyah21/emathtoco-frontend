@@ -24,7 +24,6 @@ import {
 import Navbar from '../../../../components/Navbar';
 import ToastContainer from '../../../../components/Toast';
 import { useToast } from '@/app/hooks/useToast';
-import { GlassTable, GlassTableHeader, GlassTableRow, ResponsiveTableWrapper } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase';
 import { apiGet } from '@/lib/api-client';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -544,7 +543,7 @@ export default function LecturerStudentRoster() {
                     </select>
                 </div>
 
-                {/* TABLE OF STUDENTS */}
+                {/* STUDENT CARDS */}
                 {isLoadingData ? (
                     <div className="flex flex-col items-center justify-center py-20 bg-white/40 dark:bg-[#0A0A0F]/20 border border-slate-200 dark:border-neutral-950 rounded-2xl gap-3">
                         <Loader2 className="w-8 h-8 text-cyan-600 dark:text-cyan-400 animate-spin" />
@@ -560,99 +559,96 @@ export default function LecturerStudentRoster() {
                         <p className="text-slate-500 dark:text-neutral-400 text-sm">Tidak ada data mahasiswa yang cocok dengan kriteria.</p>
                     </div>
                 ) : (
-                    <ResponsiveTableWrapper className="bg-white dark:bg-[#0A0A0F]/80 shadow-xl">
-                        <GlassTable className="min-w-[950px]">
-                            <GlassTableHeader>
-                                <tr>
-                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap w-[40px]">Foto</th>
-                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Mahasiswa</th>
-                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Kelas</th>
-                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Status Submit</th>
-                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Lembar Upload</th>
-                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-center whitespace-nowrap">Nilai Final</th>
-                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 whitespace-nowrap">Waktu Submit</th>
-                                    <th className="py-4 px-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 text-right whitespace-nowrap">Aksi</th>
-                                </tr>
-                            </GlassTableHeader>
-                            <tbody>
-                                {filteredStudents.map((student) => {
-                                    const statusBadge = getStatusBadge(student.submission);
-                                    const sheetsUploaded = student.submission?.lembar_jawaban?.length || 0;
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                        {filteredStudents.map((student) => {
+                            const statusBadge = getStatusBadge(student.submission);
+                            const sheetsUploaded = student.submission?.lembar_jawaban?.length || 0;
+                            const finalScore = student.submission?.nilai_akhir;
+                            const hasFinalScore = typeof finalScore === 'number';
 
-                                    return (
-                                        <GlassTableRow key={student.id} onClick={() => handleOpenModal(student)} hoverable={true}>
-                                            {/* Profile Photo */}
-                                            <td className="py-4 px-6 whitespace-nowrap">
-                                                {student.foto_profil_url ? (
-                                                    <img
-                                                        src={student.foto_profil_url}
-                                                        alt={student.nama_lengkap}
-                                                        className="w-10 h-10 rounded-xl object-cover border border-slate-200 dark:border-neutral-800"
-                                                    />
-                                                ) : (
-                                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 flex items-center justify-center font-bold text-cyan-400 text-xs tracking-wider font-mono">
-                                                        {getInitials(student.nama_lengkap)}
-                                                    </div>
-                                                )}
-                                            </td>
-
-                                            {/* Profile Details */}
-                                            <td className="py-4 px-6 whitespace-nowrap">
-                                                <div className="text-sm font-semibold text-slate-800 dark:text-white group-hover:text-cyan-600 dark:group-hover:text-cyan-300 transition-colors duration-200">{student.nama_lengkap}</div>
-                                                <div className="text-xs text-slate-500 dark:text-neutral-400 font-mono mt-0.5">NIM: {student.nim_nip}</div>
-                                            </td>
-
-                                            {/* Class */}
-                                            <td className="py-4 px-6 text-sm font-semibold text-slate-700 dark:text-neutral-300 whitespace-nowrap">{student.kelas}</td>
-
-                                            {/* Submission Status */}
-                                            <td className="py-4 px-6 text-center whitespace-nowrap">
-                                                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-bold uppercase tracking-wider ${statusBadge.bg} ${statusBadge.border} ${statusBadge.color}`}>
-                                                    <span>{statusBadge.icon}</span>
-                                                    <span>{statusBadge.text}</span>
-                                                </span>
-                                            </td>
-
-                                            {/* Sheets uploaded */}
-                                            <td className="py-4 px-6 text-center whitespace-nowrap">
-                                                {student.submission ? (
-                                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 text-sm font-mono font-bold">
-                                                        <span className={sheetsUploaded === 24 ? 'text-cyan-600 dark:text-cyan-400' : 'text-slate-500 dark:text-neutral-400'}>{sheetsUploaded}</span>
-                                                        <span className="text-slate-300 dark:text-neutral-600">/</span>
-                                                        <span className="text-slate-400 dark:text-neutral-500">24</span>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-slate-400 dark:text-neutral-600 font-mono text-sm">-</span>
-                                                )}
-                                            </td>
-
-                                            {/* Final Score */}
-                                            <td className="py-4 px-6 text-center whitespace-nowrap">
-                                                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 text-sm font-mono font-bold ${student.submission?.nilai_akhir !== null ? 'text-purple-600 dark:text-purple-400' : 'text-slate-400 dark:text-neutral-600'}`}>
-                                                    {student.submission?.nilai_akhir !== null ? `${student.submission?.nilai_akhir} / 100` : '-'}
+                            return (
+                                <motion.button
+                                    key={student.id}
+                                    type="button"
+                                    variants={fadeIn}
+                                    initial="initial"
+                                    animate="animate"
+                                    onClick={() => handleOpenModal(student)}
+                                    className="group text-left rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-lg shadow-slate-200/50 transition-all hover:-translate-y-0.5 hover:border-cyan-400/60 hover:shadow-cyan-500/10 dark:border-neutral-900 dark:bg-[#090A10]/85 dark:shadow-black/30 dark:hover:border-cyan-500/35 cursor-pointer"
+                                >
+                                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                        <div className="flex min-w-0 items-start gap-3">
+                                            {student.foto_profil_url ? (
+                                                <img
+                                                    src={student.foto_profil_url}
+                                                    alt={student.nama_lengkap}
+                                                    className="h-14 w-14 rounded-2xl object-cover border border-slate-200 dark:border-neutral-800 flex-shrink-0"
+                                                />
+                                            ) : (
+                                                <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 flex items-center justify-center font-extrabold text-cyan-500 dark:text-cyan-400 text-xs tracking-wider font-mono flex-shrink-0">
+                                                    {getInitials(student.nama_lengkap)}
                                                 </div>
-                                            </td>
+                                            )}
+                                            <div className="min-w-0">
+                                                <h3 className="truncate text-base font-extrabold text-slate-900 transition-colors group-hover:text-cyan-700 dark:text-white dark:group-hover:text-cyan-300">
+                                                    {student.nama_lengkap}
+                                                </h3>
+                                                <p className="mt-1 text-xs font-mono text-slate-500 dark:text-neutral-400">NIM: {student.nim_nip}</p>
+                                                <div className="mt-2 inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-600 dark:border-neutral-800 dark:bg-black/40 dark:text-neutral-300">
+                                                    {student.kelas || '-'}
+                                                </div>
+                                            </div>
+                                        </div>
 
-                                            {/* Date submitted */}
-                                            <td className="py-4 px-6 text-xs text-slate-500 dark:text-neutral-400 font-medium whitespace-nowrap">
-                                                {student.submission ? formatDate(student.submission.waktu_submit) : '-'}
-                                            </td>
+                                        <span className={`inline-flex w-fit items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider ${statusBadge.bg} ${statusBadge.border} ${statusBadge.color}`}>
+                                            <span>{statusBadge.icon}</span>
+                                            <span>{statusBadge.text}</span>
+                                        </span>
+                                    </div>
 
-                                            {/* Actions */}
-                                            <td className="py-4 px-6 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                                                <button
-                                                    onClick={() => handleOpenModal(student)}
-                                                    className="inline-flex items-center bg-gradient-to-r from-slate-100 to-slate-200 dark:from-neutral-950 dark:to-neutral-900 border border-slate-200 dark:border-neutral-800 text-slate-800 dark:text-neutral-300 px-3.5 py-2 rounded-xl text-xs font-bold tracking-wider hover:border-cyan-500/40 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all cursor-pointer"
-                                                >
-                                                    <span>DETAIL</span>
-                                                </button>
-                                            </td>
-                                        </GlassTableRow>
-                                    );
-                                })}
-                            </tbody>
-                        </GlassTable>
-                    </ResponsiveTableWrapper>
+                                    <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-neutral-900 dark:bg-black/35">
+                                            <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-neutral-500">Upload</p>
+                                            <p className="mt-1 font-mono text-sm font-extrabold">
+                                                {student.submission ? (
+                                                    <>
+                                                        <span className={sheetsUploaded === 24 ? 'text-cyan-600 dark:text-cyan-400' : 'text-slate-600 dark:text-neutral-300'}>{sheetsUploaded}</span>
+                                                        <span className="text-slate-300 dark:text-neutral-700"> / </span>
+                                                        <span className="text-slate-500 dark:text-neutral-500">24</span>
+                                                    </>
+                                                ) : (
+                                                    <span className="text-slate-400 dark:text-neutral-600">-</span>
+                                                )}
+                                            </p>
+                                        </div>
+
+                                        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-neutral-900 dark:bg-black/35">
+                                            <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-neutral-500">Nilai</p>
+                                            <p className={`mt-1 font-mono text-sm font-extrabold ${hasFinalScore ? 'text-purple-600 dark:text-purple-400' : 'text-slate-400 dark:text-neutral-600'}`}>
+                                                {hasFinalScore ? `${finalScore} / 100` : '-'}
+                                            </p>
+                                        </div>
+
+                                        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-neutral-900 dark:bg-black/35 sm:col-span-2">
+                                            <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-neutral-500">Waktu Submit</p>
+                                            <p className="mt-1 truncate text-xs font-semibold text-slate-700 dark:text-neutral-300">
+                                                {student.submission ? formatDate(student.submission.waktu_submit) : 'Belum mengumpulkan'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4 dark:border-neutral-900">
+                                        <span className="text-[11px] font-semibold text-slate-400 dark:text-neutral-500">
+                                            Klik kartu untuk melihat detail roster
+                                        </span>
+                                        <span className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-extrabold tracking-wider text-slate-700 transition-all group-hover:border-cyan-400/60 group-hover:text-cyan-600 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300 dark:group-hover:text-cyan-400">
+                                            DETAIL
+                                        </span>
+                                    </div>
+                                </motion.button>
+                            );
+                        })}
+                    </div>
                 )}
 
                 {/* STUDENT DETAIL MODAL */}
