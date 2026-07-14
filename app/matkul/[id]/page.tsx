@@ -1278,6 +1278,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
 
     const containerRef = useRef<HTMLDivElement>(null);
     const imgRef = useRef<HTMLImageElement>(null);
+    const hasAutoFitImage = useRef(false);
     
     const dragStart = useRef({ x: 0, y: 0 });
     const isDragging = useRef(false);
@@ -1285,6 +1286,31 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
     const initialScale = useRef(1);
 
     const isQuestionF = label.toLowerCase().endsWith('f');
+
+    const autoFitImageToCropGuide = () => {
+        if (!containerRef.current || !imgRef.current || !cropBox || hasAutoFitImage.current) return;
+
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const isCompactViewport = containerRect.width < 640 || containerRect.height < 560;
+        if (!isCompactViewport) {
+            hasAutoFitImage.current = true;
+            return;
+        }
+
+        const renderedImageWidth = imgRef.current.clientWidth;
+        const renderedImageHeight = imgRef.current.clientHeight;
+        if (renderedImageWidth <= 0 || renderedImageHeight <= 0) return;
+
+        const scaleNeededToCoverGuide = Math.max(
+            cropBox.width / renderedImageWidth,
+            cropBox.height / renderedImageHeight
+        );
+        const nextScale = Math.min(3, Math.max(1, scaleNeededToCoverGuide * 1.08));
+
+        setOffset({ x: 0, y: 0 });
+        setScale(nextScale);
+        hasAutoFitImage.current = true;
+    };
 
     const initializeCropBox = () => {
         if (!containerRef.current) return;
@@ -1320,6 +1346,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
 
     useEffect(() => {
         const url = URL.createObjectURL(file);
+        hasAutoFitImage.current = false;
         setImgUrl(url);
         return () => {
             URL.revokeObjectURL(url);
@@ -1335,6 +1362,14 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
     // initializeCropBox reads the latest element dimensions when the timer fires.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [imgUrl]);
+
+    useEffect(() => {
+        if (!imgUrl || !cropBox) return;
+        const timer = setTimeout(autoFitImageToCropGuide, 80);
+        return () => clearTimeout(timer);
+    // Auto-fit samples current image/crop DOM size only once per file on compact screens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [imgUrl, cropBox]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -1377,6 +1412,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
     }, [scale, offset, rotation, cropBox]);
 
     const handleReset = () => {
+        hasAutoFitImage.current = false;
         setScale(1);
         setOffset({ x: 0, y: 0 });
         setRotation(0);
@@ -1672,7 +1708,10 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
     };
 
     return (
-        <div className="fixed inset-0 bg-[#09090b]/98 backdrop-blur-md z-[9999] flex flex-col text-white select-none overflow-hidden">
+        <div
+            className="fixed inset-0 bg-[#09090b]/98 backdrop-blur-md z-[9999] flex flex-col text-white select-none overflow-hidden"
+            style={{ height: '100dvh', maxHeight: '100dvh' }}
+        >
             <div 
                 className="w-full shrink-0 bg-black/60 border-b border-white/10 flex items-center justify-between gap-2 px-3 sm:px-4 z-20"
                 style={{ paddingTop: 'env(safe-area-inset-top)', minHeight: 'calc(3rem + env(safe-area-inset-top))' }}
@@ -1708,7 +1747,10 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                         src={imgUrl}
                         alt="Preview"
                         onLoad={() => {
-                            setTimeout(() => setIsAligned(checkCoverage()), 100);
+                            setTimeout(() => {
+                                autoFitImageToCropGuide();
+                                setIsAligned(checkCoverage());
+                            }, 100);
                         }}
                         style={{
                             transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale}) rotate(${rotation}deg)`,
