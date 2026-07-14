@@ -16,7 +16,6 @@ import {
     Award,
     FileText,
     ExternalLink,
-    Mail,
     Cpu,
     Calendar,
     Trash2,
@@ -710,10 +709,6 @@ export default function LecturerStudentRoster() {
                                             <h3 className="font-extrabold text-slate-900 dark:text-white text-base truncate">{selectedStudent.nama_lengkap}</h3>
                                             <p className="text-xs font-semibold text-slate-600 dark:text-neutral-400">Kelas: <span className="text-slate-800 dark:text-neutral-200 font-mono">{selectedStudent.kelas}</span></p>
                                             <p className="text-xs font-semibold text-slate-600 dark:text-neutral-400">NIM: <span className="text-slate-800 dark:text-neutral-200 font-mono">{selectedStudent.nim_nip}</span></p>
-                                            <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-neutral-500 min-w-0">
-                                                <Mail className="w-3.5 h-3.5 flex-shrink-0" />
-                                                <span className="truncate">{selectedStudent.nim_nip}@student.kampus.ac.id</span>
-                                            </div>
                                         </div>
                                     </div>
 
