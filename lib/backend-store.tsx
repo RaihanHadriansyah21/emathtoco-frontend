@@ -94,7 +94,7 @@ export function BackendStatusProvider({ children }: { children: React.ReactNode 
       if (nextState === 'offline') {
         consecutiveFailuresRef.current += 1;
         const confirmedState: BackendState =
-          consecutiveFailuresRef.current >= 3 ? 'offline' : 'degraded';
+          consecutiveFailuresRef.current >= 2 ? 'offline' : 'degraded';
         setState(confirmedState);
         updateSnapshot(confirmedState);
         scheduleNext(confirmedState);
