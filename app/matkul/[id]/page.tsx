@@ -1294,13 +1294,19 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
         if (W_c === 0 || H_c === 0) return;
 
         const ratio = isQuestionF ? 1.4 : 1.8;
-        // Default width: 80% of container width or max 450px
-        let w = Math.min(W_c * 0.8, 450);
+        const isCompactViewport = W_c < 640 || H_c < 560;
+        const maxCropWidth = isCompactViewport ? Math.max(220, W_c - 28) : 450;
+        const cropWidthRatio = isCompactViewport ? 0.92 : 0.8;
+        const cropHeightRatio = isCompactViewport ? 0.78 : 0.8;
+
+        // On phones the old 80%/450px guide looked very narrow because the
+        // toolbar/header already takes a large part of the viewport.
+        let w = Math.min(W_c * cropWidthRatio, maxCropWidth);
         let h = w / ratio;
 
         // If height is too big for the container, scale down
-        if (h > H_c * 0.8) {
-            h = H_c * 0.8;
+        if (h > H_c * cropHeightRatio) {
+            h = H_c * cropHeightRatio;
             w = h * ratio;
         }
 
@@ -1432,6 +1438,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
         const W_c = containerRect.width;
         const H_c = containerRect.height;
         const ratio = isQuestionF ? 1.4 : 1.8;
+        const minCropWidth = Math.min(120, Math.max(88, W_c * 0.32));
 
         const dx = clientX - resizeStartCursor.x;
         let newWidth = resizeStartBox.width;
@@ -1441,7 +1448,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
 
         if (resizeActiveCorner === 'BR') {
             newWidth = resizeStartBox.width + dx;
-            newWidth = Math.max(120, Math.min(newWidth, W_c - resizeStartBox.left));
+            newWidth = Math.max(minCropWidth, Math.min(newWidth, W_c - resizeStartBox.left));
             newHeight = newWidth / ratio;
             if (newHeight > H_c - resizeStartBox.top) {
                 newHeight = H_c - resizeStartBox.top;
@@ -1449,7 +1456,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
             }
         } else if (resizeActiveCorner === 'BL') {
             newWidth = resizeStartBox.width - dx;
-            newWidth = Math.max(120, Math.min(newWidth, resizeStartBox.left + resizeStartBox.width));
+            newWidth = Math.max(minCropWidth, Math.min(newWidth, resizeStartBox.left + resizeStartBox.width));
             newHeight = newWidth / ratio;
             if (newHeight > H_c - resizeStartBox.top) {
                 newHeight = H_c - resizeStartBox.top;
@@ -1458,7 +1465,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
             newLeft = resizeStartBox.left + (resizeStartBox.width - newWidth);
         } else if (resizeActiveCorner === 'TR') {
             newWidth = resizeStartBox.width + dx;
-            newWidth = Math.max(120, Math.min(newWidth, W_c - resizeStartBox.left));
+            newWidth = Math.max(minCropWidth, Math.min(newWidth, W_c - resizeStartBox.left));
             newHeight = newWidth / ratio;
             if (newHeight > resizeStartBox.top + resizeStartBox.height) {
                 newHeight = resizeStartBox.top + resizeStartBox.height;
@@ -1467,7 +1474,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
             newTop = resizeStartBox.top + (resizeStartBox.height - newHeight);
         } else if (resizeActiveCorner === 'TL') {
             newWidth = resizeStartBox.width - dx;
-            newWidth = Math.max(120, Math.min(newWidth, resizeStartBox.left + resizeStartBox.width));
+            newWidth = Math.max(minCropWidth, Math.min(newWidth, resizeStartBox.left + resizeStartBox.width));
             newHeight = newWidth / ratio;
             if (newHeight > resizeStartBox.top + resizeStartBox.height) {
                 newHeight = resizeStartBox.top + resizeStartBox.height;
@@ -1665,21 +1672,21 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
     };
 
     return (
-        <div className="fixed inset-0 bg-[#09090b]/98 backdrop-blur-md z-[9999] flex flex-col justify-between text-white select-none">
+        <div className="fixed inset-0 bg-[#09090b]/98 backdrop-blur-md z-[9999] flex flex-col text-white select-none overflow-hidden">
             <div 
-                className="w-full bg-black/60 border-b border-white/10 flex items-center justify-between px-4 z-20"
-                style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(3.5rem + env(safe-area-inset-top))' }}
+                className="w-full shrink-0 bg-black/60 border-b border-white/10 flex items-center justify-between gap-2 px-3 sm:px-4 z-20"
+                style={{ paddingTop: 'env(safe-area-inset-top)', minHeight: 'calc(3rem + env(safe-area-inset-top))' }}
             >
                 <button
                     onClick={onClose}
-                    className="p-2 text-white/85 hover:text-white cursor-pointer transition-colors text-sm font-semibold"
+                    className="py-2 pr-2 text-white/85 hover:text-white cursor-pointer transition-colors text-xs sm:text-sm font-semibold whitespace-nowrap"
                 >
                     ✕ Batal
                 </button>
-                <span className="font-extrabold text-sm tracking-widest text-cyan-400">
+                <span className="font-extrabold text-[11px] sm:text-sm tracking-[0.22em] sm:tracking-widest text-cyan-400 text-center leading-tight truncate">
                     SESUAIKAN LEMBAR - SOAL {label.toUpperCase()}
                 </span>
-                <div className="w-8" />
+                <div className="w-10 shrink-0" />
             </div>
 
             <div
@@ -1692,7 +1699,8 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
-                className="relative flex-grow w-full overflow-hidden bg-black flex items-center justify-center cursor-move"
+                className="relative flex-1 min-h-0 w-full overflow-hidden bg-black flex items-center justify-center cursor-move"
+                style={{ touchAction: 'none' }}
             >
                 {imgUrl && (
                     <img
@@ -1705,8 +1713,8 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                         style={{
                             transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale}) rotate(${rotation}deg)`,
                             transformOrigin: 'center center',
-                            maxHeight: '75%',
-                            maxWidth: '75%',
+                            maxHeight: '94%',
+                            maxWidth: '94%',
                             objectFit: 'contain',
                             pointerEvents: 'none',
                             userSelect: 'none',
@@ -1779,7 +1787,8 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                                 flexDirection: 'column',
                                 justifyContent: 'space-between',
                                 pointerEvents: 'auto',
-                                zIndex: 100
+                                zIndex: 100,
+                                touchAction: 'none'
                             }}
                             onMouseDown={handleCropBoxMouseDown}
                             onTouchStart={handleCropBoxTouchStart}
@@ -1788,27 +1797,29 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                             {(['TL', 'TR', 'BL', 'BR'] as const).map((corner: ResizeCorner) => {
                                 const handleStyle: React.CSSProperties = {
                                     position: 'absolute',
-                                    width: '18px',
-                                    height: '18px',
+                                    width: '24px',
+                                    height: '24px',
                                     backgroundColor: '#06b6d4',
                                     border: '2px solid #ffffff',
                                     borderRadius: '50%',
                                     zIndex: 110,
                                     cursor: corner === 'TL' || corner === 'BR' ? 'nwse-resize' : 'nesw-resize',
+                                    boxShadow: '0 0 0 3px rgba(0, 0, 0, 0.35)',
+                                    touchAction: 'none'
                                 };
 
                                 if (corner === 'TL') {
-                                    handleStyle.top = '-9px';
-                                    handleStyle.left = '-9px';
+                                    handleStyle.top = '-12px';
+                                    handleStyle.left = '-12px';
                                 } else if (corner === 'TR') {
-                                    handleStyle.top = '-9px';
-                                    handleStyle.right = '-9px';
+                                    handleStyle.top = '-12px';
+                                    handleStyle.right = '-12px';
                                 } else if (corner === 'BL') {
-                                    handleStyle.bottom = '-9px';
-                                    handleStyle.left = '-9px';
+                                    handleStyle.bottom = '-12px';
+                                    handleStyle.left = '-12px';
                                 } else if (corner === 'BR') {
-                                    handleStyle.bottom = '-9px';
-                                    handleStyle.right = '-9px';
+                                    handleStyle.bottom = '-12px';
+                                    handleStyle.right = '-12px';
                                 }
 
                                 return (
@@ -1832,7 +1843,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                             <div style={{
                                 width: '100%',
                                 textAlign: 'center',
-                                padding: '8px 0',
+                                padding: '6px 0',
                                 borderBottom: '1.5px dashed rgba(255, 255, 255, 0.3)',
                                 backgroundColor: 'rgba(255, 255, 255, 0.08)',
                                 borderTopLeftRadius: '10px',
@@ -1840,7 +1851,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                                 userSelect: 'none',
                                 pointerEvents: 'none'
                             }}>
-                                <span style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1.5px', color: '#06b6d4', textShadow: '0 1px 2px rgba(0,0,0,0.9)' }}>
+                                <span style={{ fontSize: 'clamp(9px, 2.7vw, 10px)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1.3px', color: '#06b6d4', textShadow: '0 1px 2px rgba(0,0,0,0.9)' }}>
                                     Nomor Soal {label.toUpperCase()}
                                 </span>
                             </div>
@@ -1868,12 +1879,12 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     flexDirection: 'column',
-                                    gap: '4px'
+                                    gap: '3px'
                                 }}>
-                                    <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '1.5px', color: '#ffffff', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                                    <span style={{ fontSize: 'clamp(10px, 3vw, 12px)', fontWeight: '800', letterSpacing: '1.5px', color: '#ffffff', textShadow: '0 1px 2px rgba(0,0,0,0.8)', textAlign: 'center' }}>
                                         AREA JAWABAN LANSKAP
                                     </span>
-                                    <span style={{ fontSize: '8px', color: 'rgba(255, 255, 255, 0.5)', textAlign: 'center', padding: '0 4px' }}>
+                                    <span style={{ fontSize: 'clamp(8px, 2.5vw, 10px)', color: 'rgba(255, 255, 255, 0.58)', textAlign: 'center', padding: '0 4px', lineHeight: 1.25 }}>
                                         Geser/ubah ukuran bingkai atau geser gambar agar pas di dalam garis putus-putus
                                     </span>
                                 </div>
@@ -1883,19 +1894,20 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                         {/* Top Alignment Warning */}
                         <div style={{
                             position: 'absolute',
-                            top: '16px',
+                            top: '10px',
                             left: '50%',
                             transform: 'translateX(-50%)',
                             backgroundColor: 'rgba(0, 0, 0, 0.8)',
                             border: '1px solid rgba(255, 255, 255, 0.15)',
                             borderRadius: '20px',
-                            padding: '6px 16px',
+                            padding: '5px 12px',
                             textAlign: 'center',
                             pointerEvents: 'none',
                             zIndex: 110,
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '6px'
+                            gap: '6px',
+                            maxWidth: 'calc(100% - 24px)'
                         }}>
                             <span style={{
                                 width: '8px',
@@ -1904,7 +1916,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                                 backgroundColor: isAligned ? '#10b981' : '#f59e0b',
                                 boxShadow: `0 0 8px ${isAligned ? '#10b981' : '#f59e0b'}`
                             }} />
-                            <span style={{ fontSize: '11px', fontWeight: 'bold', color: isAligned ? '#10b981' : '#f59e0b' }}>
+                            <span style={{ fontSize: 'clamp(10px, 2.8vw, 11px)', fontWeight: 'bold', color: isAligned ? '#10b981' : '#f59e0b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {isAligned ? 'Area Jawaban Sesuai' : 'Geser/ubah ukuran gambar/bingkai agar sesuai'}
                             </span>
                         </div>
@@ -1912,31 +1924,31 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                 )}
             </div>
 
-            <div className="w-full bg-black/95 border-t border-white/10 py-5 px-6 flex flex-col items-center gap-5 z-20 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
-                <div className="flex items-center justify-center gap-6 w-full max-w-sm">
+            <div className="w-full shrink-0 bg-black/95 border-t border-white/10 pt-3 px-3 sm:pt-5 sm:px-6 flex flex-col items-center gap-3 sm:gap-5 z-20 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+                <div className="flex items-center justify-center gap-2 sm:gap-6 w-full max-w-lg">
                     <button
                         onClick={handleRotateLeft}
-                        className="p-3 bg-neutral-900 border border-white/10 hover:bg-neutral-800 rounded-xl transition-all cursor-pointer"
+                        className="h-11 min-w-[76px] sm:min-w-[92px] px-3 bg-neutral-900 border border-white/10 hover:bg-neutral-800 rounded-xl transition-all cursor-pointer"
                         title="Putar Kiri -90°"
                     >
                         <span className="text-xs font-bold block text-cyan-400">⟲ -90°</span>
                     </button>
 
-                    <div className="flex items-center gap-3 bg-neutral-900 border border-white/10 rounded-xl p-1.5">
+                    <div className="flex items-center gap-1 sm:gap-3 bg-neutral-900 border border-white/10 rounded-xl p-1">
                         <button
                             onClick={handleZoomOut}
                             disabled={scale <= 1}
-                            className="w-10 h-10 flex items-center justify-center hover:bg-white/5 rounded-lg text-slate-300 disabled:opacity-40 cursor-pointer"
+                            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center hover:bg-white/5 rounded-lg text-slate-300 disabled:opacity-40 cursor-pointer"
                         >
                             －
                         </button>
-                        <span className="w-12 text-center text-xs font-bold tracking-wide text-cyan-300">
+                        <span className="w-11 sm:w-12 text-center text-xs font-bold tracking-wide text-cyan-300">
                             {scale.toFixed(1)}x
                         </span>
                         <button
                             onClick={handleZoomIn}
                             disabled={scale >= 4}
-                            className="w-10 h-10 flex items-center justify-center hover:bg-white/5 rounded-lg text-slate-300 disabled:opacity-40 cursor-pointer"
+                            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center hover:bg-white/5 rounded-lg text-slate-300 disabled:opacity-40 cursor-pointer"
                         >
                             ＋
                         </button>
@@ -1944,24 +1956,24 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
 
                     <button
                         onClick={handleRotateRight}
-                        className="p-3 bg-neutral-900 border border-white/10 hover:bg-neutral-800 rounded-xl transition-all cursor-pointer"
+                        className="h-11 min-w-[76px] sm:min-w-[92px] px-3 bg-neutral-900 border border-white/10 hover:bg-neutral-800 rounded-xl transition-all cursor-pointer"
                         title="Putar Kanan +90°"
                     >
                         <span className="text-xs font-bold block text-cyan-400">⟳ +90°</span>
                     </button>
                 </div>
 
-                <div className="flex w-full max-w-md gap-3">
+                <div className="flex w-full max-w-lg gap-2 sm:gap-3">
                     <button
                         onClick={handleReset}
-                        className="flex-1 h-12 border border-slate-700 bg-neutral-900 hover:bg-neutral-800 text-slate-300 font-bold rounded-xl transition-colors cursor-pointer text-sm"
+                        className="flex-1 h-11 sm:h-12 border border-slate-700 bg-neutral-900 hover:bg-neutral-800 text-slate-300 font-bold rounded-xl transition-colors cursor-pointer text-sm"
                     >
                         Atur Ulang
                     </button>
                     <button
                         onClick={handleConfirm}
                         disabled={isSaving}
-                        className="flex-1 h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-50 text-white font-bold rounded-xl transition-all cursor-pointer text-sm shadow-lg shadow-cyan-500/10 flex items-center justify-center gap-2"
+                        className="flex-[1.25] h-11 sm:h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-50 text-white font-bold rounded-xl transition-all cursor-pointer text-sm shadow-lg shadow-cyan-500/10 flex items-center justify-center gap-2"
                     >
                         {isSaving ? (
                             <>
