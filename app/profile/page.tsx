@@ -459,11 +459,11 @@ export default function ProfilePage() {
                         )}
 
                         <div 
-                            className={`relative mb-4 group select-none ${isAdminProfile ? 'cursor-default' : 'cursor-pointer'}`}
+                            className="relative mb-4 group cursor-pointer select-none"
                             onClick={() => {
                                 if (fotoProfilUrl && !imageError) {
                                     setIsViewModalOpen(true);
-                                } else if (!isAdminProfile) {
+                                } else {
                                     fileInputRef.current?.click();
                                 }
                             }}
@@ -474,7 +474,7 @@ export default function ProfilePage() {
                                         src={fotoProfilUrl}
                                         alt={origNama}
                                         onError={() => setImageError(true)}
-                                        className={`w-full h-full object-cover transition-all duration-300 ${isAdminProfile ? '' : 'group-hover:scale-105'}`}
+                                        className="w-full h-full object-cover transition-all duration-300 group-hover:scale-105"
                                     />
                                     {/* Subtle view icon overlay on hover */}
                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
@@ -482,32 +482,28 @@ export default function ProfilePage() {
                                     </div>
                                 </div>
                             ) : (
-                                <div className={`w-24 h-24 rounded-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 flex items-center justify-center text-white text-3xl font-extrabold shadow-lg shadow-cyan-500/10 transition-all duration-300 select-none uppercase ${isAdminProfile ? '' : 'group-hover:scale-105'}`}>
+                                <div className="w-24 h-24 rounded-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 flex items-center justify-center text-white text-3xl font-extrabold shadow-lg shadow-cyan-500/10 transition-all duration-300 group-hover:scale-105 select-none uppercase">
                                     {getInitials(origNama)}
                                 </div>
                             )}
-                            {!isAdminProfile && (
-                                <>
-                                    <button
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            fileInputRef.current?.click();
-                                        }}
-                                        className="absolute bottom-0 right-0 p-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-full shadow-md border border-white dark:border-[#0A0A0F] transition-all cursor-pointer z-10"
-                                        title="Ubah Foto Profil"
-                                    >
-                                        <Camera className="w-4 h-4" />
-                                    </button>
-                                    <input
-                                        type="file"
-                                        ref={fileInputRef}
-                                        className="hidden"
-                                        accept="image/jpeg,image/jpg,image/png,image/webp"
-                                        onChange={handleFileChange}
-                                    />
-                                </>
-                            )}
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    fileInputRef.current?.click();
+                                }}
+                                className="absolute bottom-0 right-0 p-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-full shadow-md border border-white dark:border-[#0A0A0F] transition-all cursor-pointer z-10"
+                                title="Ubah Foto Profil"
+                            >
+                                <Camera className="w-4 h-4" />
+                            </button>
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                className="hidden"
+                                accept="image/jpeg,image/jpg,image/png,image/webp"
+                                onChange={handleFileChange}
+                            />
                         </div>
                         <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">{origNama}</h2>
                         <span className="mt-1 text-xs font-mono uppercase bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/20 text-cyan-600 dark:text-cyan-400 px-3 py-1 rounded-full">
@@ -770,30 +766,28 @@ export default function ProfilePage() {
                         <h4 className="text-lg font-bold text-white mb-2">{origNama}</h4>
                         <p className="text-xs text-neutral-500 uppercase tracking-widest mb-6 font-mono">FOTO PROFIL</p>
 
-                        {!isAdminProfile && (
-                            <div className="flex gap-4 w-full">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsViewModalOpen(false);
-                                        fileInputRef.current?.click();
-                                    }}
-                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl tracking-wider transition-all border border-white/10 hover:border-white/20 cursor-pointer"
-                                >
-                                    <Camera className="w-4 h-4 text-cyan-400" />
-                                    <span>UBAH FOTO</span>
-                                </button>
-                                
-                                <button
-                                    type="button"
-                                    onClick={handleDeleteAvatar}
-                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-950/30 hover:bg-red-900/50 text-red-400 hover:text-red-300 font-bold text-xs rounded-xl tracking-wider transition-all border border-red-900/50 hover:border-red-900/80 cursor-pointer"
-                                >
-                                    <Trash2 className="w-4 h-4 text-red-500" />
-                                    <span>HAPUS FOTO</span>
-                                </button>
-                            </div>
-                        )}
+                        <div className="flex gap-4 w-full">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsViewModalOpen(false);
+                                    fileInputRef.current?.click();
+                                }}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl tracking-wider transition-all border border-white/10 hover:border-white/20 cursor-pointer"
+                            >
+                                <Camera className="w-4 h-4 text-cyan-400" />
+                                <span>UBAH FOTO</span>
+                            </button>
+                            
+                            <button
+                                type="button"
+                                onClick={handleDeleteAvatar}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-950/30 hover:bg-red-900/50 text-red-400 hover:text-red-300 font-bold text-xs rounded-xl tracking-wider transition-all border border-red-900/50 hover:border-red-900/80 cursor-pointer"
+                            >
+                                <Trash2 className="w-4 h-4 text-red-500" />
+                                <span>HAPUS FOTO</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
