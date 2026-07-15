@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   X, Cpu, Play, CheckCircle, AlertTriangle,
-  Loader2, ChevronDown, Filter, Zap, BarChart3
+  Loader2, ChevronDown, Zap, BarChart3
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fadeIn, modalTransition } from '@/styles/motion';
@@ -21,6 +21,8 @@ import { apiGet, apiPost } from '@/lib/api-client';
 interface Submission {
   id: string;
   status_submit: string;
+  ai_status?: string | null;
+  lembar_jawaban?: { id: string; status?: string | null }[] | null;
   mahasiswa: { nama_lengkap: string; nim_nip: string } | null;
 }
 
@@ -45,9 +47,6 @@ export default function BatchAIModal({
 }: BatchAIModalProps) {
   // --- State ---
   const [selectedModel, setSelectedModel] = useState<AIModel>('MobileNetV2');
-  const [filterOnlySubmitted, setFilterOnlySubmitted] = useState(true);
-  const [filterSkipFinalized, setFilterSkipFinalized] = useState(true);
-  const [filterSkipReupload, setFilterSkipReupload] = useState(true);
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
 
   // Processing state
@@ -59,13 +58,33 @@ export default function BatchAIModal({
 
   // --- Computed values ---
   const eligibleSubmissions = submissions.filter(s => {
-    if (filterOnlySubmitted && s.status_submit !== 'submitted') return false;
-    if (filterSkipFinalized && s.status_submit === 'finalized') return false;
-    if (filterSkipReupload && s.status_submit === 'reupload_required') return false;
-    return true;
+    const answerCount = s.lembar_jawaban?.length ?? 0;
+    return (
+      s.status_submit !== 'finalized' &&
+      s.status_submit !== 'reupload_required' &&
+      s.ai_status !== 'finalized' &&
+      s.ai_status !== 'processing' &&
+      answerCount >= 24
+    );
   });
 
   const eligibleCount = eligibleSubmissions.length;
+  const skippedFinalizedCount = submissions.filter(
+    s => s.status_submit === 'finalized' || s.ai_status === 'finalized',
+  ).length;
+  const skippedProcessingCount = submissions.filter(s => s.ai_status === 'processing').length;
+  const skippedReuploadCount = submissions.filter(s => s.status_submit === 'reupload_required').length;
+  const skippedIncompleteCount = submissions.filter(s => {
+    const answerCount = s.lembar_jawaban?.length ?? 0;
+    return (
+      s.status_submit !== 'finalized' &&
+      s.status_submit !== 'reupload_required' &&
+      s.ai_status !== 'finalized' &&
+      s.ai_status !== 'processing' &&
+      answerCount < 24
+    );
+  }).length;
+  const previewEligible = eligibleSubmissions.slice(0, 4);
 
   // --- Polling logic ---
   const startPolling = useCallback((activeJobId: string, acceptedIds: string[]) => {
@@ -388,39 +407,29 @@ export default function BatchAIModal({
                 </div>
               </div>
 
-              {/* Filter Checkboxes */}
-              <div>
-                <label className="flex items-center gap-2 text-[10px] font-mono font-bold tracking-widest text-neutral-500 uppercase mb-3">
-                  <Filter className="w-3 h-3" />
-                  Filter Pengumpulan
-                </label>
-                <div className="space-y-2.5">
-                  {[
-                    { label: 'Hanya status "Menunggu AI" (submitted)', checked: filterOnlySubmitted, setter: setFilterOnlySubmitted },
-                    { label: 'Lewati yang sudah Finalized', checked: filterSkipFinalized, setter: setFilterSkipFinalized },
-                    { label: 'Lewati yang butuh Re-Upload', checked: filterSkipReupload, setter: setFilterSkipReupload },
-                  ].map((filter, idx) => (
-                    <label
-                      key={idx}
-                      className="flex items-center gap-3 cursor-pointer group"
-                    >
-                      <div
-                        onClick={() => filter.setter(!filter.checked)}
-                        className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all duration-200 flex-shrink-0 ${
-                          filter.checked
-                            ? 'bg-purple-500/20 border-purple-500/50'
-                            : 'bg-neutral-950 border-neutral-800 group-hover:border-neutral-700'
-                        }`}
-                      >
-                        {filter.checked && (
-                          <CheckCircle className="w-3 h-3 text-purple-400" />
-                        )}
-                      </div>
-                      <span className="text-sm text-neutral-300 group-hover:text-white transition-colors">
-                        {filter.label}
-                      </span>
-                    </label>
-                  ))}
+              {/* Fixed Safe Rules */}
+              <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-4">
+                <p className="text-[10px] font-mono font-bold tracking-widest text-purple-300 uppercase mb-2">
+                  Aturan Batch Otomatis
+                </p>
+                <p className="text-sm text-neutral-300 leading-relaxed">
+                  AI hanya memproses pengumpulan yang belum final, tidak sedang diproses,
+                  tidak butuh re-upload, dan sudah lengkap 24 section. Pengumpulan yang sudah
+                  pernah dinilai AI tetap bisa di-run ulang selama belum finalisasi dosen.
+                </p>
+                <div className="grid grid-cols-2 gap-2 mt-3 text-[11px] font-mono">
+                  <span className="rounded-lg bg-neutral-950 border border-neutral-800 px-2.5 py-2 text-neutral-400">
+                    Finalized dilewati: <b className="text-emerald-400">{skippedFinalizedCount}</b>
+                  </span>
+                  <span className="rounded-lg bg-neutral-950 border border-neutral-800 px-2.5 py-2 text-neutral-400">
+                    Processing dilewati: <b className="text-purple-400">{skippedProcessingCount}</b>
+                  </span>
+                  <span className="rounded-lg bg-neutral-950 border border-neutral-800 px-2.5 py-2 text-neutral-400">
+                    Re-upload dilewati: <b className="text-amber-400">{skippedReuploadCount}</b>
+                  </span>
+                  <span className="rounded-lg bg-neutral-950 border border-neutral-800 px-2.5 py-2 text-neutral-400">
+                    Belum lengkap: <b className="text-red-400">{skippedIncompleteCount}</b>
+                  </span>
                 </div>
               </div>
 
@@ -428,7 +437,7 @@ export default function BatchAIModal({
               <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-4 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-mono font-bold tracking-widest text-neutral-500 uppercase">
-                    Pengumpulan Eligible
+                    Siap Diproses AI
                   </p>
                   <p className="text-2xl font-black text-white font-mono mt-1">
                     {eligibleCount}
@@ -444,6 +453,34 @@ export default function BatchAIModal({
                   </p>
                 </div>
               </div>
+
+              {eligibleCount > 0 && (
+                <div className="bg-neutral-950/80 border border-neutral-800 rounded-xl p-4">
+                  <p className="text-[10px] font-mono font-bold tracking-widest text-neutral-500 uppercase mb-3">
+                    Akan diproses
+                  </p>
+                  <div className="space-y-2">
+                    {previewEligible.map(submission => (
+                      <div
+                        key={submission.id}
+                        className="flex items-center justify-between gap-3 text-sm"
+                      >
+                        <span className="text-neutral-200 truncate">
+                          {submission.mahasiswa?.nama_lengkap ?? 'Mahasiswa'}
+                        </span>
+                        <span className="text-[11px] text-neutral-500 font-mono shrink-0">
+                          {submission.mahasiswa?.nim_nip ?? '-'}
+                        </span>
+                      </div>
+                    ))}
+                    {eligibleCount > previewEligible.length && (
+                      <p className="text-xs text-neutral-500">
+                        +{eligibleCount - previewEligible.length} pengumpulan lainnya
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Start Button */}
               <button
@@ -470,7 +507,8 @@ export default function BatchAIModal({
 
               {eligibleCount === 0 && (
                 <p className="text-xs text-amber-400 text-center">
-                  Tidak ada pengumpulan tugas yang cocok dengan filter saat ini.
+                  Tidak ada pengumpulan yang siap diproses AI. Finalized, processing, re-upload,
+                  atau jawaban belum lengkap otomatis dikunci.
                 </p>
               )}
             </div>

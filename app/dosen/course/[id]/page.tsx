@@ -37,7 +37,7 @@ interface AnswerSheet {
 
 interface Submission {
   id: string;
-  status_submit: 'submitted' | 'processing_ai' | 'reviewed' | 'finalized';
+  status_submit: 'submitted' | 'processing_ai' | 'reviewed' | 'finalized' | 'reupload_required';
   waktu_submit: string;
   nilai_akhir: number | null;
   model_ai: string | null;
@@ -97,6 +97,17 @@ export default function LecturerCoursePortal() {
   const [isCreatingJoinQr, setIsCreatingJoinQr] = useState(false);
   const [isRevokingJoinQr, setIsRevokingJoinQr] = useState(false);
   const { toasts, toast, removeToast } = useToast();
+
+  const isBatchEligibleSubmission = (submission: Submission) => {
+    const answerCount = submission.lembar_jawaban?.length ?? 0;
+    return (
+      submission.status_submit !== 'finalized' &&
+      submission.status_submit !== 'reupload_required' &&
+      submission.ai_status !== 'finalized' &&
+      submission.ai_status !== 'processing' &&
+      answerCount >= 24
+    );
+  };
 
   // Polling ref to prevent duplicate intervals (BUG 2 fix)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -393,9 +404,9 @@ export default function LecturerCoursePortal() {
 
   // BUG 1 fix: Open model selection modal instead of running directly
   const handleRunAIBatch = async () => {
-    const eligible = submissions.filter(s => (!s.ai_status || s.ai_status === 'pending') && s.ai_status !== 'finalized');
+    const eligible = submissions.filter(isBatchEligibleSubmission);
     if (eligible.length === 0) {
-      toast.info('Info', 'Tidak ada pengumpulan tugas dengan status Menunggu AI.');
+      toast.info('Info', 'Tidak ada pengumpulan tugas yang siap diproses AI. Finalized, re-upload, processing, atau jawaban belum lengkap otomatis dilewati.');
       return;
     }
     setShowBatchModal(true);
@@ -529,6 +540,7 @@ export default function LecturerCoursePortal() {
     reviewed: submissions.filter(s => s.ai_status === 'reviewed').length,
     finalized: submissions.filter(s => s.ai_status === 'finalized').length,
   };
+  const batchEligibleCount = submissions.filter(isBatchEligibleSubmission).length;
 
   // Filters logic
   const filteredSubmissions = submissions.filter(s => {
@@ -889,8 +901,8 @@ export default function LecturerCoursePortal() {
               {/* Run AI Batch Button (Primary action with purple gradient and glow) */}
               <button
                 onClick={handleRunAIBatch}
-                disabled={counts.pending === 0}
-                title={counts.pending === 0 ? "Tidak ada submission yang perlu diproses" : undefined}
+                disabled={batchEligibleCount === 0}
+                title={batchEligibleCount === 0 ? "Tidak ada pengumpulan yang siap diproses AI" : undefined}
                 className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 hover:scale-[1.02] active:scale-[0.98] text-white px-5 py-3 rounded-xl text-xs font-bold tracking-wider transition-all duration-200 shadow-[0_0_15px_rgba(168,85,247,0.25)] hover:shadow-[0_0_25px_rgba(168,85,247,0.4)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none cursor-pointer whitespace-nowrap w-full sm:w-auto"
               >
                 <Cpu className="w-4 h-4 animate-pulse" />
