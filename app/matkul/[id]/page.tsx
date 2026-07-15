@@ -281,6 +281,7 @@ interface CustomCameraModalProps {
 type TorchCapabilities = MediaTrackCapabilities & { torch?: boolean };
 type TorchConstraint = MediaTrackConstraintSet & { torch: boolean };
 type ResizeCorner = 'TL' | 'TR' | 'BL' | 'BR';
+type ResizeHandle = ResizeCorner | 'T' | 'R' | 'B' | 'L';
 
 const CustomCameraModal: React.FC<CustomCameraModalProps> = ({ label, initialFile, onCapture, onClose, onFallbackToNative }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -1273,7 +1274,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
     const isDraggingCropBox = useRef(false);
     const dragBoxStart = useRef({ x: 0, y: 0 });
 
-    const [resizeActiveCorner, setResizeActiveCorner] = useState<'TL' | 'TR' | 'BL' | 'BR' | null>(null);
+    const [resizeActiveCorner, setResizeActiveCorner] = useState<ResizeHandle | null>(null);
     const [resizeStartBox, setResizeStartBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
     const [resizeStartCursor, setResizeStartCursor] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -1288,12 +1289,13 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
 
     const isQuestionF = label.toLowerCase().endsWith('f');
     const getTargetCropRatio = () => (isQuestionF ? 1.55 : 2.35);
-    const getMaxCropHeight = (containerHeight: number) => containerHeight * (isQuestionF ? 0.72 : 0.56);
+    const getMaxCropHeight = (containerHeight: number) => containerHeight * 0.92;
     const getCropValidationMessage = () => {
         if (!cropBox || !containerRef.current) return 'Bingkai belum siap.';
         if (!checkCoverage()) return 'Gambar belum menutupi seluruh bingkai.';
-        if (cropBox.height > getMaxCropHeight(containerRef.current.getBoundingClientRect().height)) {
-            return 'Bingkai terlalu tinggi. Perkecil agar hanya memuat jawaban section ini.';
+        const ratio = cropBox.width / cropBox.height;
+        if (ratio < 0.95) {
+            return 'Bingkai terlalu tinggi/sempit. Lebarkan atau kecilkan sedikit agar tetap terbaca.';
         }
         return null;
     };
@@ -1481,78 +1483,90 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
         };
     };
 
-    const handleResizeStart = (corner: 'TL' | 'TR' | 'BL' | 'BR', clientX: number, clientY: number) => {
+    const handleResizeStart = (corner: ResizeHandle, clientX: number, clientY: number) => {
         if (!cropBox) return;
         setResizeActiveCorner(corner);
         setResizeStartBox({ ...cropBox });
         setResizeStartCursor({ x: clientX, y: clientY });
     };
 
-    const handleResizeMove = (clientX: number) => {
+    const handleResizeMove = (clientX: number, clientY: number) => {
         if (!resizeActiveCorner || !resizeStartBox || !containerRef.current) return;
         const containerRect = containerRef.current.getBoundingClientRect();
         const W_c = containerRect.width;
         const H_c = containerRect.height;
-        const ratio = getTargetCropRatio();
-        const minCropWidth = Math.min(120, Math.max(88, W_c * 0.32));
+        const minCropWidth = Math.min(140, Math.max(92, W_c * 0.24));
+        const minCropHeight = Math.min(110, Math.max(72, H_c * 0.18));
         const maxCropHeight = getMaxCropHeight(H_c);
-        const maxCropWidthByHeight = maxCropHeight * ratio;
 
         const dx = clientX - resizeStartCursor.x;
+        const dy = clientY - resizeStartCursor.y;
         let newWidth = resizeStartBox.width;
         let newHeight = resizeStartBox.height;
         let newLeft = resizeStartBox.left;
         let newTop = resizeStartBox.top;
 
-        if (resizeActiveCorner === 'BR') {
+        if (resizeActiveCorner.includes('R')) {
             newWidth = resizeStartBox.width + dx;
-            newWidth = Math.max(minCropWidth, Math.min(newWidth, W_c - resizeStartBox.left, maxCropWidthByHeight));
-            newHeight = newWidth / ratio;
-            if (newHeight > H_c - resizeStartBox.top) {
-                newHeight = H_c - resizeStartBox.top;
-                newWidth = newHeight * ratio;
-            }
-        } else if (resizeActiveCorner === 'BL') {
+        }
+        if (resizeActiveCorner.includes('L')) {
             newWidth = resizeStartBox.width - dx;
-            newWidth = Math.max(minCropWidth, Math.min(newWidth, resizeStartBox.left + resizeStartBox.width, maxCropWidthByHeight));
-            newHeight = newWidth / ratio;
-            if (newHeight > H_c - resizeStartBox.top) {
-                newHeight = H_c - resizeStartBox.top;
-                newWidth = newHeight * ratio;
+            newLeft = resizeStartBox.left + dx;
+        }
+        if (resizeActiveCorner.includes('B')) {
+            newHeight = resizeStartBox.height + dy;
+        }
+        if (resizeActiveCorner.includes('T')) {
+            newHeight = resizeStartBox.height - dy;
+            newTop = resizeStartBox.top + dy;
+        }
+
+        if (newWidth < minCropWidth) {
+            if (resizeActiveCorner.includes('L')) {
+                newLeft -= minCropWidth - newWidth;
             }
-            newLeft = resizeStartBox.left + (resizeStartBox.width - newWidth);
-        } else if (resizeActiveCorner === 'TR') {
-            newWidth = resizeStartBox.width + dx;
-            newWidth = Math.max(minCropWidth, Math.min(newWidth, W_c - resizeStartBox.left, maxCropWidthByHeight));
-            newHeight = newWidth / ratio;
-            if (newHeight > resizeStartBox.top + resizeStartBox.height) {
-                newHeight = resizeStartBox.top + resizeStartBox.height;
-                newWidth = newHeight * ratio;
+            newWidth = minCropWidth;
+        }
+        if (newHeight < minCropHeight) {
+            if (resizeActiveCorner.includes('T')) {
+                newTop -= minCropHeight - newHeight;
             }
-            newTop = resizeStartBox.top + (resizeStartBox.height - newHeight);
-        } else if (resizeActiveCorner === 'TL') {
-            newWidth = resizeStartBox.width - dx;
-            newWidth = Math.max(minCropWidth, Math.min(newWidth, resizeStartBox.left + resizeStartBox.width, maxCropWidthByHeight));
-            newHeight = newWidth / ratio;
-            if (newHeight > resizeStartBox.top + resizeStartBox.height) {
-                newHeight = resizeStartBox.top + resizeStartBox.height;
-                newWidth = newHeight * ratio;
+            newHeight = minCropHeight;
+        }
+
+        if (newHeight > maxCropHeight) {
+            if (resizeActiveCorner.includes('T')) {
+                newTop += newHeight - maxCropHeight;
             }
-            newLeft = resizeStartBox.left + (resizeStartBox.width - newWidth);
-            newTop = resizeStartBox.top + (resizeStartBox.height - newHeight);
+            newHeight = maxCropHeight;
+        }
+
+        if (newLeft < 0) {
+            newWidth += newLeft;
+            newLeft = 0;
+        }
+        if (newTop < 0) {
+            newHeight += newTop;
+            newTop = 0;
+        }
+        if (newLeft + newWidth > W_c) {
+            newWidth = W_c - newLeft;
+        }
+        if (newTop + newHeight > H_c) {
+            newHeight = H_c - newTop;
         }
 
         setCropBox({
-            left: Math.max(0, Math.min(newLeft, W_c - newWidth)),
-            top: Math.max(0, Math.min(newTop, H_c - newHeight)),
-            width: newWidth,
-            height: newHeight
+            left: Math.max(0, Math.min(newLeft, W_c - minCropWidth)),
+            top: Math.max(0, Math.min(newTop, H_c - minCropHeight)),
+            width: Math.max(minCropWidth, newWidth),
+            height: Math.max(minCropHeight, newHeight)
         });
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
         if (resizeActiveCorner) {
-            handleResizeMove(e.clientX);
+            handleResizeMove(e.clientX, e.clientY);
         } else if (isDraggingCropBox.current && cropBox && containerRef.current) {
             const containerRect = containerRef.current.getBoundingClientRect();
             const W_c = containerRect.width;
@@ -1601,7 +1615,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
     const handleTouchMove = (e: React.TouchEvent) => {
         if (resizeActiveCorner) {
             if (e.touches[0]) {
-                handleResizeMove(e.touches[0].clientX);
+                handleResizeMove(e.touches[0].clientX, e.touches[0].clientY);
             }
         } else if (isDraggingCropBox.current && cropBox && containerRef.current && e.touches[0]) {
             const containerRect = containerRef.current.getBoundingClientRect();
@@ -1654,7 +1668,8 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
         try {
             const naturalW = imgRef.current.naturalWidth;
             const targetWidth = Math.min(2048, Math.max(1200, naturalW));
-            const targetHeight = Math.round(targetWidth / getTargetCropRatio());
+            const cropRatio = cropBox ? cropBox.width / cropBox.height : getTargetCropRatio();
+            const targetHeight = Math.round(targetWidth / Math.max(0.9, cropRatio));
 
             const canvas = document.createElement('canvas');
             canvas.width = targetWidth;
@@ -1775,7 +1790,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                         onLoad={() => {
                             setTimeout(() => {
                                 autoFitImageToCropGuide();
-                                setIsAligned(checkCoverage());
+                                setIsAligned(!getCropValidationMessage());
                             }, 100);
                         }}
                         style={{
@@ -1861,17 +1876,24 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                             onMouseDown={handleCropBoxMouseDown}
                             onTouchStart={handleCropBoxTouchStart}
                         >
-                            {/* Corner Handles */}
-                            {(['TL', 'TR', 'BL', 'BR'] as const).map((corner: ResizeCorner) => {
+                            {/* 8 resize handles: 4 corners + 4 edges */}
+                            {(['TL', 'TR', 'BL', 'BR', 'T', 'R', 'B', 'L'] as const).map((corner: ResizeHandle) => {
+                                const isEdge = corner.length === 1;
                                 const handleStyle: React.CSSProperties = {
                                     position: 'absolute',
-                                    width: '24px',
-                                    height: '24px',
+                                    width: isEdge ? (corner === 'T' || corner === 'B' ? '46px' : '18px') : '24px',
+                                    height: isEdge ? (corner === 'L' || corner === 'R' ? '46px' : '18px') : '24px',
                                     backgroundColor: '#06b6d4',
                                     border: '2px solid #ffffff',
-                                    borderRadius: '50%',
+                                    borderRadius: isEdge ? '999px' : '50%',
                                     zIndex: 110,
-                                    cursor: corner === 'TL' || corner === 'BR' ? 'nwse-resize' : 'nesw-resize',
+                                    cursor: corner === 'T' || corner === 'B'
+                                        ? 'ns-resize'
+                                        : corner === 'L' || corner === 'R'
+                                            ? 'ew-resize'
+                                            : corner === 'TL' || corner === 'BR'
+                                                ? 'nwse-resize'
+                                                : 'nesw-resize',
                                     boxShadow: '0 0 0 3px rgba(0, 0, 0, 0.35)',
                                     touchAction: 'none'
                                 };
@@ -1888,6 +1910,22 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                                 } else if (corner === 'BR') {
                                     handleStyle.bottom = '-12px';
                                     handleStyle.right = '-12px';
+                                } else if (corner === 'T') {
+                                    handleStyle.top = '-9px';
+                                    handleStyle.left = '50%';
+                                    handleStyle.transform = 'translateX(-50%)';
+                                } else if (corner === 'B') {
+                                    handleStyle.bottom = '-9px';
+                                    handleStyle.left = '50%';
+                                    handleStyle.transform = 'translateX(-50%)';
+                                } else if (corner === 'L') {
+                                    handleStyle.left = '-9px';
+                                    handleStyle.top = '50%';
+                                    handleStyle.transform = 'translateY(-50%)';
+                                } else if (corner === 'R') {
+                                    handleStyle.right = '-9px';
+                                    handleStyle.top = '50%';
+                                    handleStyle.transform = 'translateY(-50%)';
                                 }
 
                                 return (
@@ -1950,7 +1988,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                                     gap: '3px'
                                 }}>
                                     <span style={{ fontSize: 'clamp(10px, 3vw, 12px)', fontWeight: '800', letterSpacing: '1.5px', color: '#ffffff', textShadow: '0 1px 2px rgba(0,0,0,0.8)', textAlign: 'center' }}>
-                                        AREA JAWABAN LANSKAP
+                                        AREA JAWABAN SECTION
                                     </span>
                                     <span style={{ fontSize: 'clamp(8px, 2.5vw, 10px)', color: 'rgba(255, 255, 255, 0.58)', textAlign: 'center', padding: '0 4px', lineHeight: 1.25 }}>
                                         Geser/ubah ukuran bingkai atau geser gambar agar pas di dalam garis putus-putus
