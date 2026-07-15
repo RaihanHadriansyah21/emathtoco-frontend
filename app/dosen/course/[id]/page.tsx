@@ -610,6 +610,8 @@ export default function LecturerCoursePortal() {
           return {
             id: s.id,
             status_submit: s.status_submit,
+            ai_status: s.ai_status,
+            lembar_jawaban: s.lembar_jawaban,
             mahasiswa: mhs ? { nama_lengkap: mhs.nama_lengkap, nim_nip: mhs.nim_nip } : null,
           };
         })}
