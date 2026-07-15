@@ -1287,6 +1287,16 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
     const initialScale = useRef(1);
 
     const isQuestionF = label.toLowerCase().endsWith('f');
+    const getTargetCropRatio = () => (isQuestionF ? 1.55 : 2.35);
+    const getMaxCropHeight = (containerHeight: number) => containerHeight * (isQuestionF ? 0.72 : 0.56);
+    const getCropValidationMessage = () => {
+        if (!cropBox || !containerRef.current) return 'Bingkai belum siap.';
+        if (!checkCoverage()) return 'Gambar belum menutupi seluruh bingkai.';
+        if (cropBox.height > getMaxCropHeight(containerRef.current.getBoundingClientRect().height)) {
+            return 'Bingkai terlalu tinggi. Perkecil agar hanya memuat jawaban section ini.';
+        }
+        return null;
+    };
 
     const autoFitImageToCropGuide = () => {
         if (!containerRef.current || !imgRef.current || !cropBox || hasAutoFitImage.current) return;
@@ -1320,11 +1330,11 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
         const H_c = containerRect.height;
         if (W_c === 0 || H_c === 0) return;
 
-        const ratio = isQuestionF ? 1.4 : 1.8;
+        const ratio = getTargetCropRatio();
         const isCompactViewport = W_c < 640 || H_c < 560;
-        const maxCropWidth = isCompactViewport ? Math.max(220, W_c - 28) : 450;
-        const cropWidthRatio = isCompactViewport ? 0.92 : 0.8;
-        const cropHeightRatio = isCompactViewport ? 0.78 : 0.8;
+        const maxCropWidth = isCompactViewport ? Math.max(220, W_c - 24) : 620;
+        const cropWidthRatio = isCompactViewport ? 0.94 : 0.86;
+        const cropHeightRatio = isQuestionF ? 0.68 : 0.52;
 
         // On phones the old 80%/450px guide looked very narrow because the
         // toolbar/header already takes a large part of the viewport.
@@ -1332,8 +1342,8 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
         let h = w / ratio;
 
         // If height is too big for the container, scale down
-        if (h > H_c * cropHeightRatio) {
-            h = H_c * cropHeightRatio;
+        if (h > Math.min(H_c * cropHeightRatio, getMaxCropHeight(H_c))) {
+            h = Math.min(H_c * cropHeightRatio, getMaxCropHeight(H_c));
             w = h * ratio;
         }
 
@@ -1405,7 +1415,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
 
     useEffect(() => {
         const timer = setTimeout(() => {
-            setIsAligned(checkCoverage());
+            setIsAligned(!getCropValidationMessage());
         }, 50);
         return () => clearTimeout(timer);
     // checkCoverage intentionally samples current DOM geometry after these values change.
@@ -1418,6 +1428,15 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
         setOffset({ x: 0, y: 0 });
         setRotation(0);
         initializeCropBox();
+    };
+
+    const handleFitSection = () => {
+        hasAutoFitImage.current = false;
+        initializeCropBox();
+        window.setTimeout(() => {
+            autoFitImageToCropGuide();
+            setIsAligned(!getCropValidationMessage());
+        }, 80);
     };
 
     const handleRotateLeft = () => {
@@ -1474,8 +1493,10 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
         const containerRect = containerRef.current.getBoundingClientRect();
         const W_c = containerRect.width;
         const H_c = containerRect.height;
-        const ratio = isQuestionF ? 1.4 : 1.8;
+        const ratio = getTargetCropRatio();
         const minCropWidth = Math.min(120, Math.max(88, W_c * 0.32));
+        const maxCropHeight = getMaxCropHeight(H_c);
+        const maxCropWidthByHeight = maxCropHeight * ratio;
 
         const dx = clientX - resizeStartCursor.x;
         let newWidth = resizeStartBox.width;
@@ -1485,7 +1506,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
 
         if (resizeActiveCorner === 'BR') {
             newWidth = resizeStartBox.width + dx;
-            newWidth = Math.max(minCropWidth, Math.min(newWidth, W_c - resizeStartBox.left));
+            newWidth = Math.max(minCropWidth, Math.min(newWidth, W_c - resizeStartBox.left, maxCropWidthByHeight));
             newHeight = newWidth / ratio;
             if (newHeight > H_c - resizeStartBox.top) {
                 newHeight = H_c - resizeStartBox.top;
@@ -1493,7 +1514,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
             }
         } else if (resizeActiveCorner === 'BL') {
             newWidth = resizeStartBox.width - dx;
-            newWidth = Math.max(minCropWidth, Math.min(newWidth, resizeStartBox.left + resizeStartBox.width));
+            newWidth = Math.max(minCropWidth, Math.min(newWidth, resizeStartBox.left + resizeStartBox.width, maxCropWidthByHeight));
             newHeight = newWidth / ratio;
             if (newHeight > H_c - resizeStartBox.top) {
                 newHeight = H_c - resizeStartBox.top;
@@ -1502,7 +1523,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
             newLeft = resizeStartBox.left + (resizeStartBox.width - newWidth);
         } else if (resizeActiveCorner === 'TR') {
             newWidth = resizeStartBox.width + dx;
-            newWidth = Math.max(minCropWidth, Math.min(newWidth, W_c - resizeStartBox.left));
+            newWidth = Math.max(minCropWidth, Math.min(newWidth, W_c - resizeStartBox.left, maxCropWidthByHeight));
             newHeight = newWidth / ratio;
             if (newHeight > resizeStartBox.top + resizeStartBox.height) {
                 newHeight = resizeStartBox.top + resizeStartBox.height;
@@ -1511,7 +1532,7 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
             newTop = resizeStartBox.top + (resizeStartBox.height - newHeight);
         } else if (resizeActiveCorner === 'TL') {
             newWidth = resizeStartBox.width - dx;
-            newWidth = Math.max(minCropWidth, Math.min(newWidth, resizeStartBox.left + resizeStartBox.width));
+            newWidth = Math.max(minCropWidth, Math.min(newWidth, resizeStartBox.left + resizeStartBox.width, maxCropWidthByHeight));
             newHeight = newWidth / ratio;
             if (newHeight > resizeStartBox.top + resizeStartBox.height) {
                 newHeight = resizeStartBox.top + resizeStartBox.height;
@@ -1627,12 +1648,13 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
 
     const handleConfirm = async () => {
         if (isSaving || !imgRef.current) return;
+        if (getCropValidationMessage()) return;
         setIsSaving(true);
 
         try {
             const naturalW = imgRef.current.naturalWidth;
             const targetWidth = Math.min(2048, Math.max(1200, naturalW));
-            const targetHeight = isQuestionF ? Math.round(targetWidth / 1.4) : Math.round(targetWidth / 1.8);
+            const targetHeight = Math.round(targetWidth / getTargetCropRatio());
 
             const canvas = document.createElement('canvas');
             canvas.width = targetWidth;
@@ -1707,6 +1729,9 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
             setIsSaving(false);
         }
     };
+
+    const cropValidationMessage = cropBox ? getCropValidationMessage() : null;
+    const canConfirmCrop = !isSaving && !cropValidationMessage;
 
     return (
         <div
@@ -1960,15 +1985,15 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                                 boxShadow: `0 0 8px ${isAligned ? '#10b981' : '#f59e0b'}`
                             }} />
                             <span style={{ fontSize: 'clamp(10px, 2.8vw, 11px)', fontWeight: 'bold', color: isAligned ? '#10b981' : '#f59e0b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {isAligned ? 'Area Jawaban Sesuai' : 'Geser/ubah ukuran gambar/bingkai agar sesuai'}
+                                {isAligned ? 'Area Jawaban Sesuai' : (cropValidationMessage || 'Sesuaikan bingkai jawaban')}
                             </span>
                         </div>
                     </>
                 )}
             </div>
 
-            <div className="w-full shrink-0 bg-black/95 border-t border-white/10 pt-3 px-3 sm:pt-5 sm:px-6 flex flex-col items-center gap-3 sm:gap-5 z-20 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
-                <div className="flex items-center justify-center gap-2 sm:gap-6 w-full max-w-lg">
+            <div className="w-full shrink-0 bg-black/95 border-t border-white/10 pt-2 px-3 sm:pt-4 sm:px-6 flex flex-col items-center gap-2.5 sm:gap-4 z-20 pb-[calc(0.7rem+env(safe-area-inset-bottom))] sm:pb-[calc(1rem+env(safe-area-inset-bottom))] [@media_(orientation:landscape)_and_(max-height:640px)]:flex-row [@media_(orientation:landscape)_and_(max-height:640px)]:justify-center">
+                <div className="flex items-center justify-center gap-2 sm:gap-6 w-full max-w-lg [@media_(orientation:landscape)_and_(max-height:640px)]:max-w-sm">
                     <button
                         onClick={handleRotateLeft}
                         className="h-11 min-w-[76px] sm:min-w-[92px] px-3 bg-neutral-900 border border-white/10 hover:bg-neutral-800 rounded-xl transition-all cursor-pointer"
@@ -2006,7 +2031,13 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                     </button>
                 </div>
 
-                <div className="flex w-full max-w-lg gap-2 sm:gap-3">
+                <div className="flex w-full max-w-lg gap-2 sm:gap-3 [@media_(orientation:landscape)_and_(max-height:640px)]:max-w-sm">
+                    <button
+                        onClick={handleFitSection}
+                        className="flex-1 h-11 sm:h-12 border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/15 text-cyan-300 font-bold rounded-xl transition-colors cursor-pointer text-sm"
+                    >
+                        Pas Section
+                    </button>
                     <button
                         onClick={handleReset}
                         className="flex-1 h-11 sm:h-12 border border-slate-700 bg-neutral-900 hover:bg-neutral-800 text-slate-300 font-bold rounded-xl transition-colors cursor-pointer text-sm"
@@ -2015,8 +2046,9 @@ const ImageAdjustmentModal: React.FC<ImageAdjustmentModalProps> = ({ label, file
                     </button>
                     <button
                         onClick={handleConfirm}
-                        disabled={isSaving}
-                        className="flex-[1.25] h-11 sm:h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-50 text-white font-bold rounded-xl transition-all cursor-pointer text-sm shadow-lg shadow-cyan-500/10 flex items-center justify-center gap-2"
+                        disabled={!canConfirmCrop}
+                        title={cropValidationMessage || undefined}
+                        className="flex-[1.35] h-11 sm:h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-45 disabled:cursor-not-allowed disabled:from-neutral-800 disabled:to-neutral-800 text-white font-bold rounded-xl transition-all cursor-pointer text-sm shadow-lg shadow-cyan-500/10 flex items-center justify-center gap-2"
                     >
                         {isSaving ? (
                             <>
