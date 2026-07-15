@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -44,6 +45,10 @@ const publicPrefixes = [
 ];
 const AUTH_CHECK_TIMEOUT_MS = 3000;
 
+function isPublicPath(pathname: string): boolean {
+  return publicPrefixes.some((prefix) => pathname.startsWith(prefix));
+}
+
 async function getCurrentUserWithTimeout() {
   return Promise.race([
     supabase.auth.getUser(),
@@ -63,9 +68,22 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [redirecting, setRedirecting] = useState(false);
+  const bootstrappedRef = useRef(false);
+  const pathnameRef = useRef(pathname);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  useEffect(() => {
+    pathnameRef.current = pathname;
+    if (isPublicPath(pathname)) {
+      setRedirecting(false);
+    }
+  }, [pathname]);
+
+  const refresh = useCallback(async (force = false) => {
+    const shouldBlockUi = force || !bootstrappedRef.current;
+    if (shouldBlockUi) {
+      setLoading(true);
+    }
     try {
       const { data, error } = await getCurrentUserWithTimeout();
       if (error || !data.user) {
@@ -94,7 +112,10 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       logger.warn("AuthGate refresh failed; clearing local user state.", error);
       setUser(null);
     } finally {
-      setLoading(false);
+      bootstrappedRef.current = true;
+      if (shouldBlockUi) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -106,32 +127,41 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT") {
         setUser(null);
+        bootstrappedRef.current = true;
         setLoading(false);
-        if (!publicPrefixes.some((prefix) => pathname.startsWith(prefix))) {
+        if (!isPublicPath(pathnameRef.current)) {
+          setRedirecting(true);
           router.replace("/login");
         }
         return;
       }
 
       if (event === "PASSWORD_RECOVERY") {
+        setRedirecting(true);
         router.replace("/reset-password");
         return;
       }
 
       if (event === "SIGNED_IN" || event === "USER_UPDATED") {
-        void refresh();
+        void refresh(false);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [pathname, refresh, router]);
+  }, [refresh, router]);
+
+  useEffect(() => {
+    if (loading || user || isPublicPath(pathname)) return;
+    setRedirecting(true);
+    router.replace("/login");
+  }, [loading, pathname, router, user]);
 
   const context = useMemo(
     () => ({ user, loading, refresh }),
     [user, loading, refresh],
   );
 
-  if (loading) {
+  if (loading || redirecting) {
     return <FullscreenLoader />;
   }
 
