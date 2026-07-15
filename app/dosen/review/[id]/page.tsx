@@ -231,6 +231,22 @@ export default function ReviewWorkspace() {
   // UI Modal Preview
   const [modalImageUrl, setModalImageUrl] = useState<string | null>(null);
   const [modalTitle, setModalTitle] = useState('');
+  const [modalImageLoading, setModalImageLoading] = useState(false);
+  const [modalImageError, setModalImageError] = useState(false);
+
+  const openImagePreview = (url: string, title: string) => {
+    setModalImageUrl(url);
+    setModalTitle(title);
+    setModalImageLoading(true);
+    setModalImageError(false);
+  };
+
+  const closeImagePreview = () => {
+    setModalImageUrl(null);
+    setModalTitle('');
+    setModalImageLoading(false);
+    setModalImageError(false);
+  };
 
   // Editing Action States
   const [isSaving, setIsSaving] = useState(false);
@@ -1417,8 +1433,7 @@ export default function ReviewWorkspace() {
                                         type="button"
                                         onClick={() => {
                                           if (!asset.signedUrl) return;
-                                          setModalImageUrl(asset.signedUrl);
-                                          setModalTitle(`Gambar Soal ${slot.label.toUpperCase()}`);
+                                          openImagePreview(asset.signedUrl, `Gambar Soal ${slot.label.toUpperCase()}`);
                                         }}
                                         className="overflow-hidden rounded-lg border border-slate-205 dark:border-neutral-900 bg-slate-50 dark:bg-black hover:border-cyan-500/40 transition-colors cursor-pointer disabled:cursor-not-allowed"
                                         disabled={!asset.signedUrl}
@@ -1452,8 +1467,7 @@ export default function ReviewWorkspace() {
                               <div className="w-full h-44 bg-slate-50 dark:bg-black border border-slate-300 dark:border-neutral-900/80 rounded-xl overflow-hidden relative flex items-center justify-center">
                                 {slot.hasSheet && slot.fileUrl ? (
                                   <div className="group/card w-full h-full relative cursor-pointer" onClick={() => {
-                                    setModalImageUrl(slot.fileUrl);
-                                    setModalTitle(`Section ${slot.label.toUpperCase()}`);
+                                    openImagePreview(slot.fileUrl!, `Section ${slot.label.toUpperCase()}`);
                                   }}>
                                     <img
                                       src={slot.fileUrl}
@@ -1699,7 +1713,7 @@ export default function ReviewWorkspace() {
                       <div className="bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900/50 rounded-xl p-4 flex items-center gap-3 animate-pulse">
                         <Loader2 className="w-5 h-5 text-purple-600 dark:text-purple-400 animate-spin flex-shrink-0" />
                         <div className="text-xs font-semibold text-purple-700 dark:text-purple-300">
-                          🤖 {submission?.model_ai || selectedModel} sedang menganalisis jawaban mahasiswa. Model sedang memproses jawaban...
+                          🤖 {submission?.model_ai || selectedModel} sedang menganalisis jawaban mahasiswa. Nilai dan feedback dikunci sementara; preview lembar jawaban tetap bisa dibuka.
                         </div>
                       </div>
                     )}
@@ -1893,21 +1907,46 @@ export default function ReviewWorkspace() {
 
       {/* FULLSIZE IMAGE PREVIEW MODAL */}
       {modalImageUrl && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={() => setModalImageUrl(null)}>
-          <div className="relative max-w-4xl max-h-[90vh] bg-white border border-slate-250 dark:bg-[#0A0A0F] dark:border-neutral-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={closeImagePreview}>
+          <div className="relative w-full max-w-5xl max-h-[92vh] bg-white border border-slate-250 dark:bg-[#0A0A0F] dark:border-neutral-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-neutral-900">
               <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">{modalTitle}</span>
-              <button onClick={() => setModalImageUrl(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-neutral-900 rounded-lg transition-colors cursor-pointer">
+              <button onClick={closeImagePreview} className="p-1 hover:bg-slate-100 dark:hover:bg-neutral-900 rounded-lg transition-colors cursor-pointer">
                 <X className="w-5 h-5 text-slate-400 dark:text-neutral-400" />
               </button>
             </div>
-            <div className="p-4 overflow-auto flex items-center justify-center">
-              <img
-                src={modalImageUrl}
-                alt="Full Size Preview"
-                decoding="async"
-                className="max-w-full max-h-[70vh] rounded-xl object-contain border border-slate-200 dark:border-neutral-900 shadow-md"
-              />
+            <div className="relative min-h-[45vh] p-4 overflow-auto flex items-center justify-center">
+              {modalImageLoading && !modalImageError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white/80 dark:bg-[#0A0A0F]/80 z-10">
+                  <Loader2 className="w-6 h-6 animate-spin text-cyan-600 dark:text-cyan-400" />
+                  <span className="text-xs font-bold text-slate-600 dark:text-neutral-400 uppercase tracking-wider">
+                    Memuat lembar jawaban...
+                  </span>
+                </div>
+              )}
+              {modalImageError ? (
+                <div className="flex flex-col items-center justify-center gap-3 text-center py-16">
+                  <AlertTriangle className="w-7 h-7 text-amber-500" />
+                  <div>
+                    <p className="text-sm font-bold text-slate-800 dark:text-white">Gambar tidak dapat dimuat</p>
+                    <p className="text-xs text-slate-500 dark:text-neutral-500 mt-1">
+                      Tautan preview kemungkinan kedaluwarsa. Tutup preview lalu buka ulang section ini.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <img
+                  src={modalImageUrl}
+                  alt="Full Size Preview"
+                  decoding="async"
+                  onLoad={() => setModalImageLoading(false)}
+                  onError={() => {
+                    setModalImageLoading(false);
+                    setModalImageError(true);
+                  }}
+                  className="max-w-full max-h-[76vh] rounded-xl object-contain border border-slate-200 dark:border-neutral-900 shadow-md"
+                />
+              )}
             </div>
           </div>
         </div>
