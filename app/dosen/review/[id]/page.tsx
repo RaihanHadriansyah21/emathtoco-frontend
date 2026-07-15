@@ -3,6 +3,7 @@
 import { logger } from '@/lib/logger';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter, useParams } from 'next/navigation';
 import { Loader2, Play, CheckCircle, AlertTriangle, Eye, X, Lock, RotateCcw } from 'lucide-react';
 import Navbar from '../../../components/Navbar';
@@ -46,6 +47,17 @@ const getMaxScore = (label: string): number => {
   return label.toLowerCase().endsWith('f') ? 5 : 4;
 };
 
+const formatDateTimeId = (value?: string | null): string => {
+  if (!value) return '-';
+  return new Date(value).toLocaleString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
 interface StudentProfile {
   nama_lengkap: string;
   kelas: string;
@@ -63,6 +75,7 @@ interface SubmissionData {
   status_submit: 'submitted' | 'processing_ai' | 'reviewed' | 'finalized' | 'failed';
   ai_status?: string | null;
   waktu_submit: string;
+  ai_processed_at?: string | null;
   nilai_akhir: number | null;
   model_ai?: string | null;
   mahasiswa: StudentProfile | StudentProfile[] | null;
@@ -111,6 +124,7 @@ const isSubmissionEqual = (a: SubmissionData | null, b: SubmissionData | null): 
     a.status_submit === b.status_submit &&
     a.ai_status === b.ai_status &&
     a.waktu_submit === b.waktu_submit &&
+    a.ai_processed_at === b.ai_processed_at &&
     a.nilai_akhir === b.nilai_akhir &&
     a.model_ai === b.model_ai &&
     JSON.stringify(a.mahasiswa) === JSON.stringify(b.mahasiswa) &&
@@ -166,6 +180,7 @@ export default function ReviewWorkspace() {
   const params = useParams();
   const submissionId = params.id as string;
   const { user } = useAuth();
+  const [isMounted, setIsMounted] = useState(false);
 
   // Auth and Loading States
   const [isChecking, setIsChecking] = useState(true);
@@ -257,6 +272,10 @@ export default function ReviewWorkspace() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const { toasts, toast, removeToast } = useToast();
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Reupload Request States
   const [showReuploadModal, setShowReuploadModal] = useState(false);
@@ -425,6 +444,7 @@ export default function ReviewWorkspace() {
           status_submit,
           ai_status,
           waktu_submit,
+          ai_processed_at,
           nilai_akhir,
           model_ai,
           mahasiswa:profil_pengguna!pengumpulan_tugas_mahasiswa_id_fkey(nama_lengkap, kelas, nim_nip),
@@ -1683,6 +1703,15 @@ export default function ReviewWorkspace() {
                     </span>
                   </div>
                 </div>
+
+                {submission?.ai_processed_at && (
+                  <div className="border-t border-slate-100 dark:border-neutral-900 pt-3">
+                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-wider block">Waktu Selesai AI</span>
+                    <span className="text-xs font-mono text-cyan-700 dark:text-cyan-400 block mt-1">
+                      {formatDateTimeId(submission.ai_processed_at)}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1727,6 +1756,11 @@ export default function ReviewWorkspace() {
                           <div className="text-[11px] text-emerald-600 dark:text-emerald-500">
                             {aiSuccessModel} berhasil menyelesaikan penilaian
                           </div>
+                          {submission?.ai_processed_at && (
+                            <div className="text-[10px] font-mono text-emerald-700 dark:text-emerald-500">
+                              Selesai: {formatDateTimeId(submission.ai_processed_at)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1906,9 +1940,9 @@ export default function ReviewWorkspace() {
       )}
 
       {/* FULLSIZE IMAGE PREVIEW MODAL */}
-      {modalImageUrl && (
+      {isMounted && modalImageUrl && createPortal((
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={closeImagePreview}>
-          <div className="relative w-full max-w-5xl max-h-[92vh] bg-white border border-slate-250 dark:bg-[#0A0A0F] dark:border-neutral-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full max-w-5xl max-h-[92vh] bg-white border border-slate-250 dark:bg-[#0A0A0F] dark:border-neutral-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col z-[60]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-neutral-900">
               <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">{modalTitle}</span>
               <button onClick={closeImagePreview} className="p-1 hover:bg-slate-100 dark:hover:bg-neutral-900 rounded-lg transition-colors cursor-pointer">
@@ -1950,7 +1984,7 @@ export default function ReviewWorkspace() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
 
     </div>
     </PageTransition>
