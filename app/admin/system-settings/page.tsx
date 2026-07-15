@@ -132,10 +132,10 @@ export default function SystemSettingsPage() {
         )}
         <div>
           <h3 className="text-sm font-bold text-slate-800 dark:text-white">
-            {dbConnected === null ? 'Memeriksa koneksi...' : dbConnected ? 'Database Terhubung' : 'Database Terputus'}
+            {dbConnected === null ? 'Memeriksa koneksi...' : dbConnected ? 'Koneksi Supabase Aktif' : 'Koneksi Supabase Terputus'}
           </h3>
           <p className="text-xs text-slate-500 dark:text-neutral-400">
-            {dbConnected === null ? 'Menghubungi server database...' : dbConnected ? 'Supabase PostgreSQL merespons dengan baik.' : 'Tidak dapat menghubungi database.'}
+            {dbConnected === null ? 'Menghubungi Supabase...' : dbConnected ? 'Query ringan ke Supabase berhasil dijalankan.' : 'Tidak dapat menghubungi Supabase.'}
           </p>
         </div>
       </div>

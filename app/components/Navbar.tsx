@@ -123,10 +123,10 @@ export default function Navbar({
               <div className={`hidden md:flex items-center transition-all duration-300 border-r border-slate-200 dark:border-neutral-900 h-16 mr-4 relative overflow-hidden ${
                 sidebarCollapsed ? 'w-[80px] justify-center px-0' : 'w-[270px] justify-between px-5'
               }`}>
-                <div className={`flex items-center gap-2.5 w-full ${sidebarCollapsed ? 'justify-center' : 'justify-start'}`}>
+                <div className={`flex items-center gap-2.5 h-full w-full ${sidebarCollapsed ? 'justify-center' : 'justify-start'}`}>
                   {/* Logo Area */}
                   <div 
-                    className="relative w-10 h-10 flex items-center justify-center group cursor-pointer flex-shrink-0" 
+                    className="relative w-10 h-10 flex items-center justify-center group cursor-pointer flex-shrink-0 mx-auto" 
                     onClick={sidebarCollapsed ? onToggleSidebar : () => router.push(homeUrl)}
                   >
                     <div className={`bg-white border border-slate-200 dark:border-neutral-750/60 rounded-xl p-1.5 shadow-sm dark:shadow-[0_0_12px_rgba(6,182,212,0.08)] flex items-center justify-center transition-all duration-200 scale-100 opacity-100 ${
