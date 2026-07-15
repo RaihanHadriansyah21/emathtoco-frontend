@@ -3,6 +3,7 @@
 import { logger } from '@/lib/logger';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter, useParams } from 'next/navigation';
 import { CheckCircle, Loader2, AlertTriangle, Eye, Lock, X, RefreshCw, Trophy, Camera, Image as ImageIcon, Trash2 } from 'lucide-react';
 import Navbar from '../../components/Navbar';
@@ -2039,6 +2040,7 @@ export default function UploadWorkspace() {
     const matkulId = params.id as string;
     const { user: authUser, loading: authLoading } = useAuth();
 
+    const [isMounted, setIsMounted] = useState(false);
     const [slots, setSlots] = useState<SlotState[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showCustomCamera, setShowCustomCamera] = useState(false);
@@ -2058,6 +2060,10 @@ export default function UploadWorkspace() {
     const [isAccessDenied, setIsAccessDenied] = useState(false);
     const { toasts, toast, removeToast } = useToast();
 
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
     const [isMobile, setIsMobile] = useState(false);
     const [activeUploadChoiceLabel, setActiveUploadChoiceLabel] = useState<string | null>(null);
     const [showChoiceModal, setShowChoiceModal] = useState(false);
@@ -2067,6 +2073,21 @@ export default function UploadWorkspace() {
     const [isDeletingSlot, setIsDeletingSlot] = useState<string | null>(null);
     const [showDesktopDeleteModal, setShowDesktopDeleteModal] = useState(false);
     const [desktopDeleteTarget, setDesktopDeleteTarget] = useState<string | null>(null);
+
+    useEffect(() => {
+        const shouldLockScroll = showCustomCamera || !!adjustmentFile || showChoiceModal;
+        if (!shouldLockScroll) return;
+
+        const previousOverflow = document.body.style.overflow;
+        const previousOverscroll = document.body.style.overscrollBehavior;
+        document.body.style.overflow = 'hidden';
+        document.body.style.overscrollBehavior = 'none';
+
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            document.body.style.overscrollBehavior = previousOverscroll;
+        };
+    }, [adjustmentFile, showChoiceModal, showCustomCamera]);
 
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -3693,7 +3714,7 @@ export default function UploadWorkspace() {
             )}
 
             {/* Mobile Choice Sheet Modal — only shown on mobile devices */}
-            {showChoiceModal && activeUploadChoiceLabel && (() => {
+            {isMounted && showChoiceModal && activeUploadChoiceLabel && createPortal((() => {
                 const targetSlot = slots.find(s => s.label === activeUploadChoiceLabel);
                 const isUploaded = targetSlot?.status === 'success';
                 const isDeleting = isDeletingSlot === activeUploadChoiceLabel;
@@ -3874,9 +3895,9 @@ export default function UploadWorkspace() {
                         </div>
                     </div>
                 );
-            })()}
+            })(), document.body)}
 
-            {showCustomCamera && activeUploadChoiceLabel && (
+            {isMounted && showCustomCamera && activeUploadChoiceLabel && createPortal((
                 <CustomCameraModal
                     label={activeUploadChoiceLabel}
                     initialFile={initialCameraFile || undefined}
@@ -3901,9 +3922,9 @@ export default function UploadWorkspace() {
                         }, 100);
                     }}
                 />
-            )}
+            ), document.body)}
 
-            {adjustmentFile && adjustmentLabel && (
+            {isMounted && adjustmentFile && adjustmentLabel && createPortal((
                 <ImageAdjustmentModal
                     label={adjustmentLabel}
                     file={adjustmentFile}
@@ -3917,7 +3938,7 @@ export default function UploadWorkspace() {
                         setAdjustmentLabel(null);
                     }}
                 />
-            )}
+            ), document.body)}
         </div>
         </PageTransition>
     );
