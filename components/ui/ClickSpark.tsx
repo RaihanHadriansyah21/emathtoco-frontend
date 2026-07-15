@@ -169,6 +169,8 @@ const ClickSpark = ({
     >
       <canvas
         ref={canvasRef}
+        className="click-spark-canvas"
+        data-motion-stable="true"
         style={{
           width: '100%',
           height: '100%',

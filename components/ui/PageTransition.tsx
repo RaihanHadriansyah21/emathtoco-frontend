@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { pageTransition } from '@/styles/motion';
 
 interface PageTransitionProps {
@@ -10,13 +10,15 @@ interface PageTransitionProps {
 }
 
 export default function PageTransition({ children, className = '' }: PageTransitionProps) {
+  const prefersReducedMotion = useReducedMotion();
+
   return (
     <motion.div
-      variants={pageTransition}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      className={`w-full h-full ${className}`}
+      variants={prefersReducedMotion ? undefined : pageTransition}
+      initial={prefersReducedMotion ? false : 'initial'}
+      animate={prefersReducedMotion ? { opacity: 1 } : 'animate'}
+      exit={prefersReducedMotion ? undefined : 'exit'}
+      className={`page-transition-surface w-full h-full ${className}`}
     >
       {children}
     </motion.div>

@@ -33,19 +33,58 @@
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
 }
 
-/* Apply smooth transitions across color variables, backgrounds, and borders ONLY during theme switching */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100%;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Apply smooth, cheap transitions ONLY during theme switching */
 .theme-transitioning,
 .theme-transitioning *,
 .theme-transitioning *::before,
 .theme-transitioning *::after {
-  transition: background-color 600ms cubic-bezier(0.4, 0, 0.2, 1),
-              color 600ms cubic-bezier(0.4, 0, 0.2, 1),
-              border-color 600ms cubic-bezier(0.4, 0, 0.2, 1),
-              box-shadow 600ms cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 600ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition-property: background-color, color, border-color, outline-color, fill, stroke !important;
+  transition-duration: 360ms !important;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1) !important;
   transition-delay: 0s !important;
 }
 
+.theme-transitioning canvas,
+.theme-transitioning iframe,
+.theme-transitioning video,
+.theme-transitioning img,
+.theme-transitioning [data-motion-stable="true"],
+.theme-transitioning .spline-scene,
+.theme-transitioning .click-spark-canvas {
+  transition: none !important;
+}
+
+.theme-transitioning .animate-float-blue,
+.theme-transitioning .animate-float-purple,
+.theme-transitioning .animate-pulse,
+.theme-transitioning .animate-spin {
+  animation-play-state: paused !important;
+}
+
+.page-transition-surface {
+  backface-visibility: hidden;
+  will-change: opacity, transform;
+}
+
+.smooth-transform {
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: opacity, transform;
+}
+
+.paint-contained {
+  contain: paint;
+}
 
 @keyframes float-blue {
 
@@ -197,7 +236,11 @@ html.dark::-webkit-scrollbar-thumb:hover,
   -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.28), 0 1px 0 0 rgba(255, 255, 255, 0.04) inset !important;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  contain: paint;
 }
 
 .glass-card:hover {
@@ -214,7 +257,11 @@ html.dark::-webkit-scrollbar-thumb:hover,
   -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.28), 0 1px 0 0 rgba(255, 255, 255, 0.04) inset !important;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  contain: paint;
 }
 
 .dark .dark\:glass-card:hover {
@@ -229,6 +276,7 @@ html.dark::-webkit-scrollbar-thumb:hover,
   backdrop-filter: blur(12px) !important;
   border: 1px solid rgba(255, 255, 255, 0.06) !important;
   box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.25) !important;
+  contain: paint;
 }
 
 .btn-primary {
@@ -238,7 +286,10 @@ html.dark::-webkit-scrollbar-thumb:hover,
   font-weight: 700 !important;
   border-radius: 0.75rem !important;
   box-shadow: 0 4px 14px 0 rgba(6, 182, 212, 0.2) !important;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: background-position 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -262,7 +313,10 @@ html.dark::-webkit-scrollbar-thumb:hover,
   color: #ffffff !important;
   font-weight: 600 !important;
   border-radius: 0.75rem !important;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -284,7 +338,9 @@ html.dark::-webkit-scrollbar-thumb:hover,
   font-weight: 700 !important;
   border-radius: 0.75rem !important;
   box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.2) !important;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -305,7 +361,9 @@ html.dark::-webkit-scrollbar-thumb:hover,
   color: rgba(255, 255, 255, 0.6) !important;
   font-weight: 600 !important;
   border-radius: 0.75rem !important;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              color 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
   border: 1px solid transparent !important;
   display: inline-flex !important;
   align-items: center !important;

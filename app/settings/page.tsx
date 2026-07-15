@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
 import PageTransition from '@/components/ui/PageTransition';
 import { isStrongPassword, PASSWORD_REQUIREMENTS } from '@/lib/security/password';
+import { runWithThemeTransition } from '@/lib/theme-transition';
 
 export default function SettingsPage() {
     const { user, loading } = useAuth();
@@ -248,7 +249,7 @@ export default function SettingsPage() {
                                         <button
                                             key={opt.value}
                                             type="button"
-                                            onClick={() => setTheme(opt.value)}
+                                            onClick={() => runWithThemeTransition(() => setTheme(opt.value))}
                                             className={`flex flex-col items-center justify-center p-4 rounded-xl border text-center transition-all duration-300 cursor-pointer ${
                                                 isActive
                                                     ? 'bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border-cyan-500 text-cyan-600 dark:text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.15)]'

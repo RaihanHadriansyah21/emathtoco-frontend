@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useEffect, useRef } from 'react';
 import { ThemeProvider as NextThemesProvider, useTheme } from 'next-themes';
+import { startThemeTransition } from '@/lib/theme-transition';
  
 function ThemeTransitionHelper() {
   const { resolvedTheme } = useTheme();
@@ -15,16 +16,7 @@ function ThemeTransitionHelper() {
       return;
     }
 
-    const html = document.documentElement;
-    html.classList.add('theme-transitioning');
-
-    const timeoutId = setTimeout(() => {
-      html.classList.remove('theme-transitioning');
-    }, 650);
-
-    return () => {
-      clearTimeout(timeoutId);
-    };
+    startThemeTransition();
   }, [resolvedTheme]);
 
   return null;

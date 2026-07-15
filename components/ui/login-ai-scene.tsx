@@ -19,6 +19,7 @@ const SplineScene = dynamic(
 export default function LoginAIScene() {
     const [isLoading, setIsLoading] = useState(true);
     const [hasError, setHasError] = useState(false);
+    const [shouldMountSpline, setShouldMountSpline] = useState(false);
 
     // 21st.dev humanoid robot scene (chrome/black full-body robot)
     const splineSceneUrl = 'https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode';
@@ -49,6 +50,38 @@ export default function LoginAIScene() {
             clearTimeout(safeguardTimer);
         };
     }, []);
+
+    useEffect(() => {
+        if (hasError) return;
+
+        let timeoutId: number | null = null;
+        let frameId = 0;
+        let idleId: number | null = null;
+
+        const mountSpline = () => {
+            timeoutId = window.setTimeout(() => {
+                setShouldMountSpline(true);
+            }, 120);
+        };
+
+        frameId = window.requestAnimationFrame(() => {
+            if ('requestIdleCallback' in window) {
+                idleId = window.requestIdleCallback(mountSpline, { timeout: 300 });
+            } else {
+                mountSpline();
+            }
+        });
+
+        return () => {
+            window.cancelAnimationFrame(frameId);
+            if (idleId !== null && 'cancelIdleCallback' in window) {
+                window.cancelIdleCallback(idleId);
+            }
+            if (timeoutId) {
+                window.clearTimeout(timeoutId);
+            }
+        };
+    }, [hasError]);
 
     return (
         <div className="relative w-full h-full min-h-[400px] lg:min-h-screen bg-transparent flex items-center justify-center overflow-hidden">
@@ -101,7 +134,7 @@ export default function LoginAIScene() {
                     // ═══════════════════════════════════════════════════════
                     // ACTIVE SPLINE / LOADING SCENE
                     // ═══════════════════════════════════════════════════════
-                    <div className="relative w-full h-full flex items-center justify-center z-10">
+                    <div className="spline-scene relative w-full h-full flex items-center justify-center z-10" data-motion-stable="true">
                         {/* Loading Spinner Fallback */}
                         {isLoading && (
                             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-20">
@@ -116,16 +149,18 @@ export default function LoginAIScene() {
                             </div>
                         )}
 
-                        <SplineScene
-                            scene={splineSceneUrl}
-                            className="w-full h-full"
-                            onLoad={() => setIsLoading(false)}
-                            onError={(err) => {
-                                logger.warn('[LoginAIScene] Spline loading error:', err);
-                                setHasError(true);
-                                setIsLoading(false);
-                            }}
-                        />
+                        {shouldMountSpline && (
+                            <SplineScene
+                                scene={splineSceneUrl}
+                                className="w-full h-full"
+                                onLoad={() => setIsLoading(false)}
+                                onError={(err) => {
+                                    logger.warn('[LoginAIScene] Spline loading error:', err);
+                                    setHasError(true);
+                                    setIsLoading(false);
+                                }}
+                            />
+                        )}
                     </div>
                 )}
             </AnimatePresence>

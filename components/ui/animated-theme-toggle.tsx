@@ -2,6 +2,7 @@ import { motion, useMotionValue, useTransform } from "motion/react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { runWithThemeTransition } from "@/lib/theme-transition";
 
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -46,7 +47,7 @@ export const AnimatedThemeToggle = ({ className }: { className?: string }) => {
   const isDark = mounted ? resolvedTheme === "dark" : false;
 
   const toggleTheme = () => {
-    setTheme(isDark ? "light" : "dark");
+    runWithThemeTransition(() => setTheme(isDark ? "light" : "dark"));
   };
 
   // Show a placeholder during SSR to avoid hydration mismatch
