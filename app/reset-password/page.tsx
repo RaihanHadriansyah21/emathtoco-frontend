@@ -67,6 +67,29 @@ export default function ResetPasswordPage() {
                     return;
                 }
 
+                // Supabase PKCE recovery links arrive as /reset-password?code=...
+                // The code must be exchanged before updateUser({ password }) can work.
+                const searchParams = new URLSearchParams(window.location.search);
+                const recoveryCode = searchParams.get('code');
+                if (recoveryCode) {
+                    const { data, error } = await supabase.auth.exchangeCodeForSession(recoveryCode);
+                    if (error || !data.session) {
+                        logger.warn("Failed to exchange recovery code:", error);
+                        if (isSubscribed) {
+                            setErrorMessage('Tautan reset password tidak valid atau sudah kedaluwarsa. Silakan ajukan lupa password kembali.');
+                            setIsChecking(false);
+                        }
+                        return;
+                    }
+
+                    window.history.replaceState(null, '', '/reset-password');
+                    if (isSubscribed) {
+                        setHasSession(true);
+                        setIsChecking(false);
+                    }
+                    return;
+                }
+
                 // 1. Initial check (if session is already established on mount)
                 const { data: { session } } = await supabase.auth.getSession();
                 logger.debug("INITIAL SESSION CHECK:", session);

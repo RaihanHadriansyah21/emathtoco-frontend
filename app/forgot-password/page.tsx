@@ -9,6 +9,20 @@ import { Mail, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PageTransition from '@/components/ui/PageTransition';
 
+const PRODUCTION_APP_URL = 'https://emathtoco.vercel.app';
+
+function getPasswordResetRedirectUrl(): string {
+    const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/+$/, '');
+    const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+    const isLocalOrigin =
+        currentOrigin.includes('localhost')
+        || currentOrigin.includes('127.0.0.1')
+        || currentOrigin.includes('0.0.0.0');
+
+    const appOrigin = configuredUrl || (isLocalOrigin ? PRODUCTION_APP_URL : currentOrigin);
+    return `${appOrigin}/reset-password`;
+}
+
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -37,7 +51,7 @@ export default function ForgotPasswordPage() {
 
         try {
             const { error } = await supabase.auth.resetPasswordForEmail(emailTrimmed, {
-                redirectTo: `${window.location.origin}/reset-password`,
+                redirectTo: getPasswordResetRedirectUrl(),
             });
 
             if (error) {

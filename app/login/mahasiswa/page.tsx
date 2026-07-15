@@ -244,10 +244,10 @@ function MahasiswaLoginForm() {
             if (typeof window !== "undefined") {
               sessionStorage.removeItem(sessionKey);
             }
-            setErrorMessage(
-              "Akun ini tidak memiliki akses ke Portal Mahasiswa.",
-            );
             setIsLoading(false);
+            router.replace(
+              `/login?select=true&auth_error=wrong_role&expected=mahasiswa&actual=${encodeURIComponent(role || "tidak diketahui")}`,
+            );
             return;
           }
 

@@ -213,8 +213,10 @@ export default function DosenLoginPage() {
                         if (typeof window !== 'undefined') {
                             sessionStorage.removeItem(sessionKey);
                         }
-                        setErrorMessage('Akun ini tidak memiliki akses ke Portal Dosen.');
                         setIsLoading(false);
+                        router.replace(
+                            `/login?select=true&auth_error=wrong_role&expected=dosen/admin&actual=${encodeURIComponent(role || 'tidak diketahui')}`,
+                        );
                         return;
                     }
 

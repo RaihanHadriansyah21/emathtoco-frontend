@@ -6,7 +6,7 @@ import { useAuth } from '@/app/components/AuthGate';
 import { useBackendStatus } from '@/lib/backend-store';
 import Image from 'next/image';
 import Logo from '../Emathtoco.png';
-import { GraduationCap, BookOpen, ArrowRight, Loader2, Sparkles, ArrowLeft, LogIn, WifiOff, RefreshCw } from 'lucide-react';
+import { GraduationCap, BookOpen, ArrowRight, Loader2, Sparkles, ArrowLeft, LogIn, WifiOff, RefreshCw, AlertTriangle } from 'lucide-react';
 import LoginAIScene from '@/components/ui/login-ai-scene';
 import { motion, AnimatePresence } from 'framer-motion';
 import PageTransition from '@/components/ui/PageTransition';
@@ -19,6 +19,13 @@ function LoginPageContent() {
     const { backendState, retryBackendCheck } = useBackendStatus();
     const searchParams = useSearchParams();
     const [showSelection, setShowSelection] = useState(searchParams.get('select') === 'true');
+    const authError = searchParams.get('auth_error');
+    const expectedRole = searchParams.get('expected');
+    const actualRole = searchParams.get('actual');
+
+    const roleMismatchMessage = authError === 'wrong_role'
+        ? `Akun ini terdaftar sebagai ${actualRole || 'role lain'}, bukan ${expectedRole || 'role yang dipilih'}. Silakan pilih portal login yang sesuai.`
+        : null;
 
     const selectParam = searchParams.get('select');
     useEffect(() => {
@@ -132,6 +139,22 @@ function LoginPageContent() {
             {/* MAIN CONTENT AREA                                     */}
             {/* ═══════════════════════════════════════════════════════ */}
             <div className="relative z-10 flex flex-col lg:flex-row min-h-screen">
+                {roleMismatchMessage && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="fixed top-[calc(5rem+env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-xl"
+                    >
+                        <div role="alert" className="flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-950/35 px-4 py-3 text-amber-100 shadow-2xl shadow-black/40 backdrop-blur-xl">
+                            <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-300" />
+                            <div>
+                                <p className="text-sm font-bold">Portal login tidak sesuai</p>
+                                <p className="mt-1 text-xs leading-relaxed text-amber-100/85">{roleMismatchMessage}</p>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+
                 <AnimatePresence mode="wait">
                     {!showSelection ? (
                         /* ═══════════════════════════════════════════ */
