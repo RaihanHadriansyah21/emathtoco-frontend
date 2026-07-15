@@ -26,6 +26,7 @@ import {
   type QuestionSection,
   type QuestionSet,
 } from '@/lib/question-bank';
+import { AI_MODEL_OPTIONS } from '@/lib/constants/ai-models';
 
 import { useAuth } from '@/app/components/AuthGate';
 
@@ -1636,9 +1637,9 @@ export default function ReviewWorkspace() {
                     disabled={isReadOnly || isAIProcessing}
                     className={`w-full bg-slate-50 border border-slate-200 dark:bg-black dark:border-neutral-900 hover:border-slate-300 dark:hover:border-neutral-800 text-slate-700 dark:text-neutral-300 rounded-xl p-3 text-sm focus:outline-none cursor-pointer ${(isReadOnly || isAIProcessing) ? 'opacity-60 cursor-not-allowed' : ''}`}
                   >
-                    <option value="MobileNetV2">MobileNetV2 (Ringan & Cepat)</option>
-                    <option value="DenseNet121">DenseNet121</option>
-                    <option value="InceptionV3">InceptionV3 (Deteksi Pola Komparatif)</option>
+                    <option value="MobileNetV2">{AI_MODEL_OPTIONS.MobileNetV2.label}</option>
+                    <option value="DenseNet121">{AI_MODEL_OPTIONS.DenseNet121.label}</option>
+                    <option value="InceptionV3">{AI_MODEL_OPTIONS.InceptionV3.label}</option>
                   </select>
                 </div>
 

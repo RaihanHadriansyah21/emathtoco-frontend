@@ -11,7 +11,7 @@ import type {
   BatchAIProgress,
 } from '@/lib/types/batch-ai';
 import { ALL_SECTION_CODES } from '@/lib/types/batch-ai';
-import { AI_MODELS, type AIModel } from '@/lib/constants/ai-models';
+import { AI_MODELS, AI_MODEL_OPTIONS, type AIModel } from '@/lib/constants/ai-models';
 import { apiGet, apiPost } from '@/lib/api-client';
 
 // ============================================================
@@ -353,7 +353,7 @@ export default function BatchAIModal({
                   >
                     <span className="flex items-center gap-2">
                       <Zap className="w-4 h-4 text-purple-400" />
-                      <span className="font-semibold">{selectedModel}</span>
+                      <span className="font-semibold">{AI_MODEL_OPTIONS[selectedModel].label}</span>
                       <span className="text-neutral-500 text-xs">— 24 section models</span>
                     </span>
                     <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform duration-200 ${isModelDropdownOpen ? 'rotate-180' : ''}`} />
@@ -372,7 +372,12 @@ export default function BatchAIModal({
                           }`}
                         >
                           <Zap className="w-3.5 h-3.5 text-purple-400" />
-                          {m}
+                          <span className="flex flex-col">
+                            <span>{AI_MODEL_OPTIONS[m].label}</span>
+                            <span className="text-[10px] text-neutral-500 font-normal">
+                              {AI_MODEL_OPTIONS[m].description}
+                            </span>
+                          </span>
                           {selectedModel === m && (
                             <CheckCircle className="w-3.5 h-3.5 ml-auto text-purple-400" />
                           )}
