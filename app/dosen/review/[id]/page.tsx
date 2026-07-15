@@ -516,13 +516,19 @@ export default function ReviewWorkspace() {
         const aiScore = matchedSectionAI !== undefined && matchedSectionAI !== null ? matchedSectionAI.predicted_score : null;
         const confidence = matchedSectionAI !== undefined && matchedSectionAI !== null ? matchedSectionAI.confidence : null;
 
-        const manualScore = matchedSheet?.nilai_dosen !== undefined && matchedSheet.nilai_dosen !== null
+        const storedManualScore = matchedSheet?.nilai_dosen !== undefined && matchedSheet.nilai_dosen !== null
           ? matchedSheet.nilai_dosen
           : null;
+        const storedFinalScore = matchedSheet?.nilai_final !== undefined && matchedSheet.nilai_final !== null
+          ? matchedSheet.nilai_final
+          : null;
 
-        const finalScore = manualScore !== null
-          ? manualScore
-          : (matchedSheet?.nilai_final !== undefined && matchedSheet.nilai_final !== null ? matchedSheet.nilai_final : aiScore);
+        const finalScore = storedManualScore !== null
+          ? storedManualScore
+          : (storedFinalScore !== null ? storedFinalScore : aiScore);
+        const manualScore = finalScore !== null && aiScore !== null
+          ? (finalScore !== aiScore ? finalScore : null)
+          : storedManualScore;
         const manualCorrection = (finalScore !== null && aiScore !== null) ? (finalScore - aiScore) : 0;
 
         const existingSlot = slotsRef.current.find(ex => ex.label === s.label);
@@ -704,10 +710,13 @@ export default function ReviewWorkspace() {
     setSlots(prev => prev.map(slot => {
       if (slot.label === label) {
         const finalScore = manualVal !== null ? manualVal : slot.aiScore;
+        const nextManualScore = manualVal !== null && (slot.aiScore === null || manualVal !== slot.aiScore)
+          ? manualVal
+          : null;
         const correction = (finalScore !== null && slot.aiScore !== null) ? (finalScore - slot.aiScore) : 0;
         return {
           ...slot,
-          manualScore: manualVal,
+          manualScore: nextManualScore,
           finalScore: finalScore,
           manualCorrection: correction
         };
@@ -724,7 +733,9 @@ export default function ReviewWorkspace() {
     setSlots(prev => prev.map(slot => {
       if (slot.label === label) {
         const finalScore = finalVal !== null ? finalVal : slot.aiScore;
-        const manualVal = finalVal;
+        const manualVal = finalVal !== null && (slot.aiScore === null || finalVal !== slot.aiScore)
+          ? finalVal
+          : null;
         const correction = (finalScore !== null && slot.aiScore !== null) ? (finalScore - slot.aiScore) : 0;
         return {
           ...slot,
@@ -752,10 +763,40 @@ export default function ReviewWorkspace() {
     return slots.reduce((acc, s) => acc + (s.finalScore || 0), 0);
   };
 
+  const isSlotCorrectedByLecturer = (slot: SlotState): boolean => {
+    if (!slot.hasSheet || slot.finalScore === null) return false;
+    if (slot.aiScore === null) return slot.manualScore !== null;
+    return slot.finalScore !== slot.aiScore;
+  };
+
+  const getScoreSourceBadge = (slot: SlotState) => {
+    if (!slot.hasSheet || slot.finalScore === null) {
+      return {
+        text: 'Belum Dinilai',
+        className: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
+      };
+    }
+    if (isSlotCorrectedByLecturer(slot)) {
+      return {
+        text: 'Dikoreksi Dosen',
+        className: 'bg-amber-500/10 text-amber-500 dark:text-amber-400 border-amber-500/25',
+      };
+    }
+    return {
+      text: 'Mengikuti AI',
+      className: 'bg-purple-500/10 text-purple-500 dark:text-purple-400 border-purple-500/25',
+    };
+  };
+
   // Derived real-time dashboard summary stats
   const totalSectionScore = slots.reduce((acc, s) => acc + (s.finalScore || 0), 0);
-  const manualOverrideCount = slots.filter(s => s.hasSheet && s.manualScore !== null).length;
-  const aiContributionCount = slots.filter(s => s.hasSheet && s.manualScore === null && s.aiScore !== null).length;
+  const manualOverrideCount = slots.filter(isSlotCorrectedByLecturer).length;
+  const aiContributionCount = slots.filter(s =>
+    s.hasSheet &&
+    s.aiScore !== null &&
+    s.finalScore !== null &&
+    s.finalScore === s.aiScore
+  ).length;
 
   // AI processing caller
   const runAISimulation = async () => {
@@ -784,7 +825,8 @@ export default function ReviewWorkspace() {
       ...s,
       aiScore: null,
       confidence: null,
-      finalScore: s.manualScore !== null ? s.manualScore : null,
+      manualScore: null,
+      finalScore: null,
       manualCorrection: 0
     })));
 
@@ -1325,6 +1367,7 @@ export default function ReviewWorkspace() {
                       {questionSlots.map(slot => {
                         const sectionCode = `S-${slot.label.toUpperCase()}`;
                         const sectionQuestion = questionSectionsByCode.get(sectionCode);
+                        const scoreSourceBadge = getScoreSourceBadge(slot);
                         return (
                         <div
                           key={slot.label}
@@ -1473,7 +1516,12 @@ export default function ReviewWorkspace() {
                                 {/* Center final score */}
                                 <div className="md:col-span-3 flex flex-col justify-between">
                                   <div>
-                                    <label className="block text-[10px] font-bold text-cyan-800 dark:text-cyan-400 uppercase tracking-wider mb-1">Nilai Akhir Bagian</label>
+                                    <div className="flex items-center justify-between gap-2 mb-1">
+                                      <label className="block text-[10px] font-bold text-cyan-800 dark:text-cyan-400 uppercase tracking-wider">Nilai Akhir Bagian</label>
+                                      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${scoreSourceBadge.className}`}>
+                                        {scoreSourceBadge.text}
+                                      </span>
+                                    </div>
                                     <input
                                       type="number"
                                       placeholder="0"
@@ -1731,25 +1779,23 @@ export default function ReviewWorkspace() {
               </h3>
 
               <div className="space-y-4">
-                <div className="grid grid-cols-1 min-[360px]:grid-cols-3 gap-2.5 sm:gap-4">
+                <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-2.5 sm:gap-4">
                   <div className="bg-slate-50 border border-slate-200 dark:bg-black/45 dark:border-neutral-900 rounded-xl p-2.5 sm:p-3">
-                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-wider block mb-0.5">Skor Bagian</span>
-                    <span className="text-2xl font-extrabold text-slate-800 dark:text-white font-mono">{totalSectionScore}</span>
-                    <span className="text-[9px] text-slate-500 dark:text-neutral-500 font-mono block mt-0.5">/ 100</span>
-                  </div>
-
-                  <div className="bg-slate-50 border border-slate-200 dark:bg-black/45 dark:border-neutral-900 rounded-xl p-2.5 sm:p-3">
-                    <span className="text-[10px] text-purple-600 dark:text-purple-400 font-bold uppercase tracking-wider block mb-0.5">Total Nilai AI</span>
+                    <span className="text-[10px] text-purple-600 dark:text-purple-400 font-bold uppercase tracking-wider block mb-0.5">Prediksi AI</span>
                     <span className="text-2xl font-extrabold text-purple-600 dark:text-purple-400 font-mono">{isAIProcessing ? '⏳' : (totalAIScore !== null ? totalAIScore : '-')}</span>
-                    <span className="text-[9px] text-purple-600/80 dark:text-purple-500/60 font-mono block mt-0.5">AI Engine</span>
+                    <span className="text-[9px] text-purple-600/80 dark:text-purple-500/60 font-mono block mt-0.5">murni dari model</span>
                   </div>
 
                   <div className="bg-slate-50 border border-slate-200 dark:bg-black/45 dark:border-neutral-900 rounded-xl p-2.5 sm:p-3">
-                    <span className="text-[10px] text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-wider block mb-0.5">Nilai Resmi</span>
+                    <span className="text-[10px] text-cyan-700 dark:text-cyan-400 font-bold uppercase tracking-wider block mb-0.5">Nilai Akhir</span>
                     <span className="text-2xl font-extrabold text-cyan-600 dark:text-cyan-400 font-mono">{totalSectionScore}</span>
-                    <span className="text-[9px] text-cyan-700/80 dark:text-cyan-500/60 font-mono block mt-0.5">Official</span>
+                    <span className="text-[9px] text-cyan-700/80 dark:text-cyan-500/60 font-mono block mt-0.5">setelah review</span>
                   </div>
                 </div>
+
+                <p className="text-[10px] leading-relaxed text-slate-500 dark:text-neutral-500">
+                  Nilai akhir memakai koreksi dosen jika ada; selain itu mengikuti prediksi AI terakhir.
+                </p>
 
                 <div className="border-t border-slate-100 dark:border-neutral-900/60 pt-3 space-y-2">
                   <div className="flex justify-between items-center text-xs">
