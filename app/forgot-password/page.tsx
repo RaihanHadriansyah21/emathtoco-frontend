@@ -59,7 +59,7 @@ export default function ForgotPasswordPage() {
                 return;
             }
 
-            setSuccessMessage('Tautan reset password telah dikirim ke email Anda. Silakan periksa kotak masuk atau spam email Anda.');
+            setSuccessMessage('Jika alamat email terdaftar di E-MATHTOCO, tautan reset password akan dikirim. Silakan periksa kotak masuk atau spam email Anda.');
             setEmail('');
         } catch {
             setErrorMessage('Terjadi gangguan koneksi pada sistem. Silakan coba sesaat lagi.');
