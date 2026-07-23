@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import Image from 'next/image';
 import Logo from '../Emathtoco.png';
-import { ArrowLeft, UserPlus, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, UserPlus, Eye, EyeOff, Mail, CheckCircle2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import PageTransition from '@/components/ui/PageTransition';
 import { isStrongPassword, PASSWORD_REQUIREMENTS } from '@/lib/security/password';
@@ -22,6 +22,7 @@ export default function RegisterPage() {
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [registrationComplete, setRegistrationComplete] = useState(false);
 
     const handleRegisterSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -55,9 +56,15 @@ export default function RegisterPage() {
 
         try {
             // Fungsi Sign Up bawaan Supabase
+            // emailRedirectTo mengarahkan user ke /auth/callback setelah
+            // klik link konfirmasi di email, yang kemudian menukar code
+            // menjadi session dan redirect ke /complete-profile
             const { error } = await supabase.auth.signUp({
                 email: email,
                 password: password,
+                options: {
+                    emailRedirectTo: `${window.location.origin}/auth/callback`,
+                },
             });
 
             if (error) {
@@ -66,13 +73,13 @@ export default function RegisterPage() {
                 return;
             }
 
-            // Berhasil Mendaftar
-            setSuccessMessage('Akun berhasil dibuat! Mengalihkan ke halaman login...');
-
-            // Jeda 2 detik agar user sempat membaca pesan sukses sebelum dipindah
-            setTimeout(() => {
-                router.push('/login');
-            }, 2000);
+            // Berhasil Mendaftar — tampilkan pesan konfirmasi email
+            // JANGAN redirect ke complete-profile karena belum ada session
+            // (email confirmation aktif, user harus klik link di email dulu)
+            setRegistrationComplete(true);
+            setSuccessMessage(
+                'Akun berhasil dibuat! Silakan cek kotak masuk email Anda dan klik link konfirmasi untuk melanjutkan.'
+            );
 
         } catch {
             setErrorMessage('Terjadi kesalahan pada sistem pendaftaran.');
@@ -147,7 +154,7 @@ export default function RegisterPage() {
                         <p className="text-neutral-500 text-xs uppercase tracking-widest mt-1">Buat akun baru untuk mengakses E-MATHTOCO</p>
                     </motion.div>
 
-                    {/* Peringatan Error & Sukses */}
+                    {/* Peringatan Error */}
                     {errorMessage && (
                         <motion.div
                             initial={{ opacity: 0, y: -10 }}
@@ -158,97 +165,138 @@ export default function RegisterPage() {
                             <p className="font-medium leading-relaxed">{errorMessage}</p>
                         </motion.div>
                     )}
-                    {successMessage && (
+
+                    {registrationComplete ? (
+                        /* ── Email Confirmation Success View ──────────── */
                         <motion.div
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.3 }}
-                            className="mb-6 flex items-start gap-3 bg-emerald-950/20 border border-emerald-900/50 text-emerald-400 p-4 rounded-xl text-sm"
+                            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                            className="text-center space-y-5"
                         >
-                            <p className="font-medium leading-relaxed">{successMessage}</p>
-                        </motion.div>
-                    )}
-
-                    <motion.form
-                        initial={{ opacity: 0, y: 15 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.4, delay: 0.25 }}
-                        onSubmit={handleRegisterSubmit}
-                        className="space-y-4"
-                    >
-                        <div>
-                            <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Email</label>
-                            <input
-                                type="email"
-                                placeholder="nama@gmail.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full bg-black border border-neutral-800 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/20 transition-all text-sm placeholder:text-neutral-600"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Password Baru</label>
-                            <div className="relative">
-                                <input
-                                    type={showPassword ? "text" : "password"}
-                                    placeholder="Min. 6 Karakter Alfanumerik"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full bg-black border border-neutral-800 rounded-xl py-3 pl-4 pr-12 text-white focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/20 transition-all text-sm placeholder:text-neutral-600"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 active:scale-95 transition-all p-1 rounded-lg hover:bg-neutral-900/50 cursor-pointer flex items-center justify-center"
-                                >
-                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                </button>
+                            <div className="mx-auto w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-center">
+                                <Mail className="w-8 h-8 text-emerald-400" />
                             </div>
-                        </div>
 
-                        <div>
-                            <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Konfirmasi Password</label>
-                            <div className="relative">
-                                <input
-                                    type={showConfirmPassword ? "text" : "password"}
-                                    placeholder="Ulangi Password"
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className="w-full bg-black border border-neutral-800 rounded-xl py-3 pl-4 pr-12 text-white focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/20 transition-all text-sm placeholder:text-neutral-600"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 active:scale-95 transition-all p-1 rounded-lg hover:bg-neutral-900/50 cursor-pointer flex items-center justify-center"
-                                >
-                                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                </button>
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                    <h2 className="text-lg font-bold text-emerald-400">Akun Berhasil Dibuat!</h2>
+                                </div>
+                                <p className="text-neutral-400 text-sm leading-relaxed">
+                                    Kami telah mengirimkan email konfirmasi ke:
+                                </p>
+                                <p className="text-white font-semibold text-sm bg-white/5 border border-white/10 rounded-lg py-2 px-4 inline-block">
+                                    {email}
+                                </p>
                             </div>
-                        </div>
 
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-600 hover:via-blue-600 hover:to-indigo-700 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/10 disabled:opacity-50 text-sm tracking-widest mt-4 cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
-                        >
-                            {isLoading ? <span>Memproses...</span> : <span>DAFTARKAN AKUN</span>}
-                        </button>
-                    </motion.form>
+                            <div className="bg-cyan-500/5 border border-cyan-500/20 rounded-xl p-4 text-left space-y-2">
+                                <p className="text-cyan-400 text-xs font-bold uppercase tracking-wider">Langkah Selanjutnya:</p>
+                                <ol className="text-neutral-400 text-xs space-y-1.5 list-decimal list-inside leading-relaxed">
+                                    <li>Buka kotak masuk email Anda</li>
+                                    <li>Klik link konfirmasi dari <span className="text-white font-medium">E-MATHTOCO</span></li>
+                                    <li>Anda akan langsung diarahkan ke pengisian data diri</li>
+                                </ol>
+                            </div>
 
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.4, delay: 0.35 }}
-                        className="mt-6 text-center"
-                    >
-                        <p className="text-sm text-neutral-400">
-                            Sudah punya akun?{' '}
-                            <Link href="/login" className="text-cyan-400 font-bold hover:text-cyan-300 hover:underline transition-all">
+                            <p className="text-neutral-600 text-[11px]">
+                                Tidak menerima email? Periksa folder spam atau coba daftar ulang.
+                            </p>
+
+                            <Link
+                                href="/login"
+                                className="inline-flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 text-xs font-bold uppercase tracking-widest transition-colors"
+                            >
+                                <ArrowLeft className="w-3.5 h-3.5" />
                                 Kembali ke Login
                             </Link>
-                        </p>
-                    </motion.div>
+                        </motion.div>
+                    ) : (
+                        /* ── Registration Form ──────────────────────── */
+                        <>
+                            <motion.form
+                                initial={{ opacity: 0, y: 15 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.4, delay: 0.25 }}
+                                onSubmit={handleRegisterSubmit}
+                                className="space-y-4"
+                            >
+                                <div>
+                                    <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Email</label>
+                                    <input
+                                        type="email"
+                                        placeholder="nama@gmail.com"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="w-full bg-black border border-neutral-800 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/20 transition-all text-sm placeholder:text-neutral-600"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Password Baru</label>
+                                    <div className="relative">
+                                        <input
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder="Min. 6 Karakter Alfanumerik"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            className="w-full bg-black border border-neutral-800 rounded-xl py-3 pl-4 pr-12 text-white focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/20 transition-all text-sm placeholder:text-neutral-600"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 active:scale-95 transition-all p-1 rounded-lg hover:bg-neutral-900/50 cursor-pointer flex items-center justify-center"
+                                        >
+                                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold uppercase tracking-widest text-neutral-400 mb-2">Konfirmasi Password</label>
+                                    <div className="relative">
+                                        <input
+                                            type={showConfirmPassword ? "text" : "password"}
+                                            placeholder="Ulangi Password"
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            className="w-full bg-black border border-neutral-800 rounded-xl py-3 pl-4 pr-12 text-white focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/20 transition-all text-sm placeholder:text-neutral-600"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 active:scale-95 transition-all p-1 rounded-lg hover:bg-neutral-900/50 cursor-pointer flex items-center justify-center"
+                                        >
+                                            {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={isLoading}
+                                    className="w-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-600 hover:via-blue-600 hover:to-indigo-700 text-white font-extrabold py-3.5 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/10 disabled:opacity-50 text-sm tracking-widest mt-4 cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
+                                >
+                                    {isLoading ? <span>Memproses...</span> : <span>DAFTARKAN AKUN</span>}
+                                </button>
+                            </motion.form>
+
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ duration: 0.4, delay: 0.35 }}
+                                className="mt-6 text-center"
+                            >
+                                <p className="text-sm text-neutral-400">
+                                    Sudah punya akun?{' '}
+                                    <Link href="/login" className="text-cyan-400 font-bold hover:text-cyan-300 hover:underline transition-all">
+                                        Kembali ke Login
+                                    </Link>
+                                </p>
+                            </motion.div>
+                        </>
+                    )}
 
                 </motion.div>
             </div>

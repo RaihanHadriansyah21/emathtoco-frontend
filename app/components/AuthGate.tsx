@@ -42,6 +42,7 @@ const publicPrefixes = [
   "/reset-password",
   "/register",
   "/join-class",
+  "/complete-profile",
 ];
 const AUTH_CHECK_TIMEOUT_MS = 3000;
 
@@ -71,6 +72,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [redirecting, setRedirecting] = useState(false);
   const bootstrappedRef = useRef(false);
   const pathnameRef = useRef(pathname);
+  // Tracks whether an auth event (e.g. SIGNED_IN from email callback) is
+  // currently being processed. While true, the redirect-to-login effect
+  // is suppressed to prevent the "blip" where the user briefly sees the
+  // login page before the profile fetch completes.
+  const pendingAuthEventRef = useRef(false);
 
   useEffect(() => {
     pathnameRef.current = pathname;
@@ -101,18 +107,38 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         throw profileError;
       }
 
+      // User authenticated but no profile row yet → redirect to complete-profile
+      if (!profile) {
+        setUser({
+          id: data.user.id,
+          email: data.user.email ?? "",
+          nama_lengkap: "",
+          role: "",
+          foto_profil_url: null,
+        });
+        if (
+          pathnameRef.current &&
+          !pathnameRef.current.startsWith("/complete-profile") &&
+          !isPublicPath(pathnameRef.current)
+        ) {
+          router.replace("/complete-profile");
+        }
+        return;
+      }
+
       setUser({
         id: data.user.id,
         email: data.user.email ?? "",
-        nama_lengkap: profile?.nama_lengkap ?? "User",
-        role: normalizeRole(profile?.role ?? "mahasiswa"),
-        foto_profil_url: profile?.foto_profil_url ?? null,
+        nama_lengkap: profile.nama_lengkap ?? "User",
+        role: normalizeRole(profile.role ?? "mahasiswa"),
+        foto_profil_url: profile.foto_profil_url ?? null,
       });
     } catch (error) {
       logger.warn("AuthGate refresh failed; clearing local user state.", error);
       setUser(null);
     } finally {
       bootstrappedRef.current = true;
+      pendingAuthEventRef.current = false;
       if (shouldBlockUi) {
         setLoading(false);
       }
@@ -143,15 +169,30 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       }
 
       if (event === "SIGNED_IN" || event === "USER_UPDATED") {
-        void refresh(false);
+        // Set pending flag BEFORE refresh starts — this prevents the
+        // redirect-to-login effect from firing while we're still
+        // fetching the user profile, eliminating the page flicker.
+        pendingAuthEventRef.current = true;
+        void refresh(true);
       }
     });
 
     return () => subscription.unsubscribe();
   }, [refresh, router]);
 
+  // Reset redirecting state when user successfully loads
+  useEffect(() => {
+    if (user && redirecting) {
+      setRedirecting(false);
+    }
+  }, [user, redirecting]);
+
   useEffect(() => {
     if (loading || user || isPublicPath(pathname)) return;
+    // Don't redirect to login while an auth event is being processed.
+    // This prevents the "blip" where user briefly sees the login page
+    // before the SIGNED_IN refresh completes.
+    if (pendingAuthEventRef.current) return;
     setRedirecting(true);
     router.replace("/login");
   }, [loading, pathname, router, user]);

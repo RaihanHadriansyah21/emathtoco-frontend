@@ -232,6 +232,13 @@ function MahasiswaLoginForm() {
             .eq("id", data.session.user.id)
             .maybeSingle();
 
+          // User baru yang belum mengisi profil → arahkan ke pengisian data diri
+          if (!profile) {
+            setIsLoading(false);
+            router.replace('/complete-profile');
+            return;
+          }
+
           const role = normalizeRole(profile?.role);
 
           // ═══════════════════════════════════════════════════════

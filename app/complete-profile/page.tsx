@@ -16,7 +16,7 @@ export default function CompleteProfilePage() {
 
     // FIX #3: Use useAuth() as single source of truth instead of
     // calling supabase.auth.getUser() independently (which caused deadlocks)
-    const { user: authUser, loading: authLoading } = useAuth();
+    const { user: authUser, loading: authLoading, refresh } = useAuth();
 
     const [namaLengkap, setNamaLengkap] = useState('');
     const [nimNip, setNimNip] = useState('');
@@ -34,7 +34,7 @@ export default function CompleteProfilePage() {
 
         // If no authenticated user, redirect to login
         if (!authUser) {
-            window.location.href = '/login';
+            router.replace('/login');
             return;
         }
 
@@ -69,7 +69,7 @@ export default function CompleteProfilePage() {
                 }
             } catch {
                 // Network/unexpected error — redirect to login
-                window.location.href = '/login';
+                router.replace('/login');
             } finally {
                 setIsChecking(false);
             }
@@ -139,8 +139,10 @@ export default function CompleteProfilePage() {
             setSuccessMessage('Profil Anda berhasil dilengkapi! Mengalihkan ke halaman utama...');
 
             // Redirect setelah jeda agar notifikasi terbaca
-            setTimeout(() => {
-                window.location.href = '/';
+            setTimeout(async () => {
+                // Refresh AuthGate agar user data terupdate tanpa hard reload
+                await refresh(true);
+                router.push('/');
             }, 1500);
 
         } catch {
