@@ -9,6 +9,7 @@ import { Search, Loader2, ArrowLeft, ArrowRight, Cpu, Download, FileSpreadsheet,
 import { GlassTable, GlassTableHeader, GlassTableRow, ResponsiveTableWrapper } from '@/components/ui/table';
 import Navbar from '../../../components/Navbar';
 import PageTransition from '@/components/ui/PageTransition';
+import ModalPortal from '@/components/ui/ModalPortal';
 import BatchAIModal from '../../../components/BatchAIModal';
 import ExportCSVModal from '../../../components/ExportCSVModal';
 import ToastContainer from '../../../components/Toast';
@@ -574,7 +575,7 @@ export default function LecturerCoursePortal() {
 
   if (isAccessDenied) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans relative overflow-hidden flex flex-col">
+      <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans relative overflow-x-clip flex flex-col">
         <Navbar showBack backUrl="/dosen" title="Akses Ditolak" />
         <main className="flex-grow flex items-center justify-center">
           <div className="text-center max-w-md mx-auto px-6 space-y-4">
@@ -597,7 +598,7 @@ export default function LecturerCoursePortal() {
 
   return (
     <PageTransition>
-      <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-16 relative overflow-hidden flex flex-col">
+      <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-16 relative overflow-x-clip flex flex-col">
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
 
@@ -638,8 +639,9 @@ export default function LecturerCoursePortal() {
         onToast={(type, title, message) => toast[type](title, message)}
       />
 
-      {showJoinQrModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <ModalPortal active={showJoinQrModal}>
+        {showJoinQrModal && (
+        <div className="fixed inset-0 z-[100] flex min-h-[100dvh] items-center justify-center overflow-y-auto overscroll-contain p-4">
           <button
             type="button"
             className="absolute inset-0 bg-black/80 backdrop-blur-sm cursor-default"
@@ -647,8 +649,8 @@ export default function LecturerCoursePortal() {
             onClick={() => setShowJoinQrModal(false)}
           />
 
-          <div className="relative w-full max-w-2xl bg-white border border-slate-200 dark:bg-[#0A0A0F] dark:border-neutral-800 rounded-3xl shadow-[0_0_60px_rgba(6,182,212,0.08)] overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 dark:border-neutral-900">
+          <div className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_0_60px_rgba(6,182,212,0.08)] dark:border-neutral-800 dark:bg-[#0A0A0F]">
+            <div className="flex flex-shrink-0 items-center justify-between px-6 py-5 border-b border-slate-100 dark:border-neutral-900">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-2xl bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center">
                   <QrCode className="w-5 h-5 text-cyan-500" />
@@ -669,7 +671,7 @@ export default function LecturerCoursePortal() {
               </button>
             </div>
 
-            <div className="p-6 grid grid-cols-1 md:grid-cols-[1fr_220px] gap-6">
+            <div className="min-h-0 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-[1fr_220px] gap-6">
               <div className="space-y-4">
                 <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4 text-xs leading-relaxed text-slate-600 dark:text-neutral-300">
                   Tampilkan QR ini di awal kelas. Mahasiswa scan, login sebagai mahasiswa, lalu otomatis masuk ke mata kuliah ini. Setelah waktu habis atau QR dicabut, token tidak bisa dipakai lagi.
@@ -768,7 +770,8 @@ export default function LecturerCoursePortal() {
             </div>
           </div>
         </div>
-      )}
+        )}
+      </ModalPortal>
 
       {/* Background Glows */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">

@@ -76,9 +76,7 @@ export default function CompleteProfilePage() {
         };
 
         checkExistingProfile();
-    // FIX #10: authUser and authLoading are stable references from context,
-    // no need for router in deps (use routerRef instead)
-    }, [authUser, authLoading]);
+    }, [authUser, authLoading, router]);
 
     // Regex patterns for validation
     const NIM_PATTERN = /^\d{8,}$/;

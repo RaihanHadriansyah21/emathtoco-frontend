@@ -3,11 +3,11 @@
 import { logger } from '@/lib/logger';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { useRouter, useParams } from 'next/navigation';
 import { Loader2, Play, CheckCircle, AlertTriangle, Eye, X, Lock, RotateCcw } from 'lucide-react';
 import Navbar from '../../../components/Navbar';
 import PageTransition from '@/components/ui/PageTransition';
+import ModalPortal from '@/components/ui/ModalPortal';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/app/hooks/useToast';
 import ToastContainer from '@/app/components/Toast';
@@ -180,7 +180,6 @@ export default function ReviewWorkspace() {
   const params = useParams();
   const submissionId = params.id as string;
   const { user } = useAuth();
-  const [isMounted, setIsMounted] = useState(false);
 
   // Auth and Loading States
   const [isChecking, setIsChecking] = useState(true);
@@ -272,10 +271,6 @@ export default function ReviewWorkspace() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const { toasts, toast, removeToast } = useToast();
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   // Reupload Request States
   const [showReuploadModal, setShowReuploadModal] = useState(false);
@@ -1193,7 +1188,7 @@ export default function ReviewWorkspace() {
   if (isAccessDenied) {
     return (
       <PageTransition>
-        <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-16 relative overflow-hidden flex flex-col">
+        <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-16 relative overflow-x-clip flex flex-col">
           <Navbar showBack backUrl={courseId ? `/dosen/course/${courseId}` : "/dosen"} title="Akses Ditolak" />
           <main className="flex-grow flex items-center justify-center">
             <div className="text-center max-w-md mx-auto px-6 space-y-4">
@@ -1221,9 +1216,10 @@ export default function ReviewWorkspace() {
         <ToastContainer toasts={toasts} onRemove={removeToast} />
 
       {/* Inline Confirmation Modal */}
-      {showConfirmModal && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 dark:bg-[#0A0A0F] dark:border-amber-500/30 rounded-2xl max-w-md w-full shadow-[0_0_40px_rgba(245,158,11,0.08)] p-6">
+      <ModalPortal active={showConfirmModal}>
+        {showConfirmModal && (
+        <div className="fixed inset-0 z-[100] flex min-h-[100dvh] items-center justify-center overflow-y-auto overscroll-contain bg-black/75 p-4 backdrop-blur-sm">
+          <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_0_40px_rgba(245,158,11,0.08)] dark:border-amber-500/30 dark:bg-[#0A0A0F]">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
                 <AlertTriangle className="w-5 h-5 text-amber-500 dark:text-amber-400" />
@@ -1254,11 +1250,13 @@ export default function ReviewWorkspace() {
           </div>
         </div>
       )}
+      </ModalPortal>
 
       {/* Reupload Request Modal */}
-      {showReuploadModal && reuploadTargetSlot && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 dark:bg-[#0A0A0F] dark:border-amber-500/30 rounded-2xl max-w-md w-full shadow-[0_0_40px_rgba(245,158,11,0.08)] p-6">
+      <ModalPortal active={showReuploadModal && Boolean(reuploadTargetSlot)}>
+        {showReuploadModal && reuploadTargetSlot && (
+        <div className="fixed inset-0 z-[100] flex min-h-[100dvh] items-center justify-center overflow-y-auto overscroll-contain bg-black/75 p-4 backdrop-blur-sm">
+          <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_0_40px_rgba(245,158,11,0.08)] dark:border-amber-500/30 dark:bg-[#0A0A0F]">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
                 <RotateCcw className="w-5 h-5 text-amber-500 dark:text-amber-400" />
@@ -1313,7 +1311,8 @@ export default function ReviewWorkspace() {
             </div>
           </div>
         </div>
-      )}
+        )}
+      </ModalPortal>
       {/* Background Glows */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[10%] left-[15%] w-[450px] h-[450px] bg-cyan-500/5 dark:bg-cyan-500/8 rounded-full blur-[120px] animate-float-blue"></div>
@@ -1940,16 +1939,17 @@ export default function ReviewWorkspace() {
       )}
 
       {/* FULLSIZE IMAGE PREVIEW MODAL */}
-      {isMounted && modalImageUrl && createPortal((
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={closeImagePreview}>
-          <div className="relative w-full max-w-5xl max-h-[92vh] bg-white border border-slate-250 dark:bg-[#0A0A0F] dark:border-neutral-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col z-[60]" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-neutral-900">
+      <ModalPortal active={Boolean(modalImageUrl)}>
+        {modalImageUrl && (
+        <div className="fixed inset-0 z-[110] flex min-h-[100dvh] items-center justify-center overflow-y-auto overscroll-contain bg-black/80 p-4 backdrop-blur-md" onClick={closeImagePreview}>
+          <div className="relative z-[60] flex max-h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-250 bg-white shadow-2xl dark:border-neutral-800 dark:bg-[#0A0A0F]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-shrink-0 items-center justify-between p-4 border-b border-slate-200 dark:border-neutral-900">
               <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">{modalTitle}</span>
               <button onClick={closeImagePreview} className="p-1 hover:bg-slate-100 dark:hover:bg-neutral-900 rounded-lg transition-colors cursor-pointer">
                 <X className="w-5 h-5 text-slate-400 dark:text-neutral-400" />
               </button>
             </div>
-            <div className="relative min-h-[45vh] p-4 overflow-auto flex items-center justify-center">
+            <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
               {modalImageLoading && !modalImageError && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white/80 dark:bg-[#0A0A0F]/80 z-10">
                   <Loader2 className="w-6 h-6 animate-spin text-cyan-600 dark:text-cyan-400" />
@@ -1970,6 +1970,7 @@ export default function ReviewWorkspace() {
                 </div>
               ) : (
                 <img
+                  key={modalImageUrl}
                   src={modalImageUrl}
                   alt="Full Size Preview"
                   decoding="async"
@@ -1978,13 +1979,14 @@ export default function ReviewWorkspace() {
                     setModalImageLoading(false);
                     setModalImageError(true);
                   }}
-                  className="max-w-full max-h-[76vh] rounded-xl object-contain border border-slate-200 dark:border-neutral-900 shadow-md"
+                  className="m-auto block max-h-[calc(100dvh-7rem)] max-w-full rounded-xl border border-slate-200 object-contain shadow-md dark:border-neutral-900"
                 />
               )}
             </div>
           </div>
         </div>
-      ), document.body)}
+        )}
+      </ModalPortal>
 
     </div>
     </PageTransition>

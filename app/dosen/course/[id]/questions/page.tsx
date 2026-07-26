@@ -271,7 +271,7 @@ export default function LecturerQuestionManagerPage() {
 
   return (
     <PageTransition>
-      <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-16 relative overflow-hidden flex flex-col">
+      <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-16 relative overflow-x-clip flex flex-col">
         <ToastContainer toasts={toasts} onRemove={removeToast} />
 
         <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">

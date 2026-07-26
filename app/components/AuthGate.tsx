@@ -143,7 +143,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         setLoading(false);
       }
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     void refresh();

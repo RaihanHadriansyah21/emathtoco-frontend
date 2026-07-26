@@ -73,7 +73,7 @@ body {
 
 .page-transition-surface {
   backface-visibility: hidden;
-  will-change: opacity, transform;
+  will-change: opacity;
 }
 
 .smooth-transform {

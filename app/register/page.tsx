@@ -20,14 +20,12 @@ export default function RegisterPage() {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [registrationComplete, setRegistrationComplete] = useState(false);
 
     const handleRegisterSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrorMessage(null);
-        setSuccessMessage(null);
 
         // Validasi Form Dasar
         if (!email || !password || !confirmPassword) {
@@ -77,10 +75,6 @@ export default function RegisterPage() {
             // JANGAN redirect ke complete-profile karena belum ada session
             // (email confirmation aktif, user harus klik link di email dulu)
             setRegistrationComplete(true);
-            setSuccessMessage(
-                'Akun berhasil dibuat! Silakan cek kotak masuk email Anda dan klik link konfirmasi untuk melanjutkan.'
-            );
-
         } catch {
             setErrorMessage('Terjadi kesalahan pada sistem pendaftaran.');
         } finally {

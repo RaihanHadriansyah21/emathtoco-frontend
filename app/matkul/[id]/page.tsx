@@ -8,6 +8,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { CheckCircle, Loader2, AlertTriangle, Eye, Lock, X, RefreshCw, Trophy, Camera, Image as ImageIcon, Trash2 } from 'lucide-react';
 import Navbar from '../../components/Navbar';
 import PageTransition from '@/components/ui/PageTransition';
+import ModalPortal from '@/components/ui/ModalPortal';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/app/hooks/useToast';
 import ToastContainer from '@/app/components/Toast';
@@ -2972,7 +2973,7 @@ export default function UploadWorkspace() {
 
     return (
         <PageTransition>
-            <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-24 relative overflow-hidden flex flex-col">
+            <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-24 relative overflow-x-clip flex flex-col">
             <ToastContainer toasts={toasts} onRemove={removeToast} />
             {/* Elegant Background Glows */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
@@ -3525,9 +3526,10 @@ export default function UploadWorkspace() {
             </footer>
 
             {/* Detail Modal */}
-            {activeDetailSlot && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setActiveDetailSlot(null)}>
-                    <div className="bg-white border border-slate-200 dark:bg-[#0A0A0F] dark:border-neutral-800 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <ModalPortal active={Boolean(activeDetailSlot)}>
+              {activeDetailSlot && (
+                <div className="fixed inset-0 z-[100] flex min-h-[100dvh] items-center justify-center overflow-y-auto overscroll-contain bg-black/70 p-4 backdrop-blur-sm" onClick={() => setActiveDetailSlot(null)}>
+                    <div className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-neutral-800 dark:bg-[#0A0A0F]" onClick={(e) => e.stopPropagation()}>
                         {/* Modal Header */}
                         <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-neutral-900">
                             <div className="flex items-center gap-3">
@@ -3637,7 +3639,8 @@ export default function UploadWorkspace() {
                         </div>
                     </div>
                 </div>
-            )}
+              )}
+            </ModalPortal>
 
             {/* Desktop Delete Confirmation Modal */}
             {showDesktopDeleteModal && desktopDeleteTarget && (() => {

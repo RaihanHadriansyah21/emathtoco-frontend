@@ -13,6 +13,7 @@ import type {
 import { ALL_SECTION_CODES } from '@/lib/types/batch-ai';
 import { AI_MODELS, AI_MODEL_OPTIONS, type AIModel } from '@/lib/constants/ai-models';
 import { apiGet, apiPost } from '@/lib/api-client';
+import ModalPortal from '@/components/ui/ModalPortal';
 
 // ============================================================
 // Types for the modal
@@ -306,9 +307,10 @@ export default function BatchAIModal({
     : 0;
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <ModalPortal active={isOpen}>
+      <AnimatePresence>
+        {isOpen && (
+        <div className="fixed inset-0 z-[100] flex min-h-[100dvh] items-center justify-center overflow-y-auto overscroll-contain p-4">
           {/* Backdrop */}
           <motion.div
             variants={fadeIn}
@@ -325,11 +327,11 @@ export default function BatchAIModal({
             initial="initial"
             animate="animate"
             exit="exit"
-            className="bg-[#0A0A0F] border border-neutral-800 rounded-2xl max-w-lg w-full shadow-[0_0_60px_rgba(168,85,247,0.06)] overflow-hidden relative z-10"
+            className="bg-[#0A0A0F] border border-neutral-800 rounded-2xl max-w-lg w-full max-h-[calc(100dvh-2rem)] shadow-[0_0_60px_rgba(168,85,247,0.06)] overflow-hidden relative z-10 flex flex-col"
           >
 
         {/* ─── HEADER ─── */}
-        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-neutral-900">
+        <div className="flex flex-shrink-0 items-center justify-between px-6 pt-6 pb-4 border-b border-neutral-900">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center flex-shrink-0">
               <Cpu className="w-5 h-5 text-purple-400" />
@@ -352,7 +354,7 @@ export default function BatchAIModal({
         </div>
 
         {/* ─── BODY ─── */}
-        <div className="px-6 py-5">
+        <div className="min-h-0 overflow-y-auto px-6 py-5">
 
           {/* ════════════════════════════════════════════ */}
           {/* PHASE: CONFIG                               */}
@@ -713,7 +715,8 @@ export default function BatchAIModal({
           </div>
           </motion.div>
         </div>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+    </ModalPortal>
   );
 }

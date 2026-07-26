@@ -29,6 +29,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { fadeIn, modalTransition } from '@/styles/motion';
 import PageTransition from '@/components/ui/PageTransition';
 import ConfirmModal from '../../../../components/ConfirmModal';
+import ModalPortal from '@/components/ui/ModalPortal';
 
 import { useAuth } from '@/app/components/AuthGate';
 
@@ -460,7 +461,7 @@ export default function LecturerStudentRoster() {
 
     return (
         <PageTransition>
-            <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-16 relative overflow-hidden flex flex-col">
+            <div className="min-h-screen bg-slate-50 dark:bg-gradient-to-br dark:from-[#060814] dark:via-[#020205] dark:to-[#000000] text-slate-700 dark:text-neutral-300 font-sans pb-16 relative overflow-x-clip flex flex-col">
             <ToastContainer toasts={toasts} onRemove={removeToast} />
 
             {/* Background Glows */}
@@ -651,9 +652,10 @@ export default function LecturerStudentRoster() {
                 )}
 
                 {/* STUDENT DETAIL MODAL */}
+                <ModalPortal active={Boolean(selectedStudent)}>
                 <AnimatePresence>
                     {selectedStudent && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="fixed inset-0 z-[100] flex min-h-[100dvh] items-center justify-center overflow-y-auto overscroll-contain p-4">
                             {/* Background Overlay */}
                             <motion.div
                                 variants={fadeIn}
@@ -670,7 +672,7 @@ export default function LecturerStudentRoster() {
                                 initial="initial"
                                 animate="animate"
                                 exit="exit"
-                                className="relative bg-white border border-slate-200 dark:bg-[#0A0A0F] dark:border-neutral-800 rounded-3xl w-full max-w-4xl shadow-[0_0_60px_rgba(6,182,212,0.06)] overflow-hidden flex flex-col max-h-[85vh] z-10"
+                                className="relative bg-white border border-slate-200 dark:bg-[#0A0A0F] dark:border-neutral-800 rounded-3xl w-full max-w-4xl shadow-[0_0_60px_rgba(6,182,212,0.06)] overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)] z-10"
                             >
                                 {/* Modal Header */}
                             <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100 dark:border-neutral-900/80">
@@ -689,7 +691,7 @@ export default function LecturerStudentRoster() {
                             </div>
 
                             {/* Modal Body */}
-                            <div className="p-6 overflow-y-auto space-y-6 flex-grow">
+                            <div className="min-h-0 flex-grow space-y-6 overflow-y-auto p-6">
                                 {/* SECTION 1 & SECTION 2: PROFILE & ACTIVITY GRID */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                     {/* Section 1: Profile Mahasiswa */}
@@ -877,6 +879,7 @@ export default function LecturerStudentRoster() {
                         </div>
                     )}
                 </AnimatePresence>
+                </ModalPortal>
             </main>
 
             {/* Modal Konfirmasi Hapus Mahasiswa yang Elegan */}
