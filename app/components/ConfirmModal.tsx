@@ -3,6 +3,7 @@
 import React from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ModalPortal from '@/components/ui/ModalPortal';
 import { fadeIn, modalTransition } from '@/styles/motion';
 
 interface ConfirmModalProps {
@@ -31,9 +32,13 @@ export default function ConfirmModal({
   const isDanger = variant === 'danger';
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <ModalPortal active={isOpen}>
+      <AnimatePresence>
+        {isOpen && (
+          <div
+            className="fixed inset-0 z-[130] flex min-h-[100dvh] items-center justify-center overflow-y-auto overscroll-contain p-4"
+            data-testid="confirm-modal-layer"
+          >
           {/* Backdrop */}
           <motion.div
             variants={fadeIn}
@@ -45,13 +50,17 @@ export default function ConfirmModal({
           />
 
           {/* Modal Card */}
-          <motion.div
-            variants={modalTransition}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            className="relative w-full max-w-md bg-white dark:bg-[#0D0D14]/90 dark:backdrop-blur-md border border-slate-200 dark:border-neutral-800 rounded-2xl p-6 shadow-2xl dark:shadow-[0_0_60px_rgba(0,0,0,0.9)] z-10"
-          >
+            <motion.div
+              variants={modalTransition}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="confirm-modal-title"
+              aria-describedby="confirm-modal-message"
+              className="relative z-10 my-auto max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-neutral-800 dark:bg-[#0D0D14]/90 dark:backdrop-blur-md dark:shadow-[0_0_60px_rgba(0,0,0,0.9)]"
+            >
             {/* Close button */}
             <button
               onClick={onClose}
@@ -70,8 +79,8 @@ export default function ConfirmModal({
             </div>
 
             {/* Content */}
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">{title}</h3>
-            <p className="text-sm text-slate-500 dark:text-neutral-400 leading-relaxed mb-6">{message}</p>
+            <h3 id="confirm-modal-title" className="text-lg font-bold text-slate-900 dark:text-white mb-2">{title}</h3>
+            <p id="confirm-modal-message" className="text-sm text-slate-500 dark:text-neutral-400 leading-relaxed mb-6">{message}</p>
 
             {/* Actions */}
             <div className="flex items-center justify-end gap-3">
@@ -94,9 +103,10 @@ export default function ConfirmModal({
                 {isLoading ? 'Memproses...' : confirmLabel}
               </button>
             </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </ModalPortal>
   );
 }
