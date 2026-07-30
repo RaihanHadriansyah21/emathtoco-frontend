@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, QrCode, Loader2, CheckCircle, AlertTriangle, Camera, X, RefreshCw } from 'lucide-react';
+import { ChevronRight, QrCode, Loader2, CheckCircle, AlertTriangle, Camera, X, RefreshCw, Minus, Plus } from 'lucide-react';
 import Navbar from './components/Navbar';
 import { supabase } from '@/lib/supabase';
 import { normalizeRole } from '@/lib/utils';
@@ -34,12 +34,13 @@ type QrCameraConfig = string | MediaTrackConstraints;
 type Html5QrcodeScanner = {
   start: (
     cameraConfig: QrCameraConfig,
-    config: { fps: number; qrbox: { width: number; height: number } },
+    config: { fps: number; qrbox: { width: number; height: number }; aspectRatio?: number },
     qrCodeSuccessCallback: (decodedText: string) => void | Promise<void>,
     qrCodeErrorCallback?: () => void,
   ) => Promise<unknown>;
   stop: () => Promise<unknown>;
-  getActiveTrack?: () => MediaStreamTrack | null;
+  getRunningTrackCapabilities: () => MediaTrackCapabilities;
+  applyVideoConstraints: (constraints: MediaTrackConstraints) => Promise<void>;
 };
 
 type ZoomCapabilities = MediaTrackCapabilities & {
@@ -84,7 +85,7 @@ export default function StudentDashboard() {
   const [showScanner, setShowScanner] = useState(false);
   const [zoomRange, setZoomRange] = useState<{ min: number; max: number; step: number } | null>(null);
   const [zoomValue, setZoomValue] = useState<number>(1);
-  const [activeTrack, setActiveTrack] = useState<MediaStreamTrack | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
   const [availableCameras, setAvailableCameras] = useState<CameraDevice[]>([]);
   const [currentCameraIndex, setCurrentCameraIndex] = useState<number>(0);
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
@@ -147,7 +148,7 @@ export default function StudentDashboard() {
     setShowScanner(true);
     setZoomRange(null);
     setZoomValue(1);
-    setActiveTrack(null);
+    setCameraReady(false);
     setAvailableCameras([]);
     setCurrentCameraIndex(0);
     
@@ -200,11 +201,15 @@ export default function StudentDashboard() {
 
   const startQrWithDevice = async (html5QrCode: Html5QrcodeScanner, deviceId: QrCameraConfig) => {
     try {
+      // Sesuaikan area deteksi dengan layar. Area yang lebih besar membantu kamera
+      // membaca QR dosen dari jarak lebih jauh tanpa mengecilkan preview di ponsel.
+      const qrboxSize = Math.max(220, Math.min(320, Math.round(window.innerWidth - 84)));
       await html5QrCode.start(
         deviceId,
         {
           fps: 10,
-          qrbox: { width: 220, height: 220 }
+          qrbox: { width: qrboxSize, height: qrboxSize },
+          aspectRatio: 1,
         },
         async (decodedText: string) => {
           // Callback sukses
@@ -217,23 +222,21 @@ export default function StudentDashboard() {
         }
       );
 
-      // Cari active track untuk konfigurasi zoom
-      const track = html5QrCode.getActiveTrack?.() ?? null;
-      if (track) {
-        setActiveTrack(track);
-        const capabilities = track.getCapabilities() as ZoomCapabilities;
-        const zoom = capabilities.zoom;
-        if (zoom) {
-          setZoomRange({
-            min: zoom.min || 1,
-            max: zoom.max || 10,
-            step: zoom.step || 0.1
-          });
-          setZoomValue(zoom.min || 1);
-        } else {
-          setZoomRange(null);
-        }
+      // Gunakan API resmi html5-qrcode untuk membaca kemampuan track kamera.
+      // getActiveTrack bukan API library sehingga sebelumnya slider zoom tidak
+      // pernah tersedia pada banyak perangkat.
+      const capabilities = html5QrCode.getRunningTrackCapabilities() as ZoomCapabilities;
+      const zoom = capabilities.zoom;
+      if (zoom) {
+        const min = zoom.min ?? 1;
+        const max = zoom.max ?? min;
+        const step = zoom.step ?? 0.1;
+        setZoomRange({ min, max, step });
+        setZoomValue(min);
+      } else {
+        setZoomRange(null);
       }
+      setCameraReady(true);
     } catch (err) {
       logger.error('Failed to start camera device:', err);
     }
@@ -246,8 +249,8 @@ export default function StudentDashboard() {
     setCurrentCameraIndex(nextIndex);
     const nextDevice = availableCameras[nextIndex];
 
-    setActiveTrack(null);
     setZoomRange(null);
+    setCameraReady(false);
     try {
       await scannerRef.current.stop();
       await startQrWithDevice(scannerRef.current, nextDevice.id);
@@ -257,21 +260,32 @@ export default function StudentDashboard() {
   };
 
   const handleZoomChange = async (val: number) => {
-    setZoomValue(val);
-    if (activeTrack) {
-      try {
-        await activeTrack.applyConstraints({
-          advanced: [{ zoom: val } as ZoomConstraint]
-        });
-      } catch (err) {
-        logger.error('Failed to apply zoom constraints:', err);
-      }
+    if (!scannerRef.current || !zoomRange) return;
+
+    const nextValue = Math.min(zoomRange.max, Math.max(zoomRange.min, val));
+    const previousValue = zoomValue;
+    setZoomValue(nextValue);
+    try {
+      await scannerRef.current.applyVideoConstraints({
+        advanced: [{ zoom: nextValue } as ZoomConstraint]
+      });
+    } catch (err) {
+      // Jangan menampilkan nilai seolah sudah diterapkan bila kamera menolaknya.
+      setZoomValue(previousValue);
+      logger.error('Failed to apply zoom constraints:', err);
     }
   };
 
+  const nudgeZoom = (direction: -1 | 1) => {
+    if (!zoomRange) return;
+    // Tombol dibuat lebih terasa daripada perubahan 0,1x pada sebagian kamera.
+    const buttonStep = Math.max(zoomRange.step, 0.5);
+    void handleZoomChange(zoomValue + (direction * buttonStep));
+  };
+
   const stopScanner = () => {
-    setActiveTrack(null);
     setZoomRange(null);
+    setCameraReady(false);
     setAvailableCameras([]);
     setCurrentCameraIndex(0);
     if (scannerRef.current) {
@@ -596,8 +610,8 @@ export default function StudentDashboard() {
 
       {/* MODAL SCANNER QR CAMERA */}
       {showScanner && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md px-4">
-          <div className="bg-white/95 dark:bg-[#07070C]/90 border border-slate-200 dark:border-neutral-900 w-full max-w-sm rounded-3xl p-6 relative overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md px-3 py-4 sm:px-4">
+          <div className="bg-white/95 dark:bg-[#07070C]/90 border border-slate-200 dark:border-neutral-900 w-full max-w-md rounded-3xl p-4 sm:p-6 relative overflow-hidden shadow-2xl">
             <button
               onClick={stopScanner}
               className="absolute top-4 right-4 p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-white transition-all cursor-pointer"
@@ -605,7 +619,7 @@ export default function StudentDashboard() {
               <X className="w-5 h-5" />
             </button>
 
-            <div className="text-center space-y-2 mb-6">
+            <div className="text-center space-y-2 mb-4 sm:mb-6">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center justify-center gap-2">
                 <Camera className="w-5 h-5 text-cyan-500" />
                 Scan QR Kelas
@@ -613,7 +627,11 @@ export default function StudentDashboard() {
               <p className="text-xs text-slate-500 dark:text-neutral-500">Arahkan kamera ke QR code join kelas</p>
             </div>
 
-            <div className="w-full aspect-square bg-black border border-neutral-900 rounded-2xl overflow-hidden flex items-center justify-center relative shadow-inner">
+            <div
+              className="w-full aspect-square bg-black border border-neutral-900 rounded-2xl overflow-hidden flex items-center justify-center relative shadow-inner touch-none overscroll-contain select-none"
+              style={{ touchAction: 'none' }}
+              aria-label="Area pemindaian QR"
+            >
               <div id="qr-reader" className="w-full h-full object-cover"></div>
               {availableCameras.length > 1 && (
                 <button
@@ -621,6 +639,7 @@ export default function StudentDashboard() {
                   onClick={switchCamera}
                   className="absolute bottom-3 right-3 p-2.5 rounded-xl bg-black/60 hover:bg-black/80 backdrop-blur-md text-white border border-white/10 hover:border-white/20 transition-all cursor-pointer"
                   title="Ganti Kamera"
+                  aria-label="Ganti kamera"
                 >
                   <RefreshCw className="w-4 h-4" />
                 </button>
@@ -628,21 +647,51 @@ export default function StudentDashboard() {
             </div>
 
             {zoomRange && (
-              <div className="mt-4 space-y-1.5 px-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="mt-4 space-y-2 px-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div className="flex justify-between text-[10px] font-bold text-slate-500 dark:text-neutral-500 uppercase tracking-widest leading-none">
-                  <span>Zoom: {zoomValue.toFixed(1)}x</span>
+                  <span>Zoom kamera: {zoomValue.toFixed(1)}x</span>
                   <span>Maks: {zoomRange.max.toFixed(1)}x</span>
                 </div>
-                <input
-                  type="range"
-                  min={zoomRange.min}
-                  max={zoomRange.max}
-                  step={zoomRange.step}
-                  value={zoomValue}
-                  onChange={(e) => handleZoomChange(Number(e.target.value))}
-                  className="w-full h-1.5 bg-slate-200 dark:bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
-                />
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => nudgeZoom(-1)}
+                    disabled={zoomValue <= zoomRange.min}
+                    className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+                    aria-label="Kurangi zoom kamera"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <input
+                    type="range"
+                    min={zoomRange.min}
+                    max={zoomRange.max}
+                    step={zoomRange.step}
+                    value={zoomValue}
+                    onChange={(e) => void handleZoomChange(Number(e.target.value))}
+                    aria-label="Atur zoom kamera"
+                    className="w-full h-1.5 bg-slate-200 dark:bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => nudgeZoom(1)}
+                    disabled={zoomValue >= zoomRange.max}
+                    className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+                    aria-label="Tambah zoom kamera"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+                <p className="text-[11px] leading-relaxed text-slate-500 dark:text-neutral-500">
+                  Gunakan tombol atau penggeser ini untuk memperbesar kamera. Gesture cubit di area kamera tidak akan memperbesar halaman.
+                </p>
               </div>
+            )}
+
+            {cameraReady && !zoomRange && (
+              <p className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-center text-[11px] leading-relaxed text-amber-700 dark:text-amber-300" role="status">
+                Zoom kamera belum didukung oleh kamera atau browser ini. Coba tombol ganti kamera, atau gunakan tautan/token QR bila QR berada terlalu jauh.
+              </p>
             )}
 
             <div className="mt-6 flex justify-center">
