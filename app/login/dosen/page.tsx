@@ -90,7 +90,7 @@ function classifySupabaseError(error: { message?: string; status?: number } | nu
 
 export default function DosenLoginPage() {
     const router = useRouter();
-    const { user, loading } = useAuth();
+    const { user } = useAuth();
     const { backendState, retryBackendCheck } = useBackendStatus();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -122,7 +122,7 @@ export default function DosenLoginPage() {
         }, 2000);
     };
 
-    if (loading || user) {
+    if (user) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-[#060814] via-[#020205] to-[#000000] flex items-center justify-center">
                 <div className="w-8 h-8 border-4 border-t-indigo-500 border-indigo-200/20 rounded-full animate-spin"></div>

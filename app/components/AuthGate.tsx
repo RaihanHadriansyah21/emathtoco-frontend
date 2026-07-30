@@ -45,21 +45,58 @@ const publicPrefixes = [
   "/complete-profile",
 ];
 const AUTH_CHECK_TIMEOUT_MS = 3000;
+const PROFILE_FETCH_TIMEOUT_MS = 3000;
+
+// These routes do not need an existing profile before their first paint. They
+// remain public in the proxy; this only prevents an unnecessary full-screen
+// wait while Supabase restores a persisted browser session.
+const nonBlockingPublicPrefixes = [
+  "/login",
+  "/forgot-password",
+  "/reset-password",
+  "/register",
+];
 
 function isPublicPath(pathname: string): boolean {
   return publicPrefixes.some((prefix) => pathname.startsWith(prefix));
 }
 
-async function getCurrentUserWithTimeout() {
-  return Promise.race([
-    supabase.auth.getUser(),
-    new Promise<never>((_, reject) => {
-      window.setTimeout(
-        () => reject(new Error("AUTH_CHECK_TIMEOUT")),
-        AUTH_CHECK_TIMEOUT_MS,
-      );
-    }),
-  ]);
+function isNonBlockingPublicPath(pathname: string): boolean {
+  return nonBlockingPublicPrefixes.some((prefix) =>
+    pathname.startsWith(prefix),
+  );
+}
+
+async function withBrowserTimeout<T>(
+  operation: PromiseLike<T>,
+  timeoutMs: number,
+  timeoutCode: string,
+): Promise<T> {
+  let timeoutId: number | undefined;
+
+  try {
+    return await Promise.race([
+      Promise.resolve(operation),
+      new Promise<never>((_, reject) => {
+        timeoutId = window.setTimeout(
+          () => reject(new Error(timeoutCode)),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId);
+    }
+  }
+}
+
+async function getCurrentClaimsWithTimeout() {
+  return withBrowserTimeout(
+    supabase.auth.getClaims(),
+    AUTH_CHECK_TIMEOUT_MS,
+    "AUTH_CHECK_TIMEOUT",
+  );
 }
 
 export const useAuth = () => useContext(AuthContext);
@@ -91,17 +128,33 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       setLoading(true);
     }
     try {
-      const { data, error } = await getCurrentUserWithTimeout();
-      if (error || !data.user) {
+      // getClaims() validates the current JWT and can use the Supabase JWKS
+      // cache. It avoids a second /user round-trip when asymmetric signing is
+      // available, while the proxy and database RLS remain the authority for
+      // protected data.
+      const { data, error } = await getCurrentClaimsWithTimeout();
+      const userId = typeof data?.claims?.sub === "string"
+        ? data.claims.sub
+        : null;
+      const email = typeof data?.claims?.email === "string"
+        ? data.claims.email
+        : "";
+
+      if (error || !userId) {
         setUser(null);
         return;
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profil_pengguna")
-        .select("nama_lengkap, role, foto_profil_url")
-        .eq("id", data.user.id)
-        .maybeSingle();
+      const { data: profile, error: profileError } =
+        await withBrowserTimeout(
+          supabase
+            .from("profil_pengguna")
+            .select("nama_lengkap, role, foto_profil_url")
+            .eq("id", userId)
+            .maybeSingle(),
+          PROFILE_FETCH_TIMEOUT_MS,
+          "PROFILE_FETCH_TIMEOUT",
+        );
 
       if (profileError) {
         throw profileError;
@@ -110,8 +163,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       // User authenticated but no profile row yet → redirect to complete-profile
       if (!profile) {
         setUser({
-          id: data.user.id,
-          email: data.user.email ?? "",
+          id: userId,
+          email,
           nama_lengkap: "",
           role: "",
           foto_profil_url: null,
@@ -127,8 +180,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       }
 
       setUser({
-        id: data.user.id,
-        email: data.user.email ?? "",
+        id: userId,
+        email,
         nama_lengkap: profile.nama_lengkap ?? "User",
         role: normalizeRole(profile.role ?? "mahasiswa"),
         foto_profil_url: profile.foto_profil_url ?? null,
@@ -197,12 +250,28 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     router.replace("/login");
   }, [loading, pathname, router, user]);
 
+  useEffect(() => {
+    if (!user || !isNonBlockingPublicPath(pathname)) return;
+
+    const destination = !user.role
+      ? "/complete-profile"
+      : user.role === "admin"
+        ? "/admin"
+        : user.role === "dosen"
+          ? "/dosen"
+          : "/";
+    router.replace(destination);
+  }, [pathname, router, user]);
+
   const context = useMemo(
     () => ({ user, loading, refresh }),
     [user, loading, refresh],
   );
 
-  if (loading || redirecting) {
+  if (
+    !isNonBlockingPublicPath(pathname) &&
+    (loading || redirecting)
+  ) {
     return <FullscreenLoader />;
   }
 

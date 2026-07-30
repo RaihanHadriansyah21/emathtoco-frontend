@@ -15,7 +15,7 @@ import ShinyText from '@/components/ui/ShinyText';
 
 function LoginPageContent() {
     const router = useRouter();
-    const { user, loading } = useAuth();
+    const { user } = useAuth();
     const { backendState, retryBackendCheck } = useBackendStatus();
     const searchParams = useSearchParams();
     const [showSelection, setShowSelection] = useState(searchParams.get('select') === 'true');
@@ -32,7 +32,7 @@ function LoginPageContent() {
         setShowSelection(selectParam === 'true');
     }, [selectParam]);
 
-    if (loading || user) {
+    if (user) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-[#060814] via-[#020205] to-[#000000] flex items-center justify-center">
                 <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
